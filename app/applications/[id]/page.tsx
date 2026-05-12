@@ -26,12 +26,37 @@ export default function ApplicationDetailPage() {
   const [note, setNote] = useState('');
   const [updating, setUpdating] = useState(false);
   const [msg, setMsg] = useState('');
+  const [editingDate, setEditingDate] = useState(false);
+  const [newEffectiveDate, setNewEffectiveDate] = useState('');
+  const [dateUpdating, setDateUpdating] = useState(false);
+  const [dateMsg, setDateMsg] = useState('');
 
   useEffect(() => {
     adminApi.application(Number(id))
-      .then(r => { if (r.success) { setApp(r.data); setNewStatus(r.data.status); } })
+      .then(r => {
+        if (r.success) {
+          setApp(r.data);
+          setNewStatus(r.data.status);
+          setNewEffectiveDate(r.data.effectiveDate ? r.data.effectiveDate.substring(0, 10) : '');
+        }
+      })
       .finally(() => setLoading(false));
   }, [id]);
+
+  const saveEffectiveDate = async () => {
+    if (!app || !newEffectiveDate) return;
+    setDateUpdating(true);
+    const r = await adminApi.updateApplicationEffectiveDate(app.id, newEffectiveDate);
+    if (r.success) {
+      setApp(a => a ? { ...a, effectiveDate: newEffectiveDate } : a);
+      setDateMsg('Date updated.');
+      setEditingDate(false);
+    } else {
+      setDateMsg(r.message || 'Failed to update.');
+    }
+    setDateUpdating(false);
+    setTimeout(() => setDateMsg(''), 3000);
+  };
 
   const updateStatus = async () => {
     if (!app || newStatus === app.status) return;
@@ -99,7 +124,41 @@ export default function ApplicationDetailPage() {
               <InfoRow label="Entity Subtype" value={app.entitySubType} />
               <InfoRow label="Current Step" value={`${app.currentStep} / 7`} />
               <InfoRow label="Submitted" value={app.submittedAt ? new Date(app.submittedAt).toLocaleDateString() : undefined} />
-              <InfoRow label="Effective Date" value={app.effectiveDate ? new Date(app.effectiveDate).toLocaleDateString() : undefined} />
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8', marginBottom: 3 }}>
+                  Effective Date
+                </div>
+                {editingDate ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <input
+                      type="date"
+                      value={newEffectiveDate}
+                      onChange={e => setNewEffectiveDate(e.target.value)}
+                      style={{ padding: '4px 8px', border: '1.5px solid #b8923a', borderRadius: 6, fontSize: 13, color: '#1a1a2e' }}
+                    />
+                    <button onClick={saveEffectiveDate} disabled={dateUpdating}
+                      style={{ padding: '4px 10px', background: '#b8923a', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                      {dateUpdating ? 'Saving...' : 'Save'}
+                    </button>
+                    <button onClick={() => { setEditingDate(false); setNewEffectiveDate(app.effectiveDate ? app.effectiveDate.substring(0, 10) : ''); }}
+                      style={{ padding: '4px 10px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>
+                      Cancel
+                    </button>
+                    {dateMsg && <span style={{ fontSize: 12, color: dateMsg.includes('updated') ? '#10b981' : '#ef4444' }}>{dateMsg}</span>}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14, color: '#1a1a2e', fontWeight: 500 }}>
+                      {app.effectiveDate ? new Date(app.effectiveDate).toLocaleDateString() : '—'}
+                    </span>
+                    <button onClick={() => setEditingDate(true)}
+                      style={{ padding: '2px 8px', background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 5, fontSize: 11, cursor: 'pointer' }}>
+                      Edit
+                    </button>
+                    {dateMsg && <span style={{ fontSize: 12, color: '#10b981' }}>{dateMsg}</span>}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

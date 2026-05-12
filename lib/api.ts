@@ -151,6 +151,8 @@ export const adminApi = {
   application: (id: number) => api.get<ApiResponse<ApplicationDetail>>(`/admin/applications/${id}`),
   updateApplicationStatus: (id: number, status: string, reviewNote?: string) =>
     api.put<ApiResponse<string>>(`/admin/applications/${id}/status`, { status, reviewNote }),
+  updateApplicationEffectiveDate: (id: number, effectiveDate: string) =>
+    api.put<ApiResponse<string>>(`/admin/applications/${id}/effective-date`, { effectiveDate }),
   redemptions: (params: Record<string, string | number>) => {
     const q = new URLSearchParams(params as Record<string, string>).toString();
     return api.get<ApiResponse<PagedResult<RedemptionListItem>>>(`/admin/redemptions?${q}`);
