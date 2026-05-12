@@ -46,16 +46,22 @@ export default function ApplicationDetailPage() {
   const saveEffectiveDate = async () => {
     if (!app || !newEffectiveDate) return;
     setDateUpdating(true);
-    const r = await adminApi.updateApplicationEffectiveDate(app.id, newEffectiveDate);
-    if (r.success) {
-      setApp(a => a ? { ...a, effectiveDate: newEffectiveDate } : a);
-      setDateMsg('Date updated.');
-      setEditingDate(false);
-    } else {
-      setDateMsg(r.message || 'Failed to update.');
+    setDateMsg('');
+    try {
+      const r = await adminApi.updateApplicationEffectiveDate(app.id, newEffectiveDate);
+      if (r.success) {
+        setApp(a => a ? { ...a, effectiveDate: newEffectiveDate } : a);
+        setDateMsg('Date updated.');
+        setEditingDate(false);
+      } else {
+        setDateMsg(r.message || 'Failed to update.');
+      }
+    } catch {
+      setDateMsg('Network error. Please try again.');
+    } finally {
+      setDateUpdating(false);
+      setTimeout(() => setDateMsg(''), 4000);
     }
-    setDateUpdating(false);
-    setTimeout(() => setDateMsg(''), 3000);
   };
 
   const updateStatus = async () => {
