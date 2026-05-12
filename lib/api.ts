@@ -18,7 +18,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     }
     throw new Error('Unauthorized');
   }
-  return res.json();
+  const text = await res.text();
+  return text ? JSON.parse(text) : ({} as T);
 }
 
 export const api = {
