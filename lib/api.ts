@@ -154,6 +154,8 @@ export const adminApi = {
     api.put<ApiResponse<string>>(`/admin/applications/${id}/status`, { status, reviewNote }),
   updateApplicationEffectiveDate: (id: number, effectiveDate: string) =>
     api.put<ApiResponse<string>>(`/admin/applications/${id}/effective-date`, { effectiveDate }),
+  updateApplicationSubmittedAt: (id: number, submittedAt: string) =>
+    api.put<ApiResponse<string>>(`/admin/applications/${id}/submitted-at`, { submittedAt }),
   redemptions: (params: Record<string, string | number>) => {
     const q = new URLSearchParams(params as Record<string, string>).toString();
     return api.get<ApiResponse<PagedResult<RedemptionListItem>>>(`/admin/redemptions?${q}`);

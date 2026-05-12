@@ -30,6 +30,10 @@ export default function ApplicationDetailPage() {
   const [newEffectiveDate, setNewEffectiveDate] = useState('');
   const [dateUpdating, setDateUpdating] = useState(false);
   const [dateMsg, setDateMsg] = useState('');
+  const [editingSubmitted, setEditingSubmitted] = useState(false);
+  const [newSubmittedAt, setNewSubmittedAt] = useState('');
+  const [submittedUpdating, setSubmittedUpdating] = useState(false);
+  const [submittedMsg, setSubmittedMsg] = useState('');
 
   useEffect(() => {
     adminApi.application(Number(id))
@@ -38,6 +42,7 @@ export default function ApplicationDetailPage() {
           setApp(r.data);
           setNewStatus(r.data.status);
           setNewEffectiveDate(r.data.effectiveDate ? r.data.effectiveDate.substring(0, 10) : '');
+          setNewSubmittedAt(r.data.submittedAt ? r.data.submittedAt.substring(0, 10) : '');
         }
       })
       .finally(() => setLoading(false));
@@ -61,6 +66,27 @@ export default function ApplicationDetailPage() {
     } finally {
       setDateUpdating(false);
       setTimeout(() => setDateMsg(''), 4000);
+    }
+  };
+
+  const saveSubmittedAt = async () => {
+    if (!app || !newSubmittedAt) return;
+    setSubmittedUpdating(true);
+    setSubmittedMsg('');
+    try {
+      const r = await adminApi.updateApplicationSubmittedAt(app.id, newSubmittedAt);
+      if (r.success) {
+        setApp(a => a ? { ...a, submittedAt: newSubmittedAt } : a);
+        setSubmittedMsg('Date updated.');
+        setEditingSubmitted(false);
+      } else {
+        setSubmittedMsg(r.message || 'Failed to update.');
+      }
+    } catch {
+      setSubmittedMsg('Network error. Please try again.');
+    } finally {
+      setSubmittedUpdating(false);
+      setTimeout(() => setSubmittedMsg(''), 4000);
     }
   };
 
@@ -129,7 +155,41 @@ export default function ApplicationDetailPage() {
               <InfoRow label="Investment Type" value={app.investmentType} />
               <InfoRow label="Entity Subtype" value={app.entitySubType} />
               <InfoRow label="Current Step" value={`${app.currentStep} / 7`} />
-              <InfoRow label="Submitted" value={app.submittedAt ? new Date(app.submittedAt).toLocaleDateString() : undefined} />
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8', marginBottom: 3 }}>
+                  Submitted (Purchase Date)
+                </div>
+                {editingSubmitted ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <input
+                      type="date"
+                      value={newSubmittedAt}
+                      onChange={e => setNewSubmittedAt(e.target.value)}
+                      style={{ padding: '4px 8px', border: '1.5px solid #b8923a', borderRadius: 6, fontSize: 13, color: '#1a1a2e' }}
+                    />
+                    <button onClick={saveSubmittedAt} disabled={submittedUpdating}
+                      style={{ padding: '4px 10px', background: '#b8923a', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                      {submittedUpdating ? 'Saving...' : 'Save'}
+                    </button>
+                    <button onClick={() => { setEditingSubmitted(false); setNewSubmittedAt(app.submittedAt ? app.submittedAt.substring(0, 10) : ''); }}
+                      style={{ padding: '4px 10px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>
+                      Cancel
+                    </button>
+                    {submittedMsg && <span style={{ fontSize: 12, color: submittedMsg.includes('updated') ? '#10b981' : '#ef4444' }}>{submittedMsg}</span>}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14, color: '#1a1a2e', fontWeight: 500 }}>
+                      {app.submittedAt ? new Date(app.submittedAt).toLocaleDateString() : '—'}
+                    </span>
+                    <button onClick={() => setEditingSubmitted(true)}
+                      style={{ padding: '2px 8px', background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 5, fontSize: 11, cursor: 'pointer' }}>
+                      Edit
+                    </button>
+                    {submittedMsg && <span style={{ fontSize: 12, color: '#10b981' }}>{submittedMsg}</span>}
+                  </div>
+                )}
+              </div>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8', marginBottom: 3 }}>
                   Effective Date
