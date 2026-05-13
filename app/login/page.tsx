@@ -25,20 +25,20 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#0f2342' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: '#0e3416' }}>
       <div style={{ width: 400 }}>
         {/* Header */}
         <div className="text-center mb-8">
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
             Admin Portal
           </div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#b8923a' }}>DPEG</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: '#699172' }}>DPEG</div>
           <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>Real Estate Fund</div>
         </div>
 
         {/* Card */}
         <div style={{ background: 'white', borderRadius: 16, padding: 36, boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#0f2342', marginBottom: 6 }}>Sign in to Admin</h2>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#0e3416', marginBottom: 6 }}>Sign in to Admin</h2>
           <p style={{ fontSize: 14, color: '#64748b', marginBottom: 28 }}>Access restricted to administrators only.</p>
 
           {error && (
@@ -76,7 +76,7 @@ export default function LoginPage() {
               style={{
                 width: '100%',
                 padding: '13px',
-                background: submitting ? '#ccc' : '#b8923a',
+                background: submitting ? '#ccc' : '#699172',
                 color: 'white',
                 border: 'none',
                 borderRadius: 8,

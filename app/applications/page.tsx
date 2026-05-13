@@ -33,7 +33,7 @@ export default function ApplicationsPage() {
   return (
     <AdminLayout>
       <div style={{ padding: '32px 36px' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0f2342', marginBottom: 24 }}>Applications</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0e3416', marginBottom: 24 }}>Applications</h1>
 
         {/* Filters */}
         <form onSubmit={e => { e.preventDefault(); setPage(1); load(); }} style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
@@ -92,7 +92,7 @@ export default function ApplicationsPage() {
                       <td><StatusBadge status={a.status} /></td>
                       <td style={{ color: '#64748b', fontSize: 13 }}>{a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : '—'}</td>
                       <td>
-                        <Link href={`/applications/${a.id}`} style={{ color: '#b8923a', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>View →</Link>
+                        <Link href={`/applications/${a.id}`} style={{ color: '#699172', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>View →</Link>
                       </td>
                     </tr>
                   ))}

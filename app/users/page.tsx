@@ -32,7 +32,7 @@ export default function UsersPage() {
   return (
     <AdminLayout>
       <div style={{ padding: '32px 36px' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0f2342', marginBottom: 24 }}>Users</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0e3416', marginBottom: 24 }}>Users</h1>
 
         {/* Filters */}
         <form onSubmit={onSearch} style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
@@ -89,7 +89,7 @@ export default function UsersPage() {
                       <td style={{ textAlign: 'center' }}>{u.applicationCount}</td>
                       <td style={{ color: '#64748b', fontSize: 13 }}>{new Date(u.createdOn).toLocaleDateString()}</td>
                       <td>
-                        <Link href={`/users/${u.id}`} style={{ color: '#b8923a', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>
+                        <Link href={`/users/${u.id}`} style={{ color: '#699172', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>
                           View →
                         </Link>
                       </td>

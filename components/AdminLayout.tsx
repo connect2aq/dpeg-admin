@@ -5,10 +5,10 @@ import { useEffect } from 'react';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 const NAV = [
-  { href: '/dashboard', label: 'Dashboard', icon: '▦' },
-  { href: '/users', label: 'Users', icon: '👤' },
-  { href: '/applications', label: 'Applications', icon: '📋' },
-  { href: '/redemptions', label: 'Redemptions', icon: '↩' },
+  { href: '/dashboard',    label: 'Dashboard',    icon: '▦' },
+  { href: '/users',        label: 'Users',         icon: '👤' },
+  { href: '/applications', label: 'Applications',  icon: '📋' },
+  { href: '/redemptions',  label: 'Redemptions',   icon: '↩' },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -22,62 +22,107 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#f4f6f9' }}>
-        <div style={{ color: '#0f2342', fontSize: 16 }}>Loading...</div>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-page)' }}>
+        <div style={{ color: 'var(--forest)', fontSize: 15, fontWeight: 500 }}>Loading…</div>
       </div>
     );
   }
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar */}
+
+      {/* ── Sidebar ───────────────────────────────────────── */}
       <aside
         className="flex-shrink-0 flex flex-col"
-        style={{ width: 240, background: '#0f2342', color: 'white' }}
+        style={{ width: 'var(--sidebar-width)', background: 'var(--forest)', color: 'white' }}
       >
-        {/* Logo */}
-        <div style={{ padding: '28px 20px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
+        {/* Brand */}
+        <div style={{
+          padding: '26px 20px 22px',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+        }}>
+          <div style={{
+            fontSize: 9.5,
+            color: 'rgba(255,255,255,0.4)',
+            fontWeight: 700,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            marginBottom: 8,
+          }}>
             Admin Portal
           </div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#b8923a', lineHeight: 1.2 }}>
-            DPEG<br /><span style={{ color: 'white', fontWeight: 400 }}>Real Estate Fund</span>
+          <div style={{
+            fontFamily: "'Cormorant Garamond', Georgia, serif",
+            fontSize: 19,
+            fontWeight: 600,
+            color: '#ffffff',
+            lineHeight: 1.25,
+            letterSpacing: '0.02em',
+          }}>
+            DHANANI
+          </div>
+          <div style={{
+            fontSize: 10,
+            fontWeight: 600,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            color: 'var(--sage)',
+            marginTop: 2,
+          }}>
+            Private Equity Group
           </div>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 p-3" style={{ paddingTop: 16 }}>
+        {/* Navigation */}
+        <nav style={{ flex: 1, padding: '14px 12px' }}>
           {NAV.map(({ href, label, icon }) => (
             <Link
               key={href}
               href={href}
               className={`sidebar-link ${pathname.startsWith(href) ? 'active' : ''}`}
             >
-              <span style={{ fontSize: 16, width: 20 }}>{icon}</span>
+              <span style={{ fontSize: 15, width: 20, flexShrink: 0 }}>{icon}</span>
               {label}
             </Link>
           ))}
         </nav>
 
-        {/* User */}
-        <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>Signed in as</div>
-          <div style={{ fontSize: 14, color: 'white', fontWeight: 600, marginBottom: 12 }}>
+        {/* User footer */}
+        <div style={{
+          padding: '14px 20px 18px',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+        }}>
+          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', marginBottom: 3, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            Signed in as
+          </div>
+          <div style={{ fontSize: 13.5, color: '#ffffff', fontWeight: 600, marginBottom: 10 }}>
             {user.firstName} {user.lastName}
           </div>
           <button
             onClick={() => { logout(); router.push('/login'); }}
-            style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            style={{
+              fontSize: 12,
+              color: 'rgba(255,255,255,0.45)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              letterSpacing: '0.01em',
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.8)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.45)')}
           >
             Sign out →
           </button>
         </div>
       </aside>
 
-      {/* Main */}
-      <main className="flex-1 overflow-auto" style={{ background: '#f4f6f9' }}>
+      {/* ── Main content ──────────────────────────────────── */}
+      <main className="flex-1 overflow-auto" style={{ background: 'var(--bg-page)' }}>
         {children}
       </main>
+
     </div>
   );
 }

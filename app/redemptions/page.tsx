@@ -43,7 +43,7 @@ export default function RedemptionsPage() {
   return (
     <AdminLayout>
       <div style={{ padding: '32px 36px' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0f2342', marginBottom: 24 }}>Redemption Requests</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0e3416', marginBottom: 24 }}>Redemption Requests</h1>
 
         {/* Filter */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
@@ -81,7 +81,7 @@ export default function RedemptionsPage() {
                       <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>#{r.id}</td>
                       <td style={{ fontWeight: 600 }}>{r.sellingPartnerName ?? '—'}</td>
                       <td>{r.investorType}</td>
-                      <td style={{ fontWeight: 700, color: '#0f2342' }}>{r.unitsToRedeem ?? '—'}</td>
+                      <td style={{ fontWeight: 700, color: '#0e3416' }}>{r.unitsToRedeem ?? '—'}</td>
                       <td style={{ color: '#64748b' }}>{r.totalUnitsOwned ?? '—'}</td>
                       <td>{r.aggregatePurchasePrice ?? '—'}</td>
                       <td style={{ fontSize: 13, color: '#64748b' }}>{r.email ?? '—'}</td>

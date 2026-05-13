@@ -6,9 +6,9 @@ import { adminApi, type DashboardStats } from '@/lib/api';
 
 function KpiCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color?: string }) {
   return (
-    <div className="card" style={{ borderTop: `3px solid ${color ?? '#b8923a'}` }}>
+    <div className="card" style={{ borderTop: `3px solid ${color ?? '#699172'}` }}>
       <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: 8 }}>{label}</div>
-      <div style={{ fontSize: 32, fontWeight: 700, color: '#0f2342', lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 32, fontWeight: 700, color: '#0e3416', lineHeight: 1 }}>{value}</div>
       {sub && <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 6 }}>{sub}</div>}
     </div>
   );
@@ -27,7 +27,7 @@ export default function DashboardPage() {
   return (
     <AdminLayout>
       <div style={{ padding: '32px 36px' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0f2342', marginBottom: 6 }}>Dashboard</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0e3416', marginBottom: 6 }}>Dashboard</h1>
         <p style={{ fontSize: 14, color: '#64748b', marginBottom: 32 }}>Overview of DPEG Real Estate Fund</p>
 
         {loading ? (
@@ -35,16 +35,16 @@ export default function DashboardPage() {
         ) : stats ? (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 20, marginBottom: 36 }}>
-              <KpiCard label="Total Users" value={stats.totalUsers} color="#0f2342" />
+              <KpiCard label="Total Users" value={stats.totalUsers} color="#0e3416" />
               <KpiCard label="Active Investors" value={stats.activeInvestors} color="#10b981" />
               <KpiCard label="Pending Reviews" value={stats.pendingReviews} color="#f59e0b" />
               <KpiCard label="Total Applications" value={stats.totalApplications} color="#6366f1" />
-              <KpiCard label="Total AUM" value={fmt(stats.totalAUM)} sub={`${stats.totalUnits} units`} color="#b8923a" />
+              <KpiCard label="Total AUM" value={fmt(stats.totalAUM)} sub={`${stats.totalUnits} units`} color="#699172" />
               <KpiCard label="Pending Redemptions" value={stats.pendingRedemptions} color="#ef4444" />
             </div>
 
             <div className="card">
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#0f2342', marginBottom: 20 }}>Recent Applications</h2>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#0e3416', marginBottom: 20 }}>Recent Applications</h2>
               {stats.recentApplications.length === 0 ? (
                 <p style={{ color: '#94a3b8', fontSize: 14 }}>No applications yet.</p>
               ) : (

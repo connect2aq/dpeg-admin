@@ -1,126 +1,195 @@
+/*
+ * DPEG Admin Portal — Global Styles
+ * Brand: Dhanani Private Equity Group
+ *
+ * Brand Palette
+ *   Forest   #0E3416   Primary green — sidebar, primary buttons, headings
+ *   Sage     #699172   Accent green  — active states, highlights, badges
+ *   Silver   #C4C4C4   Neutral       — borders, dividers
+ *   Charcoal #646262   Body text
+ *   White    #FFFFFF   Card & surface backgrounds
+ *
+ * Fonts: Cormorant Garamond (brand display) · DM Sans (body/UI)
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap");
 @import "tailwindcss";
 
+/* ── Brand tokens ───────────────────────────────────────── */
 :root {
-  --navy: #0f2342;
-  --navy-light: #1a3560;
-  --navy-dark: #091829;
-  --gold: #b8923a;
-  --gold-light: #d4aa55;
-  --gold-dark: #8e6e2a;
-  --sidebar-width: 240px;
+  /* Core palette */
+  --forest:         #0E3416;
+  --forest-mid:     #1a5228;
+  --forest-dark:    #091f0c;
+  --forest-light:   #e6f0e8;
+  --sage:           #699172;
+  --sage-mid:       #7aaa84;
+  --sage-light:     #ecf4ed;
+  --silver:         #C4C4C4;
+  --silver-light:   #f0f2f0;
+  --charcoal:       #646262;
+
+  /* Layout */
+  --sidebar-width:  248px;
+
+  /* Surfaces */
+  --bg-page:        #f5f7f5;
+  --bg-card:        #ffffff;
+  --bg-table-head:  #f2f7f3;
+  --bg-row-hover:   #f5f9f5;
+
+  /* Borders */
+  --border:         #d8e4d9;
+  --border-light:   #eaf0ea;
+
+  /* Text */
+  --text-heading:   #1e3020;
+  --text-body:      #3a3838;
+  --text-muted:     #8a9e8c;
+  --text-label:     #64748b;
+
+  /* Focus ring */
+  --focus-ring:     rgba(14, 52, 22, 0.12);
 }
 
+/* ── Base ───────────────────────────────────────────────── */
 body {
-  font-family: 'DM Sans', system-ui, sans-serif;
-  background: #f4f6f9;
-  color: #1a1a2e;
+  font-family: "DM Sans", system-ui, sans-serif;
+  background: var(--bg-page);
+  color: var(--text-body);
 }
 
+/* ── Sidebar navigation ─────────────────────────────────── */
 .sidebar-link {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 16px;
-  border-radius: 8px;
-  color: rgba(255,255,255,0.7);
-  font-size: 14px;
+  padding: 9px 16px;
+  border-radius: 7px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 13.5px;
   font-weight: 500;
-  transition: all 0.2s;
+  transition: background 0.15s ease, color 0.15s ease;
   cursor: pointer;
   text-decoration: none;
+  letter-spacing: 0.01em;
 }
-
 .sidebar-link:hover {
-  background: rgba(255,255,255,0.1);
-  color: white;
+  background: rgba(255, 255, 255, 0.09);
+  color: #ffffff;
 }
-
 .sidebar-link.active {
-  background: rgba(184,146,58,0.2);
-  color: #d4aa55;
-  border-left: 3px solid #b8923a;
+  background: rgba(105, 145, 114, 0.18);
+  color: #a8c9ae;
+  border-left: 3px solid var(--sage);
+  padding-left: 13px;
 }
 
+/* ── Cards ──────────────────────────────────────────────── */
 .card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  background: var(--bg-card);
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(14, 52, 22, 0.07), 0 0 0 1px rgba(14, 52, 22, 0.04);
   padding: 24px;
 }
 
+/* ── Buttons ────────────────────────────────────────────── */
 .btn-primary {
-  background: #b8923a;
-  color: white;
-  padding: 10px 20px;
-  border-radius: 8px;
+  background: var(--forest);
+  color: #ffffff;
+  padding: 10px 22px;
+  border-radius: 7px;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13.5px;
   border: none;
   cursor: pointer;
-  transition: background 0.2s;
+  letter-spacing: 0.01em;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
 }
-
-.btn-primary:hover { background: #8e6e2a; }
-.btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+.btn-primary:hover {
+  background: var(--forest-mid);
+  box-shadow: 0 3px 10px rgba(14, 52, 22, 0.2);
+}
+.btn-primary:disabled {
+  background: var(--silver);
+  cursor: not-allowed;
+  box-shadow: none;
+}
 
 .btn-secondary {
-  background: white;
-  color: #0f2342;
-  padding: 10px 20px;
-  border-radius: 8px;
+  background: #ffffff;
+  color: var(--forest);
+  padding: 10px 22px;
+  border-radius: 7px;
   font-weight: 600;
-  font-size: 14px;
-  border: 1px solid #e2e8f0;
+  font-size: 13.5px;
+  border: 1.5px solid var(--border);
   cursor: pointer;
-  transition: all 0.2s;
+  letter-spacing: 0.01em;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.btn-secondary:hover {
+  background: var(--forest-light);
+  border-color: var(--sage);
+}
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.btn-secondary:hover { background: #f8fafc; border-color: #0f2342; }
-
+/* ── Status badges ──────────────────────────────────────── */
 .status-badge {
   display: inline-flex;
   align-items: center;
   padding: 3px 10px;
   border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.status-active     { background: #d1fae5; color: #065f46; }
-.status-inactive   { background: #fee2e2; color: #991b1b; }
-.status-inprogress { background: #e0f2fe; color: #0369a1; }
-.status-underreview { background: #fef3c7; color: #92400e; }
-.status-rejected   { background: #fee2e2; color: #991b1b; }
-.status-approved   { background: #d1fae5; color: #065f46; }
-
-input, select, textarea {
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-input:focus, select:focus {
-  border-color: #b8923a;
-  box-shadow: 0 0 0 3px rgba(184,146,58,0.1);
-}
-
-table { border-collapse: collapse; width: 100%; }
-th {
-  background: #f8fafc;
-  padding: 12px 16px;
-  text-align: left;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #64748b;
-  border-bottom: 1px solid #e2e8f0;
 }
+
+.status-active      { background: #d6ede0; color: #155c30; }
+.status-approved    { background: #d6ede0; color: #155c30; }
+.status-inactive    { background: #fee2e2; color: #991b1b; }
+.status-rejected    { background: #fee2e2; color: #991b1b; }
+.status-inprogress  { background: #e0f2fe; color: #0369a1; }
+.status-underreview { background: #fef3c7; color: #92400e; }
+.status-redeemed    { background: var(--forest-light); color: var(--forest); }
+
+/* ── Form inputs ────────────────────────────────────────── */
+input, select, textarea {
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  font-family: "DM Sans", system-ui, sans-serif;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--forest) !important;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+/* ── Tables ─────────────────────────────────────────────── */
+table { border-collapse: collapse; width: 100%; }
+
+th {
+  background: var(--bg-table-head);
+  padding: 11px 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
 td {
-  padding: 14px 16px;
-  border-bottom: 1px solid #f1f5f9;
-  font-size: 14px;
-  color: #374151;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 13.5px;
+  color: var(--text-body);
 }
-tr:hover td { background: #f8fafc; }
+
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg-row-hover); }
