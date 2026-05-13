@@ -126,6 +126,7 @@ export interface RedemptionListItem {
   effectiveDate?: string;
   investorType: string;
   unitsToRedeem?: string;
+  totalUnitsOwned?: string;
   aggregatePurchasePrice?: string;
   email?: string;
   status: string;

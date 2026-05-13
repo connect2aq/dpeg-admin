@@ -4,7 +4,7 @@ import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { adminApi, type RedemptionListItem, type PagedResult } from '@/lib/api';
 
-const STATUSES = ['', 'UnderReview', 'Active', 'Rejected'];
+const STATUSES = ['', 'UnderReview', 'Active', 'Rejected', 'Redeemed'];
 const PAGE_SIZE = 20;
 
 export default function RedemptionsPage() {
@@ -65,6 +65,7 @@ export default function RedemptionsPage() {
                     <th>Partner Name</th>
                     <th>Type</th>
                     <th>Units to Redeem</th>
+                    <th>Total Units Owned</th>
                     <th>Purchase Price</th>
                     <th>Email</th>
                     <th>Status</th>
@@ -74,13 +75,14 @@ export default function RedemptionsPage() {
                 </thead>
                 <tbody>
                   {result.items.length === 0 ? (
-                    <tr><td colSpan={9} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No redemption requests found</td></tr>
+                    <tr><td colSpan={10} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No redemption requests found</td></tr>
                   ) : result.items.map(r => (
                     <tr key={r.id}>
                       <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>#{r.id}</td>
                       <td style={{ fontWeight: 600 }}>{r.sellingPartnerName ?? '—'}</td>
                       <td>{r.investorType}</td>
-                      <td>{r.unitsToRedeem ?? '—'}</td>
+                      <td style={{ fontWeight: 700, color: '#0f2342' }}>{r.unitsToRedeem ?? '—'}</td>
+                      <td style={{ color: '#64748b' }}>{r.totalUnitsOwned ?? '—'}</td>
                       <td>{r.aggregatePurchasePrice ?? '—'}</td>
                       <td style={{ fontSize: 13, color: '#64748b' }}>{r.email ?? '—'}</td>
                       <td><StatusBadge status={r.status} /></td>
