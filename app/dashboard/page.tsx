@@ -14,6 +14,14 @@ function KpiCard({ label, value, sub, color }: { label: string; value: string | 
   );
 }
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', marginBottom: 12, marginTop: 28 }}>
+      {children}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -22,7 +30,7 @@ export default function DashboardPage() {
     adminApi.dashboard().then(r => { if (r.success) setStats(r.data); }).finally(() => setLoading(false));
   }, []);
 
-  const fmt = (n: number) => n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${n.toLocaleString()}`;
+  const fmt = (n: number) => n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M` : `$${n.toLocaleString()}`;
 
   return (
     <AdminLayout>
@@ -34,16 +42,94 @@ export default function DashboardPage() {
           <div style={{ color: '#64748b' }}>Loading stats...</div>
         ) : stats ? (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 20, marginBottom: 36 }}>
-              <KpiCard label="Total Users" value={stats.totalUsers} color="#0e3416" />
-              <KpiCard label="Active Investors" value={stats.activeInvestors} color="#10b981" />
-              <KpiCard label="Pending Reviews" value={stats.pendingReviews} color="#f59e0b" />
-              <KpiCard label="Total Applications" value={stats.totalApplications} color="#6366f1" />
-              <KpiCard label="Total AUM" value={fmt(stats.totalAUM)} sub={`${stats.totalUnits} units`} color="#699172" />
-              <KpiCard label="Pending Redemptions" value={stats.pendingRedemptions} color="#ef4444" />
+            {/* Registrants & Depositors */}
+            <SectionLabel>Registrants &amp; Depositors</SectionLabel>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 20, marginBottom: 4 }}>
+              <KpiCard
+                label="Total Registrants"
+                value={stats.totalUsers}
+                sub="All individuals in database"
+                color="#0e3416"
+              />
+              <KpiCard
+                label="Active Accounts"
+                value={stats.activeInvestors}
+                sub="Accounts approved by admin"
+                color="#6366f1"
+              />
+              <KpiCard
+                label="Depositors"
+                value={stats.totalDepositors}
+                sub="Registrants with deployed capital"
+                color="#10b981"
+              />
+              <KpiCard
+                label="Investment Files"
+                value={stats.totalInvestmentFiles}
+                sub="Open active investment tranches"
+                color="#699172"
+              />
             </div>
 
-            <div className="card">
+            {/* Pipeline */}
+            <SectionLabel>Application Pipeline</SectionLabel>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 20, marginBottom: 4 }}>
+              <KpiCard
+                label="Total Applications"
+                value={stats.totalApplications}
+                color="#64748b"
+              />
+              <KpiCard
+                label="Pending Reviews"
+                value={stats.pendingReviews}
+                sub="Awaiting admin approval"
+                color="#f59e0b"
+              />
+              <KpiCard
+                label="Pending Redemptions"
+                value={stats.pendingRedemptions}
+                sub="Awaiting admin approval"
+                color="#ef4444"
+              />
+            </div>
+
+            {/* Capital Flows */}
+            <SectionLabel>Capital Flows</SectionLabel>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20, marginBottom: 4 }}>
+              <KpiCard
+                label="Current AUM"
+                value={fmt(stats.totalAUM)}
+                sub={`${stats.totalUnits} active units`}
+                color="#699172"
+              />
+              <KpiCard
+                label="Total Deployed (All Time)"
+                value={fmt(stats.totalDeployedCommencement)}
+                sub="From commencement"
+                color="#0e3416"
+              />
+              <KpiCard
+                label="Total Withdrawn (All Time)"
+                value={fmt(stats.totalWithdrawnCommencement)}
+                sub="From commencement"
+                color="#6366f1"
+              />
+              <KpiCard
+                label="YTD Deployed"
+                value={fmt(stats.ytdDeployed)}
+                sub={`Jan 1 – today (${new Date().getFullYear()})`}
+                color="#10b981"
+              />
+              <KpiCard
+                label="YTD Withdrawn"
+                value={fmt(stats.ytdWithdrawn)}
+                sub={`Jan 1 – today (${new Date().getFullYear()})`}
+                color="#f59e0b"
+              />
+            </div>
+
+            {/* Recent Applications */}
+            <div className="card" style={{ marginTop: 28 }}>
               <h2 style={{ fontSize: 16, fontWeight: 700, color: '#0e3416', marginBottom: 20 }}>Recent Applications</h2>
               {stats.recentApplications.length === 0 ? (
                 <p style={{ color: '#94a3b8', fontSize: 14 }}>No applications yet.</p>

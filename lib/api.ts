@@ -46,13 +46,22 @@ export interface PagedResult<T> {
 }
 
 export interface DashboardStats {
+  // Registrant & depositor counts
   totalUsers: number;
   activeInvestors: number;
+  totalDepositors: number;
+  totalInvestmentFiles: number;
+  // Application pipeline
   pendingReviews: number;
   totalApplications: number;
+  pendingRedemptions: number;
+  // AUM & capital flows
   totalAUM: number;
   totalUnits: number;
-  pendingRedemptions: number;
+  totalDeployedCommencement: number;
+  totalWithdrawnCommencement: number;
+  ytdDeployed: number;
+  ytdWithdrawn: number;
   recentApplications: ApplicationSummary[];
 }
 
