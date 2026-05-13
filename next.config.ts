@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   /* config options here */
   output: "standalone",
   basePath: "/Admin",
+  env: {
+    NEXT_PUBLIC_BASE_PATH: "/Admin",
+  },
   trailingSlash: true,
 };
 

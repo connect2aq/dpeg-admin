@@ -1,0 +1,13 @@
+<svg width="32" height="32" viewBox="40 40 140 120" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .icon { fill: #0E3416; }
+    @media (prefers-color-scheme: dark) {
+      .icon { fill: #ffffff; }
+    }
+  </style>
+  <g class="icon">
+    <polygon points="110,40 40,110 55,125 110,70 165,125 180,110"/>
+    <polygon points="110,85 60,135 75,150 110,115 145,150 160,135"/>
+    <polygon points="110,125 85,155 135,155"/>
+  </g>
+</svg>
