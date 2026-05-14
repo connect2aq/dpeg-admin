@@ -13,13 +13,8 @@ interface AuthCtx {
 const Ctx = createContext<AuthCtx>({} as AuthCtx);
 
 export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AdminUser | null>({
-    userId: 1,
-    email: "",
-    firstName: "Admin",
-    lastName: "User",
-  });
-  const [token, setToken] = useState<string | null>("12345");
+  const [user, setUser] = useState<AdminUser | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
