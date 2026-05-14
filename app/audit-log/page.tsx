@@ -68,7 +68,7 @@ export default function AuditLogPage() {
     adminApi.auditLogs(params)
       .then(r => { if (r.success) setResult(r.data); })
       .finally(() => setLoading(false));
-  }, [page, category, eventType, userId, appId, from, to, successFilter]);
+  }, [page, category, eventType, userId, userEmail, appId, from, to, successFilter]);
 
   useEffect(() => { load(); }, [load]);
 
