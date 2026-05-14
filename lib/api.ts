@@ -1,5 +1,6 @@
 const BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "https://forms.dhananipeg.com/api";
+  process.env.NEXT_PUBLIC_API_URL ??
+  "https://forms.dhananipeg.com/integrationservice/api/admin";
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token =
@@ -16,7 +17,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     if (typeof window !== "undefined") {
       localStorage.removeItem("adminToken");
       localStorage.removeItem("adminUser");
-      window.location.href = "/login";
+      window.location.href = "/Admin/login";
     }
     throw new Error("Unauthorized");
   }
