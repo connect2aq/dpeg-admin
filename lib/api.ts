@@ -1,22 +1,24 @@
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
+const BASE =
+  process.env.NEXT_PUBLIC_API_URL ?? "https://forms.dhananipeg.com/api";
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("adminToken") : null;
   const res = await fetch(`${BASE}${path}`, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers ?? {}),
     },
   });
   if (res.status === 401) {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('adminToken');
-      localStorage.removeItem('adminUser');
-      window.location.href = '/login';
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("adminToken");
+      localStorage.removeItem("adminUser");
+      window.location.href = "/login";
     }
-    throw new Error('Unauthorized');
+    throw new Error("Unauthorized");
   }
   const text = await res.text();
   return text ? JSON.parse(text) : ({} as T);
@@ -24,10 +26,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export const api = {
   post: <T>(path: string, body: unknown) =>
-    request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+    request<T>(path, { method: "POST", body: JSON.stringify(body) }),
   get: <T>(path: string) => request<T>(path),
   put: <T>(path: string, body: unknown) =>
-    request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
+    request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
 };
 
 export interface AdminUser {
@@ -146,30 +148,50 @@ type ApiResponse<T> = { success: boolean; data: T; message: string };
 
 export const adminApi = {
   login: (email: string, password: string) =>
-    api.post<ApiResponse<{ token: string; userId: number; email: string; firstName: string; lastName: string }>>('/admin/login', { email, password }),
-  dashboard: () => api.get<ApiResponse<DashboardStats>>('/admin/dashboard'),
+    api.post<
+      ApiResponse<{
+        token: string;
+        userId: number;
+        email: string;
+        firstName: string;
+        lastName: string;
+      }>
+    >("/login", { email, password }),
+  dashboard: () => api.get<ApiResponse<DashboardStats>>("/dashboard"),
   users: (params: Record<string, string | number>) => {
     const q = new URLSearchParams(params as Record<string, string>).toString();
-    return api.get<ApiResponse<PagedResult<UserListItem>>>(`/admin/users?${q}`);
+    return api.get<ApiResponse<PagedResult<UserListItem>>>(`/users?${q}`);
   },
-  user: (id: number) => api.get<ApiResponse<UserDetail>>(`/admin/users/${id}`),
+  user: (id: number) => api.get<ApiResponse<UserDetail>>(`/users/${id}`),
   updateUserStatus: (id: number, status: string) =>
-    api.put<ApiResponse<string>>(`/admin/users/${id}/status`, { status }),
+    api.put<ApiResponse<string>>(`/users/${id}/status`, { status }),
   applications: (params: Record<string, string | number>) => {
     const q = new URLSearchParams(params as Record<string, string>).toString();
-    return api.get<ApiResponse<PagedResult<ApplicationListItem>>>(`/admin/applications?${q}`);
+    return api.get<ApiResponse<PagedResult<ApplicationListItem>>>(
+      `/applications?${q}`,
+    );
   },
-  application: (id: number) => api.get<ApiResponse<ApplicationDetail>>(`/admin/applications/${id}`),
+  application: (id: number) =>
+    api.get<ApiResponse<ApplicationDetail>>(`/applications/${id}`),
   updateApplicationStatus: (id: number, status: string, reviewNote?: string) =>
-    api.put<ApiResponse<string>>(`/admin/applications/${id}/status`, { status, reviewNote }),
+    api.put<ApiResponse<string>>(`/applications/${id}/status`, {
+      status,
+      reviewNote,
+    }),
   updateApplicationEffectiveDate: (id: number, effectiveDate: string) =>
-    api.put<ApiResponse<string>>(`/admin/applications/${id}/effective-date`, { effectiveDate }),
+    api.put<ApiResponse<string>>(`/applications/${id}/effective-date`, {
+      effectiveDate,
+    }),
   updateApplicationSubmittedAt: (id: number, submittedAt: string) =>
-    api.put<ApiResponse<string>>(`/admin/applications/${id}/submitted-at`, { submittedAt }),
+    api.put<ApiResponse<string>>(`/applications/${id}/submitted-at`, {
+      submittedAt,
+    }),
   redemptions: (params: Record<string, string | number>) => {
     const q = new URLSearchParams(params as Record<string, string>).toString();
-    return api.get<ApiResponse<PagedResult<RedemptionListItem>>>(`/admin/redemptions?${q}`);
+    return api.get<ApiResponse<PagedResult<RedemptionListItem>>>(
+      `/redemptions?${q}`,
+    );
   },
   updateRedemptionStatus: (id: number, status: string) =>
-    api.put<ApiResponse<string>>(`/admin/redemptions/${id}/status`, { status }),
+    api.put<ApiResponse<string>>(`/redemptions/${id}/status`, { status }),
 };
