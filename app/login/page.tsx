@@ -32,13 +32,19 @@ export default function LoginPage() {
       className="min-h-screen flex flex-col items-center justify-center gap-2"
       style={{ background: "var(--forest)" }}
     >
-      {/* <div style={{ width: 400 }}> */}
+      {/* DPEG Logo */}
+      <Image
+        src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/dpeg_logo_white.svg`}
+        alt="DPEG Logo"
+        width={500}
+        height={500}
+        className="mb-6"
+      />
       {/* Header */}
-      {/* <div className="text-center mb-8"> */}
       <div
         style={{
           fontSize: 13,
-          color: "rgba(255,255,255,0.4)",
+          color: "white",
           fontWeight: 700,
           letterSpacing: "0.1em",
           textTransform: "uppercase",
@@ -46,32 +52,6 @@ export default function LoginPage() {
       >
         Admin Portal
       </div>
-      {/* DPEG Logo */}
-      <Image
-        src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/logo_white_icon.svg`}
-        alt="DPEG Logo"
-        width={100}
-        height={100}
-      />
-      <div
-        style={{
-          fontSize: 28,
-          fontWeight: 700,
-          color: "var(--forest-light)",
-        }}
-      >
-        DHANANI
-      </div>
-      <div
-        style={{
-          fontSize: 16,
-          color: "rgba(255,255,255,0.7)",
-        }}
-      >
-        Private Equity Group
-      </div>
-      {/* </div> */}
-
       {/* Card */}
       <div
         style={{

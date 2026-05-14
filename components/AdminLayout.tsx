@@ -71,37 +71,11 @@ export default function AdminLayout({
           </div> */}
 
           <Image
-            src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/logo_white_icon.svg`}
+            src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/dpeg_logo_white.svg`}
             alt="DPEG Logo"
-            width={40}
-            height={40}
+            width={200}
+            height={200}
           />
-          <div>
-            <div
-              style={{
-                fontFamily: "'Cormorant Garamond', Georgia, serif",
-                fontSize: 19,
-                fontWeight: 600,
-                color: "#ffffff",
-                lineHeight: 1.25,
-                letterSpacing: "0.02em",
-              }}
-            >
-              DHANANI
-            </div>
-            <div
-              style={{
-                fontSize: 8,
-                fontWeight: 600,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                color: "var(--sage)",
-                marginTop: 2,
-              }}
-            >
-              Private Equity Group
-            </div>
-          </div>
         </div>
 
         {/* Navigation */}
