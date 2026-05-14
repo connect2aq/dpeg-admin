@@ -47,6 +47,7 @@ export default function AuditLogPage() {
   const [category, setCategory] = useState('');
   const [eventType, setEventType] = useState('');
   const [userId, setUserId] = useState('');
+  const [userEmail, setUserEmail] = useState('');
   const [appId, setAppId] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -59,6 +60,7 @@ export default function AuditLogPage() {
     if (category) params.category = category;
     if (eventType) params.eventType = eventType;
     if (userId) params.userId = Number(userId);
+    if (userEmail) params.userEmail = userEmail;
     if (appId) params.applicationId = Number(appId);
     if (from) params.from = from;
     if (to) params.to = to;
@@ -72,7 +74,7 @@ export default function AuditLogPage() {
 
   const onSearch = (e: React.FormEvent) => { e.preventDefault(); setPage(1); load(); };
   const onReset = () => {
-    setCategory(''); setEventType(''); setUserId(''); setAppId('');
+    setCategory(''); setEventType(''); setUserId(''); setUserEmail(''); setAppId('');
     setFrom(''); setTo(''); setSuccessFilter(''); setPage(1);
   };
 
@@ -106,6 +108,12 @@ export default function AuditLogPage() {
             <label style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>User ID</label>
             <input type="number" value={userId} onChange={e => setUserId(e.target.value)} placeholder="User ID"
               style={{ padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13.5, width: 100 }} />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>User Email</label>
+            <input type="text" value={userEmail} onChange={e => setUserEmail(e.target.value)} placeholder="e.g. user@email.com"
+              style={{ padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13.5, width: 190 }} />
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
