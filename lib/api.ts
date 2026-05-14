@@ -145,6 +145,26 @@ export interface RedemptionListItem {
   createdOn: string;
 }
 
+export interface AuditLogItem {
+  id: number;
+  timestampUtc: string;
+  userId?: number;
+  userEmail?: string;
+  actorRole: string;
+  ipAddress?: string;
+  eventCategory: string;
+  eventType: string;
+  entityName?: string;
+  entityId?: number;
+  applicationId?: number;
+  oldValuesJson?: string;
+  newValuesJson?: string;
+  metadataJson?: string;
+  success: boolean;
+  failureReason?: string;
+  correlationId?: string;
+}
+
 type ApiResponse<T> = { success: boolean; data: T; message: string };
 
 export const adminApi = {
@@ -195,4 +215,12 @@ export const adminApi = {
   },
   updateRedemptionStatus: (id: number, status: string) =>
     api.put<ApiResponse<string>>(`/redemptions/${id}/status`, { status }),
+  auditLogs: (params: Record<string, string | number | boolean>) => {
+    const q = new URLSearchParams(
+      Object.fromEntries(
+        Object.entries(params).map(([k, v]) => [k, String(v)])
+      )
+    ).toString();
+    return api.get<ApiResponse<PagedResult<AuditLogItem>>>(`/audit-logs?${q}`);
+  },
 };
