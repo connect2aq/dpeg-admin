@@ -10,6 +10,7 @@ const NAV = [
   { href: "/users", label: "Users", icon: "👤" },
   { href: "/applications", label: "Applications", icon: "📋" },
   { href: "/redemptions", label: "Redemptions", icon: "↩" },
+  { href: "/docusign", label: "DocuSign", icon: "✍" },
   { href: "/audit-log", label: "Audit Log", icon: "🔍" },
 ];
 

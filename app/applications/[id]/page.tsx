@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
-import { adminApi, type ApplicationDetail } from '@/lib/api';
+import { adminApi, type ApplicationDetail, type DocuSignEnvelopeStatus } from '@/lib/api';
 
 const STATUSES = ['UnderReview', 'Active', 'Rejected'];
 
@@ -34,6 +34,11 @@ export default function ApplicationDetailPage() {
   const [newSubmittedAt, setNewSubmittedAt] = useState('');
   const [submittedUpdating, setSubmittedUpdating] = useState(false);
   const [submittedMsg, setSubmittedMsg] = useState('');
+  const [dsStatus, setDsStatus] = useState<DocuSignEnvelopeStatus | null>(null);
+  const [dsLoading, setDsLoading] = useState(false);
+  const [dsError, setDsError] = useState('');
+  const [dsSyncing, setDsSyncing] = useState(false);
+  const [dsSyncMsg, setDsSyncMsg] = useState('');
 
   useEffect(() => {
     adminApi.application(Number(id))
@@ -98,6 +103,30 @@ export default function ApplicationDetailPage() {
     if (r.success) setApp(a => a ? { ...a, status: newStatus } : a);
     setUpdating(false);
     setTimeout(() => setMsg(''), 3000);
+  };
+
+  const loadDsStatus = async () => {
+    if (!app?.docuSignEnvelopeId) return;
+    setDsLoading(true); setDsError('');
+    const r = await adminApi.docuSignEnvelopeStatus(app.docuSignEnvelopeId);
+    if (r.success) setDsStatus(r.data);
+    else setDsError(r.message || 'Failed to load');
+    setDsLoading(false);
+  };
+
+  const syncDsDate = async () => {
+    if (!app) return;
+    setDsSyncing(true); setDsSyncMsg('');
+    const r = await adminApi.syncDocuSignDate(app.id);
+    if (r.success) {
+      setApp(a => a ? { ...a, effectiveDate: r.data } : a);
+      setNewEffectiveDate(r.data);
+      setDsSyncMsg(`Effective date set to ${r.data}`);
+    } else {
+      setDsSyncMsg(r.message || 'Failed');
+    }
+    setDsSyncing(false);
+    setTimeout(() => setDsSyncMsg(''), 6000);
   };
 
   if (loading) return <AdminLayout><div style={{ padding: 40, color: '#64748b' }}>Loading...</div></AdminLayout>;
@@ -260,6 +289,89 @@ export default function ApplicationDetailPage() {
               <InfoRow label="Entity Name" value={app.investorProfile.entityName} />
               <InfoRow label="EIN" value={app.investorProfile.ein} />
             </div>
+          </div>
+        )}
+
+        {/* DocuSign Status */}
+        {app.docuSignEnvelopeId && (
+          <div className="card" style={{ marginTop: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342' }}>DocuSign Agreement</h2>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                {!dsStatus && !dsLoading && (
+                  <button onClick={loadDsStatus}
+                    style={{ padding: '6px 14px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
+                    Check Signing Status
+                  </button>
+                )}
+                {dsStatus && !dsLoading && (
+                  <button onClick={loadDsStatus}
+                    style={{ padding: '4px 10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, color: '#94a3b8', cursor: 'pointer' }}>
+                    Refresh
+                  </button>
+                )}
+                {dsStatus?.lastSignerDate && (
+                  <button onClick={syncDsDate} disabled={dsSyncing}
+                    style={{ padding: '6px 14px', background: '#0f2342', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', cursor: dsSyncing ? 'default' : 'pointer', opacity: dsSyncing ? 0.7 : 1 }}>
+                    {dsSyncing ? 'Setting…' : 'Set Effective Date from DocuSign'}
+                  </button>
+                )}
+                {dsSyncMsg && (
+                  <span style={{ fontSize: 12, color: dsSyncMsg.includes('set') || dsSyncMsg.includes('Set') ? '#10b981' : '#ef4444' }}>{dsSyncMsg}</span>
+                )}
+              </div>
+            </div>
+
+            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 12 }}>
+              Envelope ID: <span style={{ fontFamily: 'monospace', color: '#475569' }}>{app.docuSignEnvelopeId}</span>
+            </div>
+
+            {dsLoading && <div style={{ fontSize: 13, color: '#94a3b8' }}>Loading status from DocuSign…</div>}
+            {dsError && <div style={{ fontSize: 13, color: '#ef4444' }}>{dsError}</div>}
+
+            {dsStatus && (
+              <div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                  <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: dsStatus.envelopeStatus === 'completed' ? '#ecfdf5' : '#fffbeb', color: dsStatus.envelopeStatus === 'completed' ? '#059669' : '#92400e', border: `1px solid ${dsStatus.envelopeStatus === 'completed' ? '#a7f3d0' : '#fde68a'}` }}>
+                    Envelope: {dsStatus.envelopeStatus.charAt(0).toUpperCase() + dsStatus.envelopeStatus.slice(1)}
+                  </span>
+                  {dsStatus.lastSignerDate && (
+                    <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd' }}>
+                      Last signed: {new Date(dsStatus.lastSignerDate).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+                  {dsStatus.recipients.map((r, i) => {
+                    const signed = r.status === 'completed' || r.status === 'signed';
+                    const color = signed ? '#10b981' : r.status === 'declined' ? '#ef4444' : '#f59e0b';
+                    const roleMap: Record<string, string> = { Signer: 'Investor', SpouseSigner: 'Spouse' };
+                    return (
+                      <div key={i} style={{ padding: '12px 14px', border: `1.5px solid ${color}33`, borderRadius: 10, background: signed ? '#f0fdf4' : '#fffbeb' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#0f2342', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            {roleMap[r.roleName] ?? r.roleName}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a2e' }}>{r.name || '—'}</div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>{r.email}</div>
+                        <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color }}>
+                          {signed ? `Signed ${new Date(r.signedAt!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+                        </div>
+                        {!signed && (
+                          <a href={`mailto:${r.email}`}
+                            style={{ display: 'inline-block', marginTop: 8, padding: '4px 10px', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 6, fontSize: 11, fontWeight: 600, color: '#92400e', textDecoration: 'none' }}>
+                            Send reminder
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -107,6 +107,7 @@ export interface ApplicationDetail extends ApplicationListItem {
   entitySubType?: string;
   effectiveDate?: string;
   currentStep: number;
+  docuSignEnvelopeId?: string;
   investorProfile?: {
     firstName?: string;
     lastName?: string;
@@ -165,6 +166,34 @@ export interface AuditLogItem {
   correlationId?: string;
 }
 
+export interface DocuSignEnvelopeItem {
+  applicationId: number;
+  investorName?: string;
+  email?: string;
+  maritalStatus?: string;
+  investorType: string;
+  ppmRefNo?: number;
+  submittedAt?: string;
+  effectiveDate?: string;
+  envelopeId: string;
+}
+
+export interface DocuSignRecipient {
+  name: string;
+  email: string;
+  roleName: string;
+  status: string;
+  signedAt?: string;
+}
+
+export interface DocuSignEnvelopeStatus {
+  envelopeId: string;
+  envelopeStatus: string;
+  completedAt?: string;
+  lastSignerDate?: string;
+  recipients: DocuSignRecipient[];
+}
+
 type ApiResponse<T> = { success: boolean; data: T; message: string };
 
 export const adminApi = {
@@ -207,6 +236,12 @@ export const adminApi = {
     api.put<ApiResponse<string>>(`/applications/${id}/submitted-at`, {
       submittedAt,
     }),
+  syncDocuSignDate: (id: number) =>
+    api.post<ApiResponse<string>>(`/applications/${id}/sync-docusign-date`, {}),
+  docuSignEnvelopes: () =>
+    api.get<ApiResponse<DocuSignEnvelopeItem[]>>("/docusign-envelopes"),
+  docuSignEnvelopeStatus: (envelopeId: string) =>
+    api.get<ApiResponse<DocuSignEnvelopeStatus>>(`/docusign-envelopes/${envelopeId}/status`),
   redemptions: (params: Record<string, string | number>) => {
     const q = new URLSearchParams(params as Record<string, string>).toString();
     return api.get<ApiResponse<PagedResult<RedemptionListItem>>>(
