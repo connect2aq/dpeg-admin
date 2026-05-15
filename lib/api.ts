@@ -176,6 +176,7 @@ export interface DocuSignEnvelopeItem {
   submittedAt?: string;
   effectiveDate?: string;
   envelopeId: string;
+  recordType: 'Application' | 'Redemption';
 }
 
 export interface DocuSignRecipient {

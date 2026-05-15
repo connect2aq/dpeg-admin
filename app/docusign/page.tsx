@@ -99,11 +99,21 @@ function EnvelopeStatusRow({ item, onDateSynced }: { item: DocuSignEnvelopeItem;
         {/* Left: applicant info */}
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div style={{ minWidth: 180 }}>
-            <Link href={`/applications/${item.applicationId}`}
-              style={{ fontWeight: 700, fontSize: 14, color: '#b8923a', textDecoration: 'none' }}>
-              {item.investorName || '(no name)'}
-            </Link>
-            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+              {item.recordType === 'Application'
+                ? <Link href={`/applications/${item.applicationId}`}
+                    style={{ fontWeight: 700, fontSize: 14, color: '#b8923a', textDecoration: 'none' }}>
+                    {item.investorName || '(no name)'}
+                  </Link>
+                : <span style={{ fontWeight: 700, fontSize: 14, color: '#b8923a' }}>{item.investorName || '(no name)'}</span>
+              }
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
+                background: item.recordType === 'Redemption' ? '#fef3c7' : '#e0f2fe',
+                color: item.recordType === 'Redemption' ? '#92400e' : '#0369a1' }}>
+                {item.recordType}
+              </span>
+            </div>
+            <div style={{ fontSize: 11, color: '#94a3b8' }}>
               {item.investorType} {item.maritalStatus === 'Married' ? '· Married' : ''}
               {item.ppmRefNo ? ` · PPM ${item.ppmRefNo}` : ''}
             </div>
@@ -159,7 +169,7 @@ function EnvelopeStatusRow({ item, onDateSynced }: { item: DocuSignEnvelopeItem;
               Refresh
             </button>
           )}
-          {status.data && allSigned && (
+          {status.data && allSigned && item.recordType === 'Application' && (
             <button onClick={syncDate} disabled={syncing}
               style={{ padding: '6px 14px', background: '#0f2342', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', cursor: syncing ? 'default' : 'pointer', opacity: syncing ? 0.7 : 1 }}>
               {syncing ? 'Setting…' : 'Set Effective Date'}
@@ -199,8 +209,10 @@ export default function DocuSignPage() {
     setEnvelopes(prev => prev.map(e => e.applicationId === appId ? { ...e, effectiveDate: date } : e));
   };
 
+  const pendingApplications = envelopes.filter(e => e.recordType === 'Application' && !e.effectiveDate);
+
   const displayed = filter === 'pending'
-    ? envelopes.filter(e => !e.effectiveDate)
+    ? pendingApplications
     : envelopes;
 
   return (
@@ -222,7 +234,7 @@ export default function DocuSignPage() {
           </button>
           <button onClick={() => setFilter('pending')}
             style={{ padding: '7px 16px', borderRadius: 8, border: '1.5px solid', fontSize: 13, fontWeight: 600, cursor: 'pointer', background: filter === 'pending' ? '#b8923a' : '#fff', color: filter === 'pending' ? '#fff' : '#475569', borderColor: filter === 'pending' ? '#b8923a' : '#e2e8f0' }}>
-            Effective Date Not Set ({envelopes.filter(e => !e.effectiveDate).length})
+            Effective Date Not Set ({pendingApplications.length})
           </button>
         </div>
 
