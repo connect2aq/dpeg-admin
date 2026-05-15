@@ -89,10 +89,6 @@ function EnvelopeStatusRow({ item, onDateSynced }: { item: DocuSignEnvelopeItem;
     ? status.data.recipients.length > 0 && status.data.recipients.every(r => r.status === 'completed' || r.status === 'signed')
     : false;
 
-  const hasPending = status.data
-    ? status.data.recipients.some(r => r.status !== 'completed' && r.status !== 'signed' && r.status !== 'declined' && r.status !== 'voided')
-    : false;
-
   return (
     <div style={{ borderBottom: '1px solid #f1f5f9', padding: '16px 0' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'start' }}>
@@ -174,12 +170,6 @@ function EnvelopeStatusRow({ item, onDateSynced }: { item: DocuSignEnvelopeItem;
               style={{ padding: '6px 14px', background: '#0f2342', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', cursor: syncing ? 'default' : 'pointer', opacity: syncing ? 0.7 : 1 }}>
               {syncing ? 'Setting…' : 'Set Effective Date'}
             </button>
-          )}
-          {hasPending && (
-            <a href={`mailto:${item.email}`}
-              style={{ padding: '6px 14px', background: '#fefce8', border: '1.5px solid #fde047', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#92400e', textDecoration: 'none', textAlign: 'center' }}>
-              Contact
-            </a>
           )}
           {syncMsg && (
             <span style={{ fontSize: 11, color: syncMsg.startsWith('Set') || syncMsg.startsWith('set') ? '#10b981' : '#ef4444', textAlign: 'right' }}>
