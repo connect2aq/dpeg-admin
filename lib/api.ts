@@ -166,6 +166,14 @@ export interface AuditLogItem {
   correlationId?: string;
 }
 
+export interface DocuSignSigner {
+  name: string;
+  email: string;
+  roleName: string;
+  status: string;
+  signedDateTime?: string;
+}
+
 export interface DocuSignEnvelopeItem {
   applicationId: number;
   investorName?: string;
@@ -177,6 +185,9 @@ export interface DocuSignEnvelopeItem {
   effectiveDate?: string;
   envelopeId: string;
   recordType: 'Application' | 'Redemption';
+  docuSignStatus?: string;
+  docuSignCompletedAt?: string;
+  docuSignSignersJson?: string;
 }
 
 export interface DocuSignRecipient {
