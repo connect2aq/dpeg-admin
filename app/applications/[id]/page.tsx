@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
-import { adminApi, type ApplicationDetail, type DocuSignEnvelopeStatus } from '@/lib/api';
+import { adminApi, STATIC_BASE, type ApplicationDetail, type DocuSignEnvelopeStatus } from '@/lib/api';
 
 const STATUSES = ['UnderReview', 'Active', 'Rejected'];
 
@@ -14,6 +14,44 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8', marginBottom: 3 }}>{label}</div>
       <div style={{ fontSize: 14, color: '#1a1a2e', fontWeight: 500 }}>{value}</div>
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#b8923a', marginBottom: 10, marginTop: 18, paddingBottom: 4, borderBottom: '1px solid #f1f5f9' }}>
+      {children}
+    </div>
+  );
+}
+
+function DocumentPreview({ label, number, state, path }: { label: string; number?: string | null; state?: string | null; path: string }) {
+  const fileUrl = `${STATIC_BASE}${path.startsWith('/') ? path : '/' + path}`;
+  const ext = path.split('.').pop()?.toLowerCase() ?? '';
+  const isImage = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'].includes(ext);
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#0f2342' }}>{label}</div>
+          {number && <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>No: {number}{state ? ` · ${state}` : ''}</div>}
+        </div>
+        <a href={fileUrl} target="_blank" rel="noopener noreferrer"
+          style={{ padding: '5px 12px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 7, fontSize: 12, fontWeight: 600, color: '#475569', textDecoration: 'none' }}>
+          Open in new tab ↗
+        </a>
+      </div>
+      {isImage ? (
+        <a href={fileUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block' }}>
+          <img src={fileUrl} alt={label}
+            style={{ maxWidth: '100%', maxHeight: 320, objectFit: 'contain', borderRadius: 8, border: '1px solid #e2e8f0', background: '#f8fafc', display: 'block' }} />
+        </a>
+      ) : (
+        <iframe src={fileUrl} title={label}
+          style={{ width: '100%', height: 400, border: '1px solid #e2e8f0', borderRadius: 8 }} />
+      )}
     </div>
   );
 }
@@ -276,19 +314,87 @@ export default function ApplicationDetailPage() {
         {/* Investor Profile */}
         {app.investorProfile && (
           <div className="card">
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 16 }}>Investor Profile</h2>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 4 }}>Investor Profile</h2>
+
+            <SectionLabel>Identity</SectionLabel>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
               <InfoRow label="Name" value={[app.investorProfile.firstName, app.investorProfile.lastName].filter(Boolean).join(' ')} />
+              <InfoRow label="Date of Birth" value={app.investorProfile.dateOfBirth} />
+              <InfoRow label="Citizenship" value={app.investorProfile.citizenship} />
+              <InfoRow label="Marital Status" value={app.investorProfile.maritalStatus} />
+              <InfoRow label="Ownership Type" value={app.investorProfile.ownershipType} />
+            </div>
+
+            <SectionLabel>Contact</SectionLabel>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
               <InfoRow label="Email" value={app.investorProfile.email} />
               <InfoRow label="Phone" value={app.investorProfile.phone} />
+              <InfoRow label="Day Phone" value={app.investorProfile.dayPhone} />
+              <InfoRow label="Night Phone" value={app.investorProfile.nightPhone} />
+              <InfoRow label="Employer" value={app.investorProfile.employer} />
               <InfoRow label="Address" value={app.investorProfile.addressLine1} />
               <InfoRow label="City / State" value={[app.investorProfile.city, app.investorProfile.state].filter(Boolean).join(', ')} />
               <InfoRow label="Zip" value={app.investorProfile.zipCode} />
-              <InfoRow label="Citizenship" value={app.investorProfile.citizenship} />
-              <InfoRow label="Marital Status" value={app.investorProfile.maritalStatus} />
-              <InfoRow label="Entity Name" value={app.investorProfile.entityName} />
-              <InfoRow label="EIN" value={app.investorProfile.ein} />
+              <InfoRow label="Mailing Address" value={app.investorProfile.mailingAddress} />
             </div>
+
+            {app.investorProfile.spouseFullName && (
+              <>
+                <SectionLabel>Spouse</SectionLabel>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+                  <InfoRow label="Spouse Name" value={app.investorProfile.spouseFullName} />
+                  <InfoRow label="Spouse Email" value={app.investorProfile.spouseEmail} />
+                  <InfoRow label="Spouse DOB" value={app.investorProfile.spouseDateOfBirth} />
+                </div>
+              </>
+            )}
+
+            {app.investorProfile.entityName && (
+              <>
+                <SectionLabel>Entity</SectionLabel>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+                  <InfoRow label="Entity Name" value={app.investorProfile.entityName} />
+                  <InfoRow label="EIN" value={app.investorProfile.ein} />
+                  <InfoRow label="State of Formation" value={app.investorProfile.stateFormation} />
+                  <InfoRow label="Signatory Name" value={app.investorProfile.signatoryName} />
+                  <InfoRow label="Signatory Title" value={app.investorProfile.signatoryTitle} />
+                </div>
+              </>
+            )}
+
+            {app.investorProfile.custodianName && (
+              <>
+                <SectionLabel>Custodian</SectionLabel>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+                  <InfoRow label="Custodian Name" value={app.investorProfile.custodianName} />
+                  <InfoRow label="Account" value={app.investorProfile.custodianAcct} />
+                  <InfoRow label="Phone" value={app.investorProfile.custodianPhone} />
+                  <InfoRow label="Email" value={app.investorProfile.custodianEmail} />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Identity Documents */}
+        {app.investorProfile && (app.investorProfile.drivingLicensePath || app.investorProfile.taxCertificatePath) && (
+          <div className="card" style={{ marginTop: 20 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 16 }}>Identity Documents</h2>
+            {app.investorProfile.drivingLicensePath && (
+              <DocumentPreview
+                label="Driving License"
+                number={app.investorProfile.drivingLicenseNo}
+                state={app.investorProfile.drivingLicenseState}
+                path={app.investorProfile.drivingLicensePath}
+              />
+            )}
+            {app.investorProfile.taxCertificatePath && (
+              <DocumentPreview
+                label="Tax Certificate / EIN Letter"
+                number={app.investorProfile.taxCertificateNo}
+                path={app.investorProfile.taxCertificatePath}
+              />
+            )}
           </div>
         )}
 

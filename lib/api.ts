@@ -1,4 +1,6 @@
 const BASE = process.env.NEXT_PUBLIC_API_URL;
+// Static files (wwwroot) are served from the app root, not under /api/admin
+export const STATIC_BASE = (BASE ?? '').replace(/\/api\/admin\/?$/, '').replace(/\/api\/?$/, '').replace(/\/$/, '');
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token =
@@ -119,6 +121,33 @@ export interface ApplicationDetail extends ApplicationListItem {
     maritalStatus?: string;
     entityName?: string;
     ein?: string;
+    // Identity
+    dateOfBirth?: string;
+    ownershipType?: string;
+    // Spouse
+    spouseFullName?: string;
+    spouseEmail?: string;
+    spouseDateOfBirth?: string;
+    // Entity
+    stateFormation?: string;
+    signatoryName?: string;
+    signatoryTitle?: string;
+    // Custodian
+    custodianName?: string;
+    custodianAcct?: string;
+    custodianPhone?: string;
+    custodianEmail?: string;
+    // Contact extras
+    mailingAddress?: string;
+    employer?: string;
+    dayPhone?: string;
+    nightPhone?: string;
+    // Identity documents
+    drivingLicenseNo?: string;
+    drivingLicenseState?: string;
+    drivingLicensePath?: string;
+    taxCertificateNo?: string;
+    taxCertificatePath?: string;
   };
   investment?: {
     numUnits: number;
