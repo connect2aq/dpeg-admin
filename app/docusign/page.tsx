@@ -226,7 +226,7 @@ function EnvelopeRow({ item, onDateSynced }: { item: DocuSignEnvelopeItem; onDat
                 <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
                   background: item.recordType === 'Redemption' ? '#fef3c7' : '#e0f2fe',
                   color: item.recordType === 'Redemption' ? '#92400e' : '#0369a1' }}>
-                  {item.recordType}
+                  {item.recordType === 'Application' ? 'Investment' : item.recordType}
                 </span>
               </div>
               <div style={{ fontSize: 11, color: '#94a3b8' }}>
