@@ -62,27 +62,28 @@ function buildSteps(item: DocuSignEnvelopeItem): TimelineStep[] {
   const signers = parseSigners(item.docuSignSignersJson);
   const envelopeStatus = item.docuSignStatus ?? '';
 
-  const investor  = signers.find(s => s.roleName === 'Signer');
-  const spouse    = signers.find(s => s.roleName === 'SpouseSigner');
-  // Any role that is neither Signer nor SpouseSigner is treated as the final owner/counter-signer
-  const owner     = signers.find(s => s.roleName !== 'Signer' && s.roleName !== 'SpouseSigner');
+  const investor = signers.find(s => s.roleName === 'Signer');
+  const spouse   = signers.find(s => s.roleName === 'SpouseSigner');
+  // Any role that is neither Signer nor SpouseSigner is the final owner/counter-signer
+  const owner    = signers.find(s => s.roleName !== 'Signer' && s.roleName !== 'SpouseSigner');
+
+  // Use actual sentDateTime from webhook data; don't fall back to submittedAt (would duplicate Created)
+  const sentTime = investor?.sentDateTime ?? spouse?.sentDateTime ?? owner?.sentDateTime;
 
   const steps: TimelineStep[] = [];
 
-  // Step 1: Created & Sent
   steps.push({
     label:     'Created',
     timestamp: item.submittedAt ? fmtTime(item.submittedAt) : undefined,
-    state:     'done', // envelope always exists if it's in this list
+    state:     'done',
   });
 
   steps.push({
     label:     'Sent',
-    timestamp: item.submittedAt ? fmtTime(item.submittedAt) : undefined,
-    state:     'done', // envelope is always sent at creation time
+    timestamp: sentTime ? fmtTime(sentTime) : undefined,
+    state:     'done',
   });
 
-  // Step 3: Investor signs
   const investorDone = investor ? isSignerDone(investor) : false;
   steps.push({
     label:     'Investor Signed',
@@ -91,7 +92,6 @@ function buildSteps(item: DocuSignEnvelopeItem): TimelineStep[] {
     state:     investorDone ? 'done' : 'pending',
   });
 
-  // Step 4: Spouse signs (only for married)
   if (item.maritalStatus === 'Married' || spouse) {
     const spouseDone = spouse ? isSignerDone(spouse) : false;
     steps.push({
@@ -102,22 +102,26 @@ function buildSteps(item: DocuSignEnvelopeItem): TimelineStep[] {
     });
   }
 
-  // Step 5: Owner/counter-signer (only if role present in data)
   if (owner) {
     const ownerDone = isSignerDone(owner);
     steps.push({
-      label:     roleLabel(owner.roleName),
+      label:     'Owner Signed',
       sublabel:  owner.name || owner.email,
       timestamp: ownerDone ? fmtTime(owner.signedDateTime) : undefined,
       state:     ownerDone ? 'done' : 'pending',
     });
   }
 
-  // Step 6: Completed
+  // Use owner's signedDateTime for Completed to avoid timezone discrepancy
+  const completedDone = envelopeStatus.toLowerCase() === 'completed';
+  const completedTime = (owner && isSignerDone(owner))
+    ? fmtTime(owner.signedDateTime)
+    : item.docuSignCompletedAt ? fmtTime(item.docuSignCompletedAt) : undefined;
+
   steps.push({
     label:     'Completed',
-    timestamp: item.docuSignCompletedAt ? fmtTime(item.docuSignCompletedAt) : undefined,
-    state:     envelopeStatus.toLowerCase() === 'completed' ? 'done' : 'pending',
+    timestamp: completedDone ? completedTime : undefined,
+    state:     completedDone ? 'done' : 'pending',
   });
 
   return steps;
@@ -229,7 +233,7 @@ function EnvelopeRow({ item, onDateSynced }: { item: DocuSignEnvelopeItem; onDat
                 {item.investorType}{item.maritalStatus === 'Married' ? ' · Married' : ''}
                 {item.ppmRefNo ? ` · PPM ${item.ppmRefNo}` : ''}
               </div>
-              <div style={{ fontSize: 11, color: '#94a3b8' }}>{item.email}</div>
+              {item.email && <div style={{ fontSize: 11, color: '#94a3b8' }}>{item.email}</div>}
             </div>
 
             {/* Submitted */}
@@ -285,7 +289,7 @@ function EnvelopeRow({ item, onDateSynced }: { item: DocuSignEnvelopeItem; onDat
 export default function DocuSignPage() {
   const [envelopes, setEnvelopes] = useState<DocuSignEnvelopeItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [filter, setFilter] = useState<'notCompleted' | 'all' | 'completed' | 'pendingDate'>('notCompleted');
 
   useEffect(() => {
     adminApi.docuSignEnvelopes()
@@ -301,10 +305,14 @@ export default function DocuSignPage() {
   const awaitingCount    = envelopes.filter(e => e.docuSignStatus !== 'completed').length;
   const pendingDateCount = envelopes.filter(e => e.recordType === 'Application' && !e.effectiveDate).length;
 
-  const displayed = filter === 'pending'
-    ? envelopes.filter(e => e.recordType === 'Application' && !e.effectiveDate)
+  const notCompletedCount = envelopes.filter(e => e.docuSignStatus !== 'completed').length;
+
+  const displayed = filter === 'notCompleted'
+    ? envelopes.filter(e => e.docuSignStatus !== 'completed')
     : filter === 'completed'
     ? envelopes.filter(e => e.docuSignStatus === 'completed')
+    : filter === 'pendingDate'
+    ? envelopes.filter(e => e.recordType === 'Application' && !e.effectiveDate)
     : envelopes;
 
   return (
@@ -330,13 +338,18 @@ export default function DocuSignPage() {
         </div>
 
         {/* Filters */}
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 20 }}>
-          {([['all', `All (${envelopes.length})`], ['completed', `Completed (${completedCount})`], ['pending', `Effective Date Not Set (${pendingDateCount})`]] as const).map(([val, label]) => (
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
+          {([
+            ['notCompleted', `Not Completed (${notCompletedCount})`],
+            ['all',          `All (${envelopes.length})`],
+            ['completed',    `Completed (${completedCount})`],
+            ['pendingDate',  `Effective Date Not Set (${pendingDateCount})`],
+          ] as const).map(([val, label]) => (
             <button key={val} onClick={() => setFilter(val)}
               style={{ padding: '7px 16px', borderRadius: 8, border: '1.5px solid', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                background: filter === val ? (val === 'pending' ? '#b8923a' : '#0f2342') : '#fff',
+                background: filter === val ? (val === 'pendingDate' ? '#b8923a' : '#0f2342') : '#fff',
                 color: filter === val ? '#fff' : '#475569',
-                borderColor: filter === val ? (val === 'pending' ? '#b8923a' : '#0f2342') : '#e2e8f0' }}>
+                borderColor: filter === val ? (val === 'pendingDate' ? '#b8923a' : '#0f2342') : '#e2e8f0' }}>
               {label}
             </button>
           ))}
