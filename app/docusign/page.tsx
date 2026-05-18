@@ -67,8 +67,8 @@ function buildSteps(item: DocuSignEnvelopeItem): TimelineStep[] {
   // Any role that is neither Signer nor SpouseSigner is the final owner/counter-signer
   const owner    = signers.find(s => s.roleName !== 'Signer' && s.roleName !== 'SpouseSigner');
 
-  // Use actual sentDateTime from webhook data; don't fall back to submittedAt (would duplicate Created)
-  const sentTime = investor?.sentDateTime ?? spouse?.sentDateTime ?? owner?.sentDateTime;
+  // Use sentDateTime from webhook data if available; fall back to submittedAt (envelope is sent at creation)
+  const sentTime = investor?.sentDateTime ?? spouse?.sentDateTime ?? owner?.sentDateTime ?? item.submittedAt;
 
   const steps: TimelineStep[] = [];
 
