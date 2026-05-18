@@ -185,6 +185,7 @@ export interface DocuSignEnvelopeItem {
   envelopeId: string;
   recordType: "Application" | "Redemption";
   docuSignStatus?: string;
+  docuSignSentAt?: string;
   docuSignCompletedAt?: string;
   docuSignSignersJson?: string;
 }
