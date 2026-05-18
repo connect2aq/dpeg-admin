@@ -18,7 +18,18 @@ function fmtTime(iso?: string): string {
 
 function parseSigners(json?: string): DocuSignSigner[] {
   if (!json) return [];
-  try { return JSON.parse(json); } catch { return []; }
+  try {
+    // Normalize both camelCase (new) and PascalCase (legacy) keys from the stored JSON
+    const raw: Record<string, unknown>[] = JSON.parse(json);
+    return raw.map(s => ({
+      name:            (s.name            ?? s.Name            ?? '') as string,
+      email:           (s.email           ?? s.Email           ?? '') as string,
+      roleName:        (s.roleName        ?? s.RoleName        ?? '') as string,
+      status:          (s.status          ?? s.Status          ?? '') as string,
+      signedDateTime:  (s.signedDateTime  ?? s.SignedDateTime)  as string | undefined,
+      sentDateTime:    (s.sentDateTime    ?? s.SentDateTime)    as string | undefined,
+    }));
+  } catch { return []; }
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -50,7 +61,6 @@ interface TimelineStep {
 function buildSteps(item: DocuSignEnvelopeItem): TimelineStep[] {
   const signers = parseSigners(item.docuSignSignersJson);
   const envelopeStatus = item.docuSignStatus ?? '';
-  const isSentOrBeyond = ['sent', 'delivered', 'completed'].includes(envelopeStatus.toLowerCase());
 
   const investor  = signers.find(s => s.roleName === 'Signer');
   const spouse    = signers.find(s => s.roleName === 'SpouseSigner');
@@ -69,7 +79,7 @@ function buildSteps(item: DocuSignEnvelopeItem): TimelineStep[] {
   steps.push({
     label:     'Sent',
     timestamp: item.submittedAt ? fmtTime(item.submittedAt) : undefined,
-    state:     isSentOrBeyond ? 'done' : 'pending',
+    state:     'done', // envelope is always sent at creation time
   });
 
   // Step 3: Investor signs

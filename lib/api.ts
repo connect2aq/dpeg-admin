@@ -170,6 +170,7 @@ export interface DocuSignSigner {
   roleName: string;
   status: string;
   signedDateTime?: string;
+  sentDateTime?: string;
 }
 
 export interface DocuSignEnvelopeItem {
