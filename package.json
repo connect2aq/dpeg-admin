@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "build:production": "dotenv -e .env.production -- next build",
+    "build:staging": "dotenv -e .env.staging -- next build",
+    "start:production": "dotenv -e .env.production -- next start",
+    "start:staging": "dotenv -e .env.staging -- next start",
     "lint": "eslint"
   },
   "dependencies": {
@@ -18,6 +20,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",

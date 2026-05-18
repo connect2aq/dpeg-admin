@@ -1,6 +1,4 @@
-const BASE =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "https://forms.dhananipeg.com/integrationservice/api/admin";
+const BASE = process.env.NEXT_PUBLIC_API_URL;
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token =
@@ -184,7 +182,7 @@ export interface DocuSignEnvelopeItem {
   submittedAt?: string;
   effectiveDate?: string;
   envelopeId: string;
-  recordType: 'Application' | 'Redemption';
+  recordType: "Application" | "Redemption";
   docuSignStatus?: string;
   docuSignCompletedAt?: string;
   docuSignSignersJson?: string;
@@ -253,7 +251,9 @@ export const adminApi = {
   docuSignEnvelopes: () =>
     api.get<ApiResponse<DocuSignEnvelopeItem[]>>("/docusign-envelopes"),
   docuSignEnvelopeStatus: (envelopeId: string) =>
-    api.get<ApiResponse<DocuSignEnvelopeStatus>>(`/docusign-envelopes/${envelopeId}/status`),
+    api.get<ApiResponse<DocuSignEnvelopeStatus>>(
+      `/docusign-envelopes/${envelopeId}/status`,
+    ),
   redemptions: (params: Record<string, string | number>) => {
     const q = new URLSearchParams(params as Record<string, string>).toString();
     return api.get<ApiResponse<PagedResult<RedemptionListItem>>>(
@@ -265,8 +265,8 @@ export const adminApi = {
   auditLogs: (params: Record<string, string | number | boolean>) => {
     const q = new URLSearchParams(
       Object.fromEntries(
-        Object.entries(params).map(([k, v]) => [k, String(v)])
-      )
+        Object.entries(params).map(([k, v]) => [k, String(v)]),
+      ),
     ).toString();
     return api.get<ApiResponse<PagedResult<AuditLogItem>>>(`/audit-logs?${q}`);
   },
