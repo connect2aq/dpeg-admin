@@ -173,6 +173,48 @@ export default function DashboardPage() {
               />
             </div>
 
+            {/* Capital Flows */}
+            <SectionLabel>Capital Flows</SectionLabel>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: 20,
+                marginBottom: 4,
+              }}
+            >
+              <KpiCard
+                label="Current AUM"
+                value={fmt(stats.totalAUM)}
+                sub={`${stats.totalUnits} active units`}
+                color="#699172"
+              />
+              <KpiCard
+                label="Total Deployed (All Time)"
+                value={fmt(stats.totalDeployedCommencement)}
+                sub="From commencement"
+                color="#0e3416"
+              />
+              <KpiCard
+                label="Total Withdrawn (All Time)"
+                value={fmt(stats.totalWithdrawnCommencement)}
+                sub="From commencement"
+                color="#6366f1"
+              />
+              <KpiCard
+                label="YTD Deployed"
+                value={fmt(stats.ytdDeployed)}
+                sub={`Jan 1 – today (${new Date().getFullYear()})`}
+                color="#10b981"
+              />
+              <KpiCard
+                label="YTD Withdrawn"
+                value={fmt(stats.ytdWithdrawn)}
+                sub={`Jan 1 – today (${new Date().getFullYear()})`}
+                color="#f59e0b"
+              />
+            </div>
+
             {/* Recent Applications */}
             <div className="card" style={{ marginTop: 28 }}>
               <h2
@@ -229,48 +271,6 @@ export default function DashboardPage() {
                   </tbody>
                 </table>
               )}
-            </div>
-
-            {/* Capital Flows */}
-            <SectionLabel>Capital Flows</SectionLabel>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                gap: 20,
-                marginBottom: 4,
-              }}
-            >
-              <KpiCard
-                label="Current AUM"
-                value={fmt(stats.totalAUM)}
-                sub={`${stats.totalUnits} active units`}
-                color="#699172"
-              />
-              <KpiCard
-                label="Total Deployed (All Time)"
-                value={fmt(stats.totalDeployedCommencement)}
-                sub="From commencement"
-                color="#0e3416"
-              />
-              <KpiCard
-                label="Total Withdrawn (All Time)"
-                value={fmt(stats.totalWithdrawnCommencement)}
-                sub="From commencement"
-                color="#6366f1"
-              />
-              <KpiCard
-                label="YTD Deployed"
-                value={fmt(stats.ytdDeployed)}
-                sub={`Jan 1 – today (${new Date().getFullYear()})`}
-                color="#10b981"
-              />
-              <KpiCard
-                label="YTD Withdrawn"
-                value={fmt(stats.ytdWithdrawn)}
-                sub={`Jan 1 – today (${new Date().getFullYear()})`}
-                color="#f59e0b"
-              />
             </div>
           </>
         ) : (
