@@ -16,8 +16,6 @@ export default function RedemptionsPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
-  const [updating, setUpdating] = useState<number | null>(null);
-  const [msgs, setMsgs] = useState<Record<number, string>>({});
 
   const load = useCallback(() => {
     setLoading(true);
@@ -32,20 +30,6 @@ export default function RedemptionsPage() {
   }, [page, status, search, from, to]);
 
   useEffect(() => { load(); }, [load]);
-
-  const updateStatus = async (id: number, newStatus: string) => {
-    setUpdating(id);
-    const r = await adminApi.updateRedemptionStatus(id, newStatus);
-    setMsgs(m => ({ ...m, [id]: r.success ? 'Updated' : r.message }));
-    if (r.success) {
-      setResult(res => res ? {
-        ...res,
-        items: res.items.map(item => item.id === id ? { ...item, status: newStatus } : item)
-      } : res);
-    }
-    setUpdating(null);
-    setTimeout(() => setMsgs(m => { const n = { ...m }; delete n[id]; return n; }), 3000);
-  };
 
   return (
     <AdminLayout>
@@ -112,12 +96,8 @@ export default function RedemptionsPage() {
                     <tr><td colSpan={10} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No redemption requests found</td></tr>
                   ) : result.items.map(r => (
                     <tr key={r.id}>
-                      <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>
-                        <Link href={`/redemptions/${r.id}`} style={{ color: '#b8923a', textDecoration: 'none' }}>#{r.id}</Link>
-                      </td>
-                      <td style={{ fontWeight: 600 }}>
-                        <Link href={`/redemptions/${r.id}`} style={{ color: '#0f2342', textDecoration: 'none' }}>{r.sellingPartnerName ?? '—'}</Link>
-                      </td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#b8923a' }}>#{r.id}</td>
+                      <td style={{ fontWeight: 600 }}>{r.sellingPartnerName ?? '—'}</td>
                       <td>{r.investorType}</td>
                       <td style={{ fontWeight: 700, color: '#0e3416' }}>{r.unitsToRedeem ?? '—'}</td>
                       <td style={{ color: '#64748b' }}>{r.totalUnitsOwned ?? '—'}</td>
@@ -126,23 +106,10 @@ export default function RedemptionsPage() {
                       <td><StatusBadge status={r.status} /></td>
                       <td style={{ fontSize: 13, color: '#64748b' }}>{new Date(r.createdOn).toLocaleDateString()}</td>
                       <td>
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          {r.status === 'UnderReview' && (
-                            <>
-                              <button
-                                onClick={() => updateStatus(r.id, 'Active')}
-                                disabled={updating === r.id}
-                                style={{ padding: '5px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-                              >Approve</button>
-                              <button
-                                onClick={() => updateStatus(r.id, 'Rejected')}
-                                disabled={updating === r.id}
-                                style={{ padding: '5px 12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-                              >Reject</button>
-                            </>
-                          )}
-                          {msgs[r.id] && <span style={{ fontSize: 12, color: '#10b981' }}>{msgs[r.id]}</span>}
-                        </div>
+                        <Link href={`/redemptions/${r.id}`}
+                          style={{ padding: '5px 12px', background: '#0f2342', color: 'white', borderRadius: 6, fontSize: 12, fontWeight: 600, textDecoration: 'none', display: 'inline-block' }}>
+                          View
+                        </Link>
                       </td>
                     </tr>
                   ))}

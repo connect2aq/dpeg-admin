@@ -31,6 +31,7 @@ export default function RedemptionDetailPage() {
   const [redemption, setRedemption] = useState<RedemptionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [newStatus, setNewStatus] = useState('');
+  const [note, setNote] = useState('');
   const [updating, setUpdating] = useState(false);
   const [msg, setMsg] = useState('');
 
@@ -112,19 +113,25 @@ export default function RedemptionDetailPage() {
           <StatusBadge status={redemption.status} />
         </div>
 
-        {/* Status management */}
-        <div className="card" style={{ marginBottom: 20 }}>
-          <SectionLabel>Update Status</SectionLabel>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        {/* Review Decision */}
+        <div className="card" style={{ marginBottom: 24 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 16 }}>Review Decision</h2>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
             <select value={newStatus} onChange={e => setNewStatus(e.target.value)}
-              style={{ padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}>
+              style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
               {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
-            <button onClick={updateStatus} disabled={updating || newStatus === redemption.status}
-              style={{ padding: '8px 18px', background: '#0f2342', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: updating || newStatus === redemption.status ? 'default' : 'pointer', opacity: updating || newStatus === redemption.status ? 0.5 : 1 }}>
-              {updating ? 'Saving…' : 'Save Status'}
+            <input
+              type="text"
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              placeholder="Review note (optional)"
+              style={{ flex: '1 1 250px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}
+            />
+            <button className="btn-primary" onClick={updateStatus} disabled={updating || newStatus === redemption.status}>
+              {updating ? 'Updating...' : 'Apply Decision'}
             </button>
-            {msg && <span style={{ fontSize: 13, color: msg === 'Status updated.' ? '#10b981' : '#ef4444' }}>{msg}</span>}
+            {msg && <span style={{ fontSize: 13, color: msg.includes('updated') ? '#10b981' : '#ef4444', alignSelf: 'center' }}>{msg}</span>}
           </div>
         </div>
 
