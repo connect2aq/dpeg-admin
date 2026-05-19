@@ -108,6 +108,10 @@ export interface ApplicationDetail extends ApplicationListItem {
   effectiveDate?: string;
   currentStep: number;
   docuSignEnvelopeId?: string;
+  docuSignStatus?: string;
+  docuSignSentAt?: string;
+  docuSignCompletedAt?: string;
+  docuSignSignersJson?: string;
   investorProfile?: {
     firstName?: string;
     lastName?: string;

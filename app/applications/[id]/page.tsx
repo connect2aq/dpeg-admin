@@ -399,60 +399,69 @@ export default function ApplicationDetailPage() {
         )}
 
         {/* DocuSign Status */}
-        {app.docuSignEnvelopeId && (
-          <div className="card" style={{ marginTop: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342' }}>DocuSign Agreement</h2>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                {!dsStatus && !dsLoading && (
-                  <button onClick={loadDsStatus}
-                    style={{ padding: '6px 14px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
-                    Check Signing Status
+        {app.docuSignEnvelopeId && (() => {
+          const dbSigners = (() => {
+            try { return app.docuSignSignersJson ? JSON.parse(app.docuSignSignersJson) : null; } catch { return null; }
+          })();
+          const displayStatus = dsStatus ? dsStatus.envelopeStatus : app.docuSignStatus;
+          const isCompleted = displayStatus === 'completed';
+          const roleMap: Record<string, string> = { Signer: 'Investor', SpouseSigner: 'Spouse' };
+          return (
+            <div className="card" style={{ marginTop: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+                <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342' }}>DocuSign Agreement</h2>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button onClick={loadDsStatus} disabled={dsLoading}
+                    style={{ padding: '4px 10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, color: '#94a3b8', cursor: dsLoading ? 'default' : 'pointer', opacity: dsLoading ? 0.6 : 1 }}>
+                    {dsLoading ? 'Refreshing…' : 'Refresh from DocuSign'}
                   </button>
-                )}
-                {dsStatus && !dsLoading && (
-                  <button onClick={loadDsStatus}
-                    style={{ padding: '4px 10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, color: '#94a3b8', cursor: 'pointer' }}>
-                    Refresh
-                  </button>
-                )}
-                {dsStatus?.lastSignerDate && (
-                  <button onClick={syncDsDate} disabled={dsSyncing}
-                    style={{ padding: '6px 14px', background: '#0f2342', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', cursor: dsSyncing ? 'default' : 'pointer', opacity: dsSyncing ? 0.7 : 1 }}>
-                    {dsSyncing ? 'Setting…' : 'Set Effective Date from DocuSign'}
-                  </button>
-                )}
-                {dsSyncMsg && (
-                  <span style={{ fontSize: 12, color: dsSyncMsg.includes('set') || dsSyncMsg.includes('Set') ? '#10b981' : '#ef4444' }}>{dsSyncMsg}</span>
-                )}
-              </div>
-            </div>
-
-            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 12 }}>
-              Envelope ID: <span style={{ fontFamily: 'monospace', color: '#475569' }}>{app.docuSignEnvelopeId}</span>
-            </div>
-
-            {dsLoading && <div style={{ fontSize: 13, color: '#94a3b8' }}>Loading status from DocuSign…</div>}
-            {dsError && <div style={{ fontSize: 13, color: '#ef4444' }}>{dsError}</div>}
-
-            {dsStatus && (
-              <div>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                  <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: dsStatus.envelopeStatus === 'completed' ? '#ecfdf5' : '#fffbeb', color: dsStatus.envelopeStatus === 'completed' ? '#059669' : '#92400e', border: `1px solid ${dsStatus.envelopeStatus === 'completed' ? '#a7f3d0' : '#fde68a'}` }}>
-                    Envelope: {dsStatus.envelopeStatus.charAt(0).toUpperCase() + dsStatus.envelopeStatus.slice(1)}
-                  </span>
-                  {dsStatus.lastSignerDate && (
-                    <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd' }}>
-                      Last signed: {new Date(dsStatus.lastSignerDate).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                  {dsStatus?.lastSignerDate && (
+                    <button onClick={syncDsDate} disabled={dsSyncing}
+                      style={{ padding: '6px 14px', background: '#0f2342', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', cursor: dsSyncing ? 'default' : 'pointer', opacity: dsSyncing ? 0.7 : 1 }}>
+                      {dsSyncing ? 'Setting…' : 'Set Effective Date from DocuSign'}
+                    </button>
+                  )}
+                  {dsSyncMsg && (
+                    <span style={{ fontSize: 12, color: dsSyncMsg.includes('set') || dsSyncMsg.includes('Set') ? '#10b981' : '#ef4444' }}>{dsSyncMsg}</span>
                   )}
                 </div>
+              </div>
 
+              <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 12 }}>
+                Envelope ID: <span style={{ fontFamily: 'monospace', color: '#475569' }}>{app.docuSignEnvelopeId}</span>
+              </div>
+
+              {dsError && <div style={{ fontSize: 13, color: '#ef4444', marginBottom: 8 }}>{dsError}</div>}
+
+              {displayStatus && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                  <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: isCompleted ? '#ecfdf5' : '#fffbeb', color: isCompleted ? '#059669' : '#92400e', border: `1px solid ${isCompleted ? '#a7f3d0' : '#fde68a'}` }}>
+                    {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
+                  </span>
+                  {(dsStatus?.lastSignerDate || app.docuSignCompletedAt) && (
+                    <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd' }}>
+                      Completed: {new Date(dsStatus?.lastSignerDate ?? app.docuSignCompletedAt!).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                  {app.docuSignSentAt && (
+                    <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0' }}>
+                      Sent: {new Date(app.docuSignSentAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                  {dsStatus && <span style={{ fontSize: 10, color: '#94a3b8', alignSelf: 'center' }}>Live</span>}
+                </div>
+              )}
+
+              {/* Signers — prefer live dsStatus recipients, fall back to DB signers JSON */}
+              {(dsStatus?.recipients || dbSigners) && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
-                  {dsStatus.recipients.map((r, i) => {
+                  {(dsStatus?.recipients
+                    ? dsStatus.recipients.map(r => ({ name: r.name, email: r.email, roleName: r.roleName, status: r.status, signedAt: r.signedAt }))
+                    : (dbSigners as Array<{ name: string; email: string; roleName: string; status: string; signedDateTime?: string }>)
+                        .map(s => ({ name: s.name, email: s.email, roleName: s.roleName, status: s.status, signedAt: s.signedDateTime }))
+                  ).map((r, i) => {
                     const signed = r.status === 'completed' || r.status === 'signed';
                     const color = signed ? '#10b981' : r.status === 'declined' ? '#ef4444' : '#f59e0b';
-                    const roleMap: Record<string, string> = { Signer: 'Investor', SpouseSigner: 'Spouse' };
                     return (
                       <div key={i} style={{ padding: '12px 14px', border: `1.5px solid ${color}33`, borderRadius: 10, background: signed ? '#f0fdf4' : '#fffbeb' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -464,7 +473,7 @@ export default function ApplicationDetailPage() {
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a2e' }}>{r.name || '—'}</div>
                         <div style={{ fontSize: 11, color: '#64748b' }}>{r.email}</div>
                         <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color }}>
-                          {signed ? `Signed ${new Date(r.signedAt!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+                          {signed && r.signedAt ? `Signed ${new Date(r.signedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : r.status.charAt(0).toUpperCase() + r.status.slice(1)}
                         </div>
                         {!signed && (
                           <a href={`mailto:${r.email}`}
@@ -476,10 +485,10 @@ export default function ApplicationDetailPage() {
                     );
                   })}
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          );
+        })()}
 
         {/* User link */}
         {app.userId && (
