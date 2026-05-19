@@ -107,6 +107,7 @@ export interface ApplicationDetail extends ApplicationListItem {
   entitySubType?: string;
   effectiveDate?: string;
   currentStep: number;
+  reviewNote?: string;
   docuSignEnvelopeId?: string;
   docuSignStatus?: string;
   docuSignSentAt?: string;
@@ -179,6 +180,7 @@ export interface RedemptionListItem {
 
 export interface RedemptionDetail extends RedemptionListItem {
   entityName?: string;
+  reviewNote?: string;
   signatoryName?: string;
   signatoryTitle?: string;
   printedName?: string;
@@ -325,8 +327,8 @@ export const adminApi = {
   },
   redemption: (id: number) =>
     api.get<ApiResponse<RedemptionDetail>>(`/redemptions/${id}`),
-  updateRedemptionStatus: (id: number, status: string) =>
-    api.put<ApiResponse<string>>(`/redemptions/${id}/status`, { status }),
+  updateRedemptionStatus: (id: number, status: string, reviewNote?: string) =>
+    api.put<ApiResponse<string>>(`/redemptions/${id}/status`, { status, reviewNote }),
   sendRedemptionDocuSignEnvelope: (id: number) =>
     api.post<ApiResponse<string>>(`/redemptions/${id}/send-docusign`, {}),
   auditLogs: (params: Record<string, string | number | boolean>) => {
