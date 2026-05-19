@@ -2,7 +2,11 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "@/components/AdminLayout";
 import { StatusBadge } from "@/components/StatusBadge";
-import { adminApi, type DashboardStats } from "@/lib/api";
+import { adminApi, type DashboardStats, type DashboardTrends } from "@/lib/api";
+import {
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+} from "recharts";
 
 function KpiCard({
   label,
@@ -69,15 +73,18 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+const PIE_COLORS = ["#0e3416", "#699172", "#b8923a", "#6366f1", "#10b981"];
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [trends, setTrends] = useState<DashboardTrends | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    adminApi
-      .dashboard()
-      .then((r) => {
-        if (r.success) setStats(r.data);
+    Promise.allSettled([adminApi.dashboard(), adminApi.dashboardTrends()])
+      .then(([sR, tR]) => {
+        if (sR.status === "fulfilled" && sR.value.success) setStats(sR.value.data);
+        if (tR.status === "fulfilled" && tR.value.success) setTrends(tR.value.data);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -214,6 +221,59 @@ export default function DashboardPage() {
                 color="#f59e0b"
               />
             </div>
+
+            {/* Charts */}
+            {trends && (
+              <>
+                <SectionLabel>Analytics</SectionLabel>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, marginBottom: 20 }}>
+                  {/* Applications by Month */}
+                  <div className="card">
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>Applications by Month</div>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={trends.monthlyApplications} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                        <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} allowDecimals={false} />
+                        <Tooltip contentStyle={{ fontSize: 12 }} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        <Bar dataKey="total" name="Submitted" fill="#c8d9cb" radius={[3,3,0,0]} />
+                        <Bar dataKey="approved" name="Approved" fill="#699172" radius={[3,3,0,0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Investor Type Breakdown */}
+                  <div className="card">
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>Investor Type Breakdown</div>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie data={trends.investorTypeBreakdown} dataKey="count" nameKey="type" cx="40%" cy="50%" outerRadius={70} label={({ type, percent }) => `${type} ${Math.round((percent ?? 0) * 100)}%`} labelLine={false}>
+                          {trends.investorTypeBreakdown.map((_, i) => (
+                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip contentStyle={{ fontSize: 12 }} formatter={(val, name) => [val, name]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Monthly Capital Deployed */}
+                  <div className="card">
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>Monthly Capital Deployed</div>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={trends.monthlyCapital} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                        <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={v => v >= 1_000_000 ? `$${(v/1_000_000).toFixed(1)}M` : `$${(v/1000).toFixed(0)}k`} />
+                        <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v: number) => [`$${v.toLocaleString()}`, "Deployed"]} />
+                        <Line type="monotone" dataKey="deployed" stroke="#699172" strokeWidth={2} dot={{ r: 4, fill: "#699172" }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Recent Applications */}
             <div className="card" style={{ marginTop: 28 }}>

@@ -215,6 +215,12 @@ export interface AuditLogItem {
   correlationId?: string;
 }
 
+export interface DashboardTrends {
+  monthlyApplications: { month: string; total: number; approved: number }[];
+  investorTypeBreakdown: { type: string; count: number }[];
+  monthlyCapital: { month: string; deployed: number }[];
+}
+
 export interface DocuSignSigner {
   name: string;
   email: string;
@@ -272,6 +278,7 @@ export const adminApi = {
       }>
     >("/login", { email, password }),
   dashboard: () => api.get<ApiResponse<DashboardStats>>("/dashboard"),
+  dashboardTrends: () => api.get<ApiResponse<DashboardTrends>>("/dashboard/trends"),
   users: (params: Record<string, string | number>) => {
     const q = new URLSearchParams(params as Record<string, string>).toString();
     return api.get<ApiResponse<PagedResult<UserListItem>>>(`/users?${q}`);

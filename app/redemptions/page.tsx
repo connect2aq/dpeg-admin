@@ -12,6 +12,9 @@ export default function RedemptionsPage() {
   const [result, setResult] = useState<PagedResult<RedemptionListItem> | null>(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('');
+  const [search, setSearch] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
   const [updating, setUpdating] = useState<number | null>(null);
   const [msgs, setMsgs] = useState<Record<number, string>>({});
@@ -20,10 +23,13 @@ export default function RedemptionsPage() {
     setLoading(true);
     const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE };
     if (status) params.status = status;
+    if (search) params.search = search;
+    if (from) params.from = from;
+    if (to) params.to = to;
     adminApi.redemptions(params)
       .then(r => { if (r.success) setResult(r.data); })
       .finally(() => setLoading(false));
-  }, [page, status]);
+  }, [page, status, search, from, to]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -46,12 +52,39 @@ export default function RedemptionsPage() {
       <div style={{ padding: '32px 36px' }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0e3416', marginBottom: 24 }}>Redemption Requests</h1>
 
-        {/* Filter */}
-        <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+        {/* Filters */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            placeholder="Search by name or email…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, minWidth: 240 }}
+          />
           <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}
             style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
             {STATUSES.map(s => <option key={s} value={s}>{s || 'All Statuses'}</option>)}
           </select>
+          <input
+            type="date"
+            value={from}
+            onChange={e => { setFrom(e.target.value); setPage(1); }}
+            style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}
+            title="From date"
+          />
+          <input
+            type="date"
+            value={to}
+            onChange={e => { setTo(e.target.value); setPage(1); }}
+            style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}
+            title="To date"
+          />
+          {(search || from || to) && (
+            <button
+              onClick={() => { setSearch(''); setFrom(''); setTo(''); setPage(1); }}
+              style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white', cursor: 'pointer', color: '#64748b' }}
+            >Clear</button>
+          )}
         </div>
 
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
