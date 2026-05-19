@@ -77,6 +77,8 @@ export default function ApplicationDetailPage() {
   const [dsError, setDsError] = useState('');
   const [dsSyncing, setDsSyncing] = useState(false);
   const [dsSyncMsg, setDsSyncMsg] = useState('');
+  const [dsSending, setDsSending] = useState(false);
+  const [dsSendMsg, setDsSendMsg] = useState('');
 
   useEffect(() => {
     adminApi.application(Number(id))
@@ -150,6 +152,20 @@ export default function ApplicationDetailPage() {
     if (r.success) setDsStatus(r.data);
     else setDsError(r.message || 'Failed to load');
     setDsLoading(false);
+  };
+
+  const sendDsEnvelope = async () => {
+    if (!app) return;
+    setDsSending(true); setDsSendMsg('');
+    const r = await adminApi.sendDocuSignEnvelope(app.id);
+    if (r.success) {
+      setApp(a => a ? { ...a, docuSignStatus: 'sent', docuSignSentAt: new Date().toISOString() } : a);
+      setDsSendMsg('Sent to signers.');
+    } else {
+      setDsSendMsg(r.message || 'Failed to send');
+    }
+    setDsSending(false);
+    setTimeout(() => setDsSendMsg(''), 5000);
   };
 
   const syncDsDate = async () => {
@@ -411,6 +427,15 @@ export default function ApplicationDetailPage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
                 <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342' }}>DocuSign Agreement</h2>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {(!app.docuSignStatus || app.docuSignStatus === 'created') && (
+                    <button onClick={sendDsEnvelope} disabled={dsSending}
+                      style={{ padding: '6px 14px', background: '#10b981', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', cursor: dsSending ? 'default' : 'pointer', opacity: dsSending ? 0.7 : 1 }}>
+                      {dsSending ? 'Sending…' : 'Send to Signers'}
+                    </button>
+                  )}
+                  {dsSendMsg && (
+                    <span style={{ fontSize: 12, color: dsSendMsg === 'Sent to signers.' ? '#10b981' : '#ef4444' }}>{dsSendMsg}</span>
+                  )}
                   <button onClick={loadDsStatus} disabled={dsLoading}
                     style={{ padding: '4px 10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, color: '#94a3b8', cursor: dsLoading ? 'default' : 'pointer', opacity: dsLoading ? 0.6 : 1 }}>
                     {dsLoading ? 'Refreshing…' : 'Refresh from DocuSign'}

@@ -283,6 +283,8 @@ export const adminApi = {
     }),
   syncDocuSignDate: (id: number) =>
     api.post<ApiResponse<string>>(`/applications/${id}/sync-docusign-date`, {}),
+  sendDocuSignEnvelope: (id: number) =>
+    api.post<ApiResponse<string>>(`/applications/${id}/send-docusign`, {}),
   docuSignEnvelopes: () =>
     api.get<ApiResponse<DocuSignEnvelopeItem[]>>("/docusign-envelopes"),
   docuSignEnvelopeStatus: (envelopeId: string) =>
