@@ -427,7 +427,8 @@ export default function ApplicationDetailPage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
                 <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342' }}>DocuSign Agreement</h2>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  {(!app.docuSignStatus || app.docuSignStatus === 'created') && (
+                  {(!app.docuSignStatus || app.docuSignStatus === 'created') &&
+                    !['sent', 'completed', 'delivered'].includes(dsStatus?.envelopeStatus ?? '') && (
                     <button onClick={sendDsEnvelope} disabled={dsSending}
                       style={{ padding: '6px 14px', background: '#10b981', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', cursor: dsSending ? 'default' : 'pointer', opacity: dsSending ? 0.7 : 1 }}>
                       {dsSending ? 'Sending…' : 'Send to Signers'}
@@ -481,9 +482,9 @@ export default function ApplicationDetailPage() {
               {(dsStatus?.recipients || dbSigners) && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
                   {(dsStatus?.recipients
-                    ? dsStatus.recipients.map(r => ({ name: r.name, email: r.email, roleName: r.roleName, status: r.status, signedAt: r.signedAt }))
-                    : (dbSigners as Array<{ name: string; email: string; roleName: string; status: string; signedDateTime?: string }>)
-                        .map(s => ({ name: s.name, email: s.email, roleName: s.roleName, status: s.status, signedAt: s.signedDateTime }))
+                    ? dsStatus.recipients.map(r => ({ name: r.name, email: r.email, roleName: r.roleName, status: r.status, signedAt: r.signedAt, sentAt: r.sentAt }))
+                    : (dbSigners as Array<{ name: string; email: string; roleName: string; status: string; signedDateTime?: string; sentDateTime?: string }>)
+                        .map(s => ({ name: s.name, email: s.email, roleName: s.roleName, status: s.status, signedAt: s.signedDateTime, sentAt: s.sentDateTime }))
                   ).map((r, i) => {
                     const signed = r.status === 'completed' || r.status === 'signed';
                     const color = signed ? '#10b981' : r.status === 'declined' ? '#ef4444' : '#f59e0b';
@@ -498,7 +499,11 @@ export default function ApplicationDetailPage() {
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a2e' }}>{r.name || '—'}</div>
                         <div style={{ fontSize: 11, color: '#64748b' }}>{r.email}</div>
                         <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color }}>
-                          {signed && r.signedAt ? `Signed ${new Date(r.signedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+                          {signed && r.signedAt
+                            ? `Signed ${new Date(r.signedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                            : r.sentAt
+                              ? `Sent ${new Date(r.sentAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                              : r.status.charAt(0).toUpperCase() + r.status.slice(1)}
                         </div>
                         {!signed && (
                           <a href={`mailto:${r.email}`}

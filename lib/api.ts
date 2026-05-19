@@ -247,6 +247,7 @@ export interface DocuSignRecipient {
   roleName: string;
   status: string;
   signedAt?: string;
+  sentAt?: string;
 }
 
 export interface DocuSignEnvelopeStatus {
