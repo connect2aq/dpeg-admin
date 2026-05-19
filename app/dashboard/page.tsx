@@ -248,7 +248,7 @@ export default function DashboardPage() {
                     <div style={{ fontSize: 14, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>Investor Type Breakdown</div>
                     <ResponsiveContainer width="100%" height={200}>
                       <PieChart>
-                        <Pie data={trends.investorTypeBreakdown} dataKey="count" nameKey="type" cx="40%" cy="50%" outerRadius={70} label={({ type, percent }) => `${type} ${Math.round((percent ?? 0) * 100)}%`} labelLine={false}>
+                        <Pie data={trends.investorTypeBreakdown} dataKey="count" nameKey="type" cx="40%" cy="50%" outerRadius={70} label={({ type, percent }: any) => `${type} ${Math.round((percent ?? 0) * 100)}%`} labelLine={false}>
                           {trends.investorTypeBreakdown.map((_, i) => (
                             <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                           ))}
