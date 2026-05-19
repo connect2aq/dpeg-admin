@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { adminApi, type RedemptionListItem, type PagedResult } from '@/lib/api';
@@ -78,8 +79,12 @@ export default function RedemptionsPage() {
                     <tr><td colSpan={10} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No redemption requests found</td></tr>
                   ) : result.items.map(r => (
                     <tr key={r.id}>
-                      <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>#{r.id}</td>
-                      <td style={{ fontWeight: 600 }}>{r.sellingPartnerName ?? '—'}</td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                        <Link href={`/redemptions/${r.id}`} style={{ color: '#b8923a', textDecoration: 'none' }}>#{r.id}</Link>
+                      </td>
+                      <td style={{ fontWeight: 600 }}>
+                        <Link href={`/redemptions/${r.id}`} style={{ color: '#0f2342', textDecoration: 'none' }}>{r.sellingPartnerName ?? '—'}</Link>
+                      </td>
                       <td>{r.investorType}</td>
                       <td style={{ fontWeight: 700, color: '#0e3416' }}>{r.unitsToRedeem ?? '—'}</td>
                       <td style={{ color: '#64748b' }}>{r.totalUnitsOwned ?? '—'}</td>

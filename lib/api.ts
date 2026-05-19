@@ -177,6 +177,24 @@ export interface RedemptionListItem {
   createdOn: string;
 }
 
+export interface RedemptionDetail extends RedemptionListItem {
+  entityName?: string;
+  signatoryName?: string;
+  signatoryTitle?: string;
+  printedName?: string;
+  originalPurchaseDate?: string;
+  proratedPreferredReturn?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  addressLine3?: string;
+  trancheApplicationId?: number;
+  docuSignEnvelopeId?: string;
+  docuSignStatus?: string;
+  docuSignSentAt?: string;
+  docuSignCompletedAt?: string;
+  docuSignSignersJson?: string;
+}
+
 export interface AuditLogItem {
   id: number;
   timestampUtc: string;
@@ -297,8 +315,12 @@ export const adminApi = {
       `/redemptions?${q}`,
     );
   },
+  redemption: (id: number) =>
+    api.get<ApiResponse<RedemptionDetail>>(`/redemptions/${id}`),
   updateRedemptionStatus: (id: number, status: string) =>
     api.put<ApiResponse<string>>(`/redemptions/${id}/status`, { status }),
+  sendRedemptionDocuSignEnvelope: (id: number) =>
+    api.post<ApiResponse<string>>(`/redemptions/${id}/send-docusign`, {}),
   auditLogs: (params: Record<string, string | number | boolean>) => {
     const q = new URLSearchParams(
       Object.fromEntries(
