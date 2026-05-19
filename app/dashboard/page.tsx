@@ -266,7 +266,7 @@ export default function DashboardPage() {
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                         <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
                         <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={v => v >= 1_000_000 ? `$${(v/1_000_000).toFixed(1)}M` : `$${(v/1000).toFixed(0)}k`} />
-                        <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v: number) => [`$${v.toLocaleString()}`, "Deployed"]} />
+                        <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v: any) => [`$${Number(v).toLocaleString()}`, "Deployed"]} />
                         <Line type="monotone" dataKey="deployed" stroke="#699172" strokeWidth={2} dot={{ r: 4, fill: "#699172" }} />
                       </LineChart>
                     </ResponsiveContainer>
