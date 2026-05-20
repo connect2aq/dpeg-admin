@@ -22,7 +22,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new Error("Unauthorized");
   }
   const text = await res.text();
-  return text ? JSON.parse(text) : ({} as T);
+  if (!text) return {} as T;
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(text.slice(0, 300));
+  }
 }
 
 export const api = {
