@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Providers from "@/components/Providers";
 
+const isStaging = process.env.NEXT_PUBLIC_ENV === "staging";
+// const isStaging = true;
+
 export const metadata: Metadata = {
-  title: "DPEG Admin Portal",
+  title: isStaging ? "DPEG Admin Portal (Staging)" : "DPEG Admin Portal",
   description: "Administration portal for DPEG Real Estate Fund",
   icons: {
     icon: `${process.env.NEXT_PUBLIC_BASE_PATH || ""}/favicon.svg`,
@@ -18,7 +21,13 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className="h-full">
-        <Providers>{children}</Providers>
+        <Providers>
+          {isStaging && (
+            <div className="bg-amber-500 text-amber-950 text-center py-2 font-bold text-sm tracking-wider uppercase sticky top-0 z-50 shadow-md">
+              This is a Testing Portal
+            </div>
+          )}
+          {children}</Providers>
       </body>
     </html>
   );
