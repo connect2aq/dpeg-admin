@@ -8,6 +8,10 @@ import { adminApi, type RedemptionDetail, type DocuSignEnvelopeStatus } from '@/
 
 const STATUSES = ['UnderReview', 'Active', 'Rejected', 'Redeemed'];
 
+// DB DateTime columns come back without timezone info; append Z so JS treats them as UTC
+const asUtc = (iso?: string | null) =>
+  iso ? (iso.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(iso) ? iso : iso + 'Z') : null;
+
 function InfoRow({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null;
   return (
@@ -224,12 +228,12 @@ export default function RedemptionDetailPage() {
                 </span>
                 {(dsStatus?.lastSignerDate || redemption.docuSignCompletedAt) && (
                   <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd' }}>
-                    Completed: {new Date(dsStatus?.lastSignerDate ?? redemption.docuSignCompletedAt!).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    Completed: {new Date(asUtc(dsStatus?.lastSignerDate ?? redemption.docuSignCompletedAt)!).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </span>
                 )}
                 {redemption.docuSignSentAt && (
                   <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0' }}>
-                    Sent: {new Date(redemption.docuSignSentAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    Sent: {new Date(asUtc(redemption.docuSignSentAt)!).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </span>
                 )}
                 {dsStatus && <span style={{ fontSize: 10, color: '#94a3b8', alignSelf: 'center' }}>Live</span>}
@@ -257,9 +261,9 @@ export default function RedemptionDetailPage() {
                       <div style={{ fontSize: 11, color: '#64748b' }}>{r.email}</div>
                       <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color }}>
                         {signed && r.signedAt
-                          ? `Signed ${new Date(r.signedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                          ? `Signed ${new Date(asUtc(r.signedAt)!).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
                           : r.sentAt
-                            ? `Sent ${new Date(r.sentAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                            ? `Sent ${new Date(asUtc(r.sentAt)!).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
                             : r.status.charAt(0).toUpperCase() + r.status.slice(1)}
                       </div>
                       {!signed && (
