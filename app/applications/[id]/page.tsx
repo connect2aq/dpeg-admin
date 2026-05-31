@@ -402,27 +402,6 @@ export default function ApplicationDetailPage() {
           </div>
         )}
 
-        {/* Identity Documents */}
-        {app.investorProfile && (app.investorProfile.drivingLicensePath || app.investorProfile.taxCertificatePath) && (
-          <div className="card" style={{ marginTop: 20 }}>
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 16 }}>Identity Documents</h2>
-            {app.investorProfile.drivingLicensePath && (
-              <DocumentPreview
-                label="Driving License"
-                number={app.investorProfile.drivingLicenseNo}
-                state={app.investorProfile.drivingLicenseState}
-                path={app.investorProfile.drivingLicensePath}
-              />
-            )}
-            {app.investorProfile.taxCertificatePath && (
-              <DocumentPreview
-                label="Tax Certificate / EIN Letter"
-                number={app.investorProfile.taxCertificateNo}
-                path={app.investorProfile.taxCertificatePath}
-              />
-            )}
-          </div>
-        )}
 
         {/* DocuSign Status */}
         {app.docuSignEnvelopeId && (() => {
