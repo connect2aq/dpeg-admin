@@ -168,6 +168,8 @@ export interface ApplicationDetail extends ApplicationListItem {
     distributionPreference?: string;
     bankName?: string;
     accHolder?: string;
+    routingNumber?: number;
+    accNumber?: string;
   };
 }
 

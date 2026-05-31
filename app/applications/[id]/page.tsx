@@ -332,6 +332,8 @@ export default function ApplicationDetailPage() {
                 <InfoRow label="Distribution" value={app.investment.distributionPreference} />
                 <InfoRow label="Bank" value={app.investment.bankName} />
                 <InfoRow label="Account Holder" value={app.investment.accHolder} />
+                <InfoRow label="Routing Number" value={app.investment.routingNumber?.toString()} />
+                <InfoRow label="Account Number" value={app.investment.accNumber} />
               </div>
             </div>
           )}
