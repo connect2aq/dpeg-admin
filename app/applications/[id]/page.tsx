@@ -366,13 +366,15 @@ export default function ApplicationDetailPage() {
               <InfoRow label="Mailing Address" value={app.investorProfile.mailingAddress} />
             </div>
 
-            {app.investorProfile.spouseFullName && (
+            {app.investorProfile.maritalStatus?.toLowerCase() === 'married' && (
               <>
-                <SectionLabel>Spouse</SectionLabel>
+                <SectionLabel>Spouse / Joint Tenant</SectionLabel>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
                   <InfoRow label="Spouse Name" value={app.investorProfile.spouseFullName} />
                   <InfoRow label="Spouse Email" value={app.investorProfile.spouseEmail} />
+                  <InfoRow label="Spouse SSN" value={app.investorProfile.spouseSSN} />
                   <InfoRow label="Spouse DOB" value={app.investorProfile.spouseDateOfBirth} />
+                  <InfoRow label="Ownership Type" value={app.investorProfile.ownershipType} />
                 </div>
               </>
             )}

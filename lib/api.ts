@@ -138,6 +138,7 @@ export interface ApplicationDetail extends ApplicationListItem {
     // Spouse
     spouseFullName?: string;
     spouseEmail?: string;
+    spouseSSN?: string;
     spouseDateOfBirth?: string;
     // Entity
     stateFormation?: string;
