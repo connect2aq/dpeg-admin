@@ -6,7 +6,7 @@ import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { adminApi, type RedemptionDetail, type DocuSignEnvelopeStatus } from '@/lib/api';
 
-const STATUSES = ['UnderReview', 'Active', 'Rejected', 'Redeemed'];
+const STATUSES = ['UnderReview', 'Rejected', 'Redeemed'];
 
 // DB DateTime columns come back without timezone info; append Z so JS treats them as UTC
 const asUtc = (iso?: string | null) =>
