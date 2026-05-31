@@ -344,4 +344,17 @@ export const adminApi = {
     ).toString();
     return api.get<ApiResponse<PagedResult<AuditLogItem>>>(`/audit-logs?${q}`);
   },
+  getBankDetails: () =>
+    api.get<ApiResponse<BankDetails>>('/bank-details'),
+  saveBankDetails: (dto: BankDetails) =>
+    api.put<ApiResponse<string>>('/bank-details', dto),
 };
+
+export interface BankDetails {
+  id?: number;
+  beneficiaryName: string;
+  bankName: string;
+  accountNumber: string;
+  routingSwiftCode: string;
+  address: string;
+}

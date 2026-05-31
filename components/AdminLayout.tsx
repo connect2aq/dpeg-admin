@@ -12,6 +12,7 @@ const NAV = [
   { href: "/redemptions", label: "Redemptions", icon: "↩" },
   { href: "/docusign", label: "DocuSign", icon: "✍" },
   { href: "/audit-log", label: "Audit Log", icon: "🔍" },
+  { href: "/settings", label: "Settings", icon: "⚙" },
 ];
 
 export default function AdminLayout({
