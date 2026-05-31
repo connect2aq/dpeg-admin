@@ -106,6 +106,7 @@ export interface ApplicationListItem extends ApplicationSummary {
   userFirstName: string;
   userLastName: string;
   userEmail: string;
+  investorName?: string;
 }
 
 export interface ApplicationDetail extends ApplicationListItem {

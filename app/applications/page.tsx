@@ -64,6 +64,7 @@ export default function ApplicationsPage() {
                 <thead>
                   <tr>
                     <th>ID / Ref</th>
+                    <th>Account User</th>
                     <th>Investor</th>
                     <th>Type</th>
                     <th>Units</th>
@@ -75,7 +76,7 @@ export default function ApplicationsPage() {
                 </thead>
                 <tbody>
                   {result.items.length === 0 ? (
-                    <tr><td colSpan={8} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No applications found</td></tr>
+                    <tr><td colSpan={9} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No applications found</td></tr>
                   ) : result.items.map(a => (
                     <tr key={a.id}>
                       <td>
@@ -85,6 +86,9 @@ export default function ApplicationsPage() {
                       <td>
                         <div style={{ fontWeight: 600 }}>{a.userFirstName} {a.userLastName}</div>
                         <div style={{ fontSize: 12, color: '#94a3b8' }}>{a.userEmail}</div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{a.investorName || '—'}</div>
                       </td>
                       <td>{a.investorType}</td>
                       <td>{a.numUnits ?? '—'}</td>
