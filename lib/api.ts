@@ -232,6 +232,94 @@ export interface DashboardTrends {
   monthlyCapital: { month: string; deployed: number }[];
 }
 
+// ── Historical Import ────────────────────────────────────────────────────────
+
+export interface ImportRowResult {
+  rowNumber: number;
+  userEmail?: string;
+  investorName?: string;
+  success: boolean;
+  errorMessage?: string;
+  userId?: number;
+  applicationId?: number;
+  ppmRefNO?: number;
+}
+
+export interface ImportResult {
+  totalRows: number;
+  succeeded: number;
+  failed: number;
+  rows: ImportRowResult[];
+}
+
+export interface WelcomeEmailRowResult {
+  userId: number;
+  email?: string;
+  sent: boolean;
+  alreadySent: boolean;
+  errorMessage?: string;
+}
+
+export interface WelcomeEmailResult {
+  total: number;
+  sent: number;
+  alreadySent: number;
+  failed: number;
+  rows: WelcomeEmailRowResult[];
+}
+
+export interface OdooSyncRowResult {
+  applicationId: number;
+  investorName?: string;
+  email?: string;
+  odooInvestorSynced: boolean;
+  odooInvestmentSynced: boolean;
+  errorMessage?: string;
+}
+
+export interface OdooSyncResult {
+  total: number;
+  succeeded: number;
+  failed: number;
+  rows: OdooSyncRowResult[];
+}
+
+export const historicalImportApi = {
+  downloadTemplate: () => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("adminToken") : null;
+    return fetch(`${BASE}historical-import/template`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+  },
+
+  upload: (file: File): Promise<{ success: boolean; data: ImportResult; message: string }> => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("adminToken") : null;
+    const form = new FormData();
+    form.append("file", file);
+    return fetch(`${BASE}historical-import/upload`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    }).then((r) => r.json());
+  },
+
+  sendWelcomeEmails: (
+    userIds: number[]
+  ): Promise<{ success: boolean; data: WelcomeEmailResult; message: string }> =>
+    request(`historical-import/send-welcome-emails`, {
+      method: "POST",
+      body: JSON.stringify({ userIds }),
+    }),
+
+  syncToOdoo: (
+    applicationIds: number[]
+  ): Promise<{ success: boolean; data: OdooSyncResult; message: string }> =>
+    request(`historical-import/sync-odoo`, {
+      method: "POST",
+      body: JSON.stringify({ applicationIds }),
+    }),
+};
+
 export interface DocuSignSigner {
   name: string;
   email: string;
