@@ -91,7 +91,10 @@ export default function HistoricalImportPage() {
     const blob = await res.blob();
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href = url; a.download = 'HistoricalImportTemplate.xlsx'; a.click();
+    a.href = url; a.download = 'HistoricalImportTemplate.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 

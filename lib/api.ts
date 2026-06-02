@@ -287,7 +287,7 @@ export interface OdooSyncResult {
 export const historicalImportApi = {
   downloadTemplate: () => {
     const token = typeof window !== "undefined" ? localStorage.getItem("adminToken") : null;
-    return fetch(`${BASE}historical-import/template`, {
+    return fetch(`${BASE}/historical-import/template`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
   },
@@ -296,7 +296,7 @@ export const historicalImportApi = {
     const token = typeof window !== "undefined" ? localStorage.getItem("adminToken") : null;
     const form = new FormData();
     form.append("file", file);
-    return fetch(`${BASE}historical-import/upload`, {
+    return fetch(`${BASE}/historical-import/upload`, {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: form,
@@ -306,7 +306,7 @@ export const historicalImportApi = {
   sendWelcomeEmails: (
     userIds: number[]
   ): Promise<{ success: boolean; data: WelcomeEmailResult; message: string }> =>
-    request(`historical-import/send-welcome-emails`, {
+    request(`/historical-import/send-welcome-emails`, {
       method: "POST",
       body: JSON.stringify({ userIds }),
     }),
@@ -314,7 +314,7 @@ export const historicalImportApi = {
   syncToOdoo: (
     applicationIds: number[]
   ): Promise<{ success: boolean; data: OdooSyncResult; message: string }> =>
-    request(`historical-import/sync-odoo`, {
+    request(`/historical-import/sync-odoo`, {
       method: "POST",
       body: JSON.stringify({ applicationIds }),
     }),
