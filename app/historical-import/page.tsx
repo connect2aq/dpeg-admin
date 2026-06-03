@@ -1,5 +1,6 @@
 'use client';
 import { useRef, useState } from 'react';
+import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import {
   historicalImportApi,
@@ -47,9 +48,10 @@ function exportToCsv(rows: object[], filename: string) {
 
 export default function HistoricalImportPage() {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading]     = useState(false);
+  const [uploading, setUploading]       = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const [importError, setImportError]  = useState('');
+  const [importError, setImportError]   = useState('');
+  const [lastSessionId, setLastSessionId] = useState<number | null>(null);
 
   // Phase 2 — welcome email state per userId
   const [emailSending, setEmailSending]  = useState(false);
@@ -73,10 +75,13 @@ export default function HistoricalImportPage() {
     setImportResult(null);
     setEmailResults({});
     setOdooResults({});
+    setLastSessionId(null);
     try {
       const res = await historicalImportApi.upload(file);
-      if (res.success) setImportResult(res.data);
-      else setImportError(res.message || 'Upload failed.');
+      if (res.success) {
+        setImportResult(res.data);
+        setLastSessionId(res.data.sessionId ?? null);
+      } else setImportError(res.message || 'Upload failed.');
     } catch {
       setImportError('Network error. Please try again.');
     } finally {
@@ -164,7 +169,14 @@ export default function HistoricalImportPage() {
   return (
     <AdminLayout>
       <div style={s.page}>
-        <h1 style={s.h1}>Historical Import</h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <h1 style={{ ...s.h1, marginBottom: 0 }}>Historical Import</h1>
+          <Link href="/historical-import/history" style={{
+            fontSize: 13, color: '#b8923a', fontWeight: 600, textDecoration: 'none',
+          }}>
+            View Import History →
+          </Link>
+        </div>
         <p style={s.sub}>
           Load historical investor records directly at Active status — no DocuSign, no approval workflow.
           Follow the three steps below in order.
@@ -227,6 +239,13 @@ export default function HistoricalImportPage() {
             <div style={{ display: 'flex', gap: 24, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ fontWeight: 700, color: '#0f2342', fontSize: 15 }}>
                 Import Results
+                {lastSessionId && (
+                  <Link href={`/historical-import/history/${lastSessionId}`} style={{
+                    marginLeft: 12, fontSize: 12, color: '#b8923a', fontWeight: 600, textDecoration: 'none',
+                  }}>
+                    View in History →
+                  </Link>
+                )}
               </span>
               <span style={{ fontSize: 13, color: '#64748b' }}>
                 Total: <strong>{importResult.totalRows}</strong> &nbsp;|&nbsp;

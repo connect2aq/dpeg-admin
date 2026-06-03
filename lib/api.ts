@@ -246,6 +246,7 @@ export interface ImportRowResult {
 }
 
 export interface ImportResult {
+  sessionId: number;
   totalRows: number;
   succeeded: number;
   failed: number;
@@ -318,7 +319,49 @@ export const historicalImportApi = {
       method: "POST",
       body: JSON.stringify({ applicationIds }),
     }),
+
+  getSessions: (): Promise<{ success: boolean; data: ImportSessionListItem[]; message: string }> =>
+    request(`/historical-import/sessions`),
+
+  getSessionDetail: (sessionId: number): Promise<{ success: boolean; data: ImportSessionDetail; message: string }> =>
+    request(`/historical-import/sessions/${sessionId}`),
 };
+
+export interface ImportSessionListItem {
+  id: number;
+  fileName: string;
+  importedAt: string;
+  importedByUserId: number;
+  totalRows: number;
+  succeeded: number;
+  failed: number;
+}
+
+export interface ImportSessionRow {
+  id: number;
+  rowNumber: number;
+  userEmail?: string;
+  investorName?: string;
+  success: boolean;
+  errorMessage?: string;
+  userId?: number;
+  applicationId?: number;
+  ppmRefNo?: number;
+  welcomeEmailSentAt?: string;
+  odooInvestorSyncedAt?: string;
+  odooInvestmentSyncedAt?: string;
+}
+
+export interface ImportSessionDetail {
+  id: number;
+  fileName: string;
+  importedAt: string;
+  importedByUserId: number;
+  totalRows: number;
+  succeeded: number;
+  failed: number;
+  rows: ImportSessionRow[];
+}
 
 export interface DocuSignSigner {
   name: string;
