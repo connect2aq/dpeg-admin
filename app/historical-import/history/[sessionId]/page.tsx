@@ -279,7 +279,7 @@ export default function SessionDetailPage() {
                           <td style={s.td} onClick={e => e.stopPropagation()}>{odooStatusCell(row, 'investor')}</td>
                           <td style={s.td} onClick={e => e.stopPropagation()}>{odooStatusCell(row, 'investment')}</td>
                           <td style={{ ...s.td, color: '#991b1b', fontSize: 12, maxWidth: 220, wordBreak: 'break-word' }}>
-                            {row.errorMessage ?? ''}
+                            {row.errorMessage ?? (row.userId ? emailResults[row.userId]?.errorMessage : undefined) ?? ''}
                           </td>
                         </tr>
                       );
