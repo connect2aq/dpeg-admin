@@ -75,9 +75,11 @@ export default function SessionDetailPage() {
     r.userId && !r.welcomeEmailSentAt && !emailResults[r.userId!]?.sent && !emailResults[r.userId!]?.alreadySent
   );
 
-  // Odoo: selected rows that still need syncing
+  // Odoo: selected rows that still need any Odoo sync (investor pending, or investor done but investment pending)
   const odooTargets = selectedSuccessRows.filter(r =>
-    r.applicationId && !r.odooInvestorSyncedAt && !odooResults[r.applicationId!]
+    r.applicationId &&
+    !odooResults[r.applicationId!] &&
+    (!r.odooInvestorSyncedAt || !r.odooInvestmentSyncedAt)
   );
 
   // ── Send emails ──────────────────────────────────────────────────────────────
@@ -159,6 +161,14 @@ export default function SessionDetailPage() {
       return (
         <button onClick={() => row.applicationId && syncOdoo([row.applicationId])} disabled={odooSyncing} style={s.btn('#0f2342', odooSyncing)}>
           ⚡ Sync
+        </button>
+      );
+    }
+    // Investment pending but investor already done — show a retry button
+    if (row.odooInvestorSyncedAt) {
+      return (
+        <button onClick={() => row.applicationId && syncOdoo([row.applicationId])} disabled={odooSyncing} style={s.btn('#0f2342', odooSyncing)}>
+          ⚡ Retry
         </button>
       );
     }
