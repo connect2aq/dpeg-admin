@@ -25,11 +25,11 @@ export default function SessionDetailPage() {
   const params    = useParams();
   const sessionId = Number(params.sessionId);
 
-  const [session, setSession]       = useState<ImportSessionDetail | null>(null);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState('');
+  const [session, setSession]     = useState<ImportSessionDetail | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState('');
+  const [selected, setSelected]   = useState<Set<number>>(new Set()); // row IDs
 
-  // Per-row transient action results (in-memory, not persisted until refresh)
   const [emailSending, setEmailSending] = useState(false);
   const [emailResults, setEmailResults] = useState<Record<number, WelcomeEmailRowResult>>({});
   const [odooSyncing, setOdooSyncing]   = useState(false);
@@ -39,7 +39,7 @@ export default function SessionDetailPage() {
     setLoading(true);
     historicalImportApi.getSessionDetail(sessionId)
       .then(res => {
-        if (res.success) setSession(res.data);
+        if (res.success) { setSession(res.data); setSelected(new Set()); }
         else setError(res.message || 'Session not found.');
       })
       .catch(() => setError('Network error. Please try again.'))
@@ -49,6 +49,36 @@ export default function SessionDetailPage() {
   useEffect(() => { load(); }, [sessionId]);
 
   const successRows = session?.rows.filter(r => r.success) ?? [];
+
+  // ── Selection helpers ────────────────────────────────────────────────────────
+
+  const selectableIds = successRows.map(r => r.id);
+  const allSelected   = selectableIds.length > 0 && selectableIds.every(id => selected.has(id));
+  const someSelected  = selectableIds.some(id => selected.has(id));
+
+  const toggleAll = () => {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(selectableIds));
+  };
+
+  const toggleRow = (id: number) => {
+    const next = new Set(selected);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setSelected(next);
+  };
+
+  // Rows the user has checked
+  const selectedSuccessRows = successRows.filter(r => selected.has(r.id));
+
+  // Email: selected rows that still need an email
+  const emailTargets = selectedSuccessRows.filter(r =>
+    r.userId && !r.welcomeEmailSentAt && !emailResults[r.userId!]?.sent && !emailResults[r.userId!]?.alreadySent
+  );
+
+  // Odoo: selected rows that still need syncing
+  const odooTargets = selectedSuccessRows.filter(r =>
+    r.applicationId && !r.odooInvestorSyncedAt && !odooResults[r.applicationId!]
+  );
 
   // ── Send emails ──────────────────────────────────────────────────────────────
 
@@ -60,18 +90,10 @@ export default function SessionDetailPage() {
         const map: Record<number, WelcomeEmailRowResult> = { ...emailResults };
         res.data.rows.forEach(r => { map[r.userId] = r; });
         setEmailResults(map);
-        // Refresh session to get updated WelcomeEmailSentAt timestamps
         load();
       }
     } catch {/* ignore */}
     finally { setEmailSending(false); }
-  };
-
-  const sendAllEmails = () => {
-    const ids = successRows
-      .filter(r => r.userId && !r.welcomeEmailSentAt && !emailResults[r.userId!]?.sent && !emailResults[r.userId!]?.alreadySent)
-      .map(r => r.userId!);
-    if (ids.length) sendEmails(ids);
   };
 
   // ── Odoo sync ────────────────────────────────────────────────────────────────
@@ -84,29 +106,13 @@ export default function SessionDetailPage() {
         const map: Record<number, OdooSyncRowResult> = { ...odooResults };
         res.data.rows.forEach(r => { map[r.applicationId] = r; });
         setOdooResults(map);
-        // Refresh session to get updated Odoo timestamps
         load();
       }
     } catch {/* ignore */}
     finally { setOdooSyncing(false); }
   };
 
-  const syncAllOdoo = () => {
-    const ids = successRows
-      .filter(r => r.applicationId && !r.odooInvestorSyncedAt && !odooResults[r.applicationId!])
-      .map(r => r.applicationId!);
-    if (ids.length) syncOdoo(ids);
-  };
-
-  // ── Helpers ──────────────────────────────────────────────────────────────────
-
-  const emailPendingCount = successRows.filter(r =>
-    r.userId && !r.welcomeEmailSentAt && !emailResults[r.userId!]?.sent && !emailResults[r.userId!]?.alreadySent
-  ).length;
-
-  const odooPendingCount = successRows.filter(r =>
-    r.applicationId && !r.odooInvestorSyncedAt && !odooResults[r.applicationId!]
-  ).length;
+  // ── Styles ───────────────────────────────────────────────────────────────────
 
   const s = {
     page:  { padding: '32px 0' } as React.CSSProperties,
@@ -122,12 +128,14 @@ export default function SessionDetailPage() {
     }),
   };
 
+  // ── Cell renderers ───────────────────────────────────────────────────────────
+
   const emailStatusCell = (row: ImportSessionRow) => {
     const transient = row.userId ? emailResults[row.userId] : undefined;
     if (!row.success) return <span style={{ color: '#94a3b8' }}>—</span>;
     if (row.welcomeEmailSentAt)
       return <Badge ok={true} label={`Sent ${new Date(row.welcomeEmailSentAt).toLocaleDateString()}`} />;
-    if (transient?.sent)      return <Badge ok={true} label="Sent" />;
+    if (transient?.sent)        return <Badge ok={true} label="Sent" />;
     if (transient?.alreadySent) return <Badge ok={true} label="Already Sent" />;
     if (transient?.errorMessage) return <Badge ok={false} label="Failed" />;
     return (
@@ -140,17 +148,13 @@ export default function SessionDetailPage() {
   const odooStatusCell = (row: ImportSessionRow, field: 'investor' | 'investment') => {
     const transient = row.applicationId ? odooResults[row.applicationId] : undefined;
     if (!row.success) return <span style={{ color: '#94a3b8' }}>—</span>;
-
     const syncedAt = field === 'investor' ? row.odooInvestorSyncedAt : row.odooInvestmentSyncedAt;
     if (syncedAt)
       return <Badge ok={true} label={`Synced ${new Date(syncedAt).toLocaleDateString()}`} />;
-
     if (transient) {
       const ok = field === 'investor' ? transient.odooInvestorSynced : transient.odooInvestmentSynced;
       return <Badge ok={ok} label={ok ? 'Synced' : 'Failed'} />;
     }
-
-    // Show sync button only in investor column; investment is always bulk
     if (field === 'investor') {
       return (
         <button onClick={() => row.applicationId && syncOdoo([row.applicationId])} disabled={odooSyncing} style={s.btn('#0f2342', odooSyncing)}>
@@ -160,6 +164,8 @@ export default function SessionDetailPage() {
     }
     return <span style={{ color: '#94a3b8' }}>Pending</span>;
   };
+
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <AdminLayout>
@@ -183,21 +189,37 @@ export default function SessionDetailPage() {
             </p>
 
             <div style={s.card}>
-              {/* Bulk action bar */}
-              <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-                {emailPendingCount > 0 && (
-                  <button onClick={sendAllEmails} disabled={emailSending} style={s.btn('#b8923a', emailSending)}>
-                    {emailSending ? 'Sending…' : `✉ Send All Welcome Emails (${emailPendingCount})`}
-                  </button>
-                )}
-                {odooPendingCount > 0 && (
-                  <button onClick={syncAllOdoo} disabled={odooSyncing} style={s.btn('#0f2342', odooSyncing)}>
-                    {odooSyncing ? 'Syncing…' : `⚡ Sync All to Odoo (${odooPendingCount})`}
-                  </button>
-                )}
-                {emailPendingCount === 0 && odooPendingCount === 0 && successRows.length > 0 && (
-                  <span style={{ fontSize: 13, color: '#166534', fontWeight: 600 }}>
-                    ✓ All actions complete for this session
+              {/* Action bar */}
+              <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                {someSelected ? (
+                  <>
+                    <span style={{ fontSize: 13, color: '#64748b', marginRight: 4 }}>
+                      {selected.size} row{selected.size !== 1 ? 's' : ''} selected
+                    </span>
+                    <button
+                      onClick={() => sendEmails(emailTargets.map(r => r.userId!))}
+                      disabled={emailSending || emailTargets.length === 0}
+                      style={s.btn('#b8923a', emailSending || emailTargets.length === 0)}
+                    >
+                      {emailSending ? 'Sending…' : `✉ Send Welcome Emails (${emailTargets.length})`}
+                    </button>
+                    <button
+                      onClick={() => syncOdoo(odooTargets.map(r => r.applicationId!))}
+                      disabled={odooSyncing || odooTargets.length === 0}
+                      style={s.btn('#0f2342', odooSyncing || odooTargets.length === 0)}
+                    >
+                      {odooSyncing ? 'Syncing…' : `⚡ Sync to Odoo (${odooTargets.length})`}
+                    </button>
+                    <button
+                      onClick={() => setSelected(new Set())}
+                      style={{ ...s.btn('#94a3b8'), background: 'none', color: '#64748b', border: '1px solid #d1d5db' }}
+                    >
+                      Clear
+                    </button>
+                  </>
+                ) : (
+                  <span style={{ fontSize: 13, color: '#94a3b8' }}>
+                    Select rows below to send emails or sync to Odoo.
                   </span>
                 )}
               </div>
@@ -206,6 +228,16 @@ export default function SessionDetailPage() {
                 <table style={s.table}>
                   <thead>
                     <tr>
+                      {/* Select-all checkbox */}
+                      <th style={{ ...s.th, width: 36, textAlign: 'center' as const }}>
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                          onChange={toggleAll}
+                          style={{ cursor: 'pointer', width: 14, height: 14 }}
+                        />
+                      </th>
                       <th style={s.th}>Row</th>
                       <th style={s.th}>Investor</th>
                       <th style={s.th}>Email</th>
@@ -218,23 +250,40 @@ export default function SessionDetailPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {session.rows.map(row => (
-                      <tr key={row.rowNumber}>
-                        <td style={s.td}>{row.rowNumber}</td>
-                        <td style={s.td}>{row.investorName ?? '—'}</td>
-                        <td style={s.td}>{row.userEmail ?? '—'}</td>
-                        <td style={s.td}>
-                          <Badge ok={row.success} label={row.success ? 'Imported' : 'Failed'} />
-                        </td>
-                        <td style={s.td}>{row.ppmRefNo ?? '—'}</td>
-                        <td style={s.td}>{emailStatusCell(row)}</td>
-                        <td style={s.td}>{odooStatusCell(row, 'investor')}</td>
-                        <td style={s.td}>{odooStatusCell(row, 'investment')}</td>
-                        <td style={{ ...s.td, color: '#991b1b', fontSize: 12, maxWidth: 220, wordBreak: 'break-word' }}>
-                          {row.errorMessage ?? ''}
-                        </td>
-                      </tr>
-                    ))}
+                    {session.rows.map(row => {
+                      const isSelected = selected.has(row.id);
+                      return (
+                        <tr
+                          key={row.rowNumber}
+                          style={{ background: isSelected ? '#fffbeb' : undefined, cursor: row.success ? 'pointer' : 'default' }}
+                          onClick={() => row.success && toggleRow(row.id)}
+                        >
+                          <td style={{ ...s.td, textAlign: 'center' as const }} onClick={e => e.stopPropagation()}>
+                            {row.success && (
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleRow(row.id)}
+                                style={{ cursor: 'pointer', width: 14, height: 14 }}
+                              />
+                            )}
+                          </td>
+                          <td style={s.td}>{row.rowNumber}</td>
+                          <td style={s.td}>{row.investorName ?? '—'}</td>
+                          <td style={s.td}>{row.userEmail ?? '—'}</td>
+                          <td style={s.td}>
+                            <Badge ok={row.success} label={row.success ? 'Imported' : 'Failed'} />
+                          </td>
+                          <td style={s.td}>{row.ppmRefNo ?? '—'}</td>
+                          <td style={s.td} onClick={e => e.stopPropagation()}>{emailStatusCell(row)}</td>
+                          <td style={s.td} onClick={e => e.stopPropagation()}>{odooStatusCell(row, 'investor')}</td>
+                          <td style={s.td} onClick={e => e.stopPropagation()}>{odooStatusCell(row, 'investment')}</td>
+                          <td style={{ ...s.td, color: '#991b1b', fontSize: 12, maxWidth: 220, wordBreak: 'break-word' }}>
+                            {row.errorMessage ?? ''}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
