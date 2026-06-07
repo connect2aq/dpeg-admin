@@ -192,6 +192,24 @@ export default function RedemptionDetailPage() {
           </div>
         </div>
 
+        {/* Bank Details */}
+        {(redemption.bankName || redemption.bankAccountHolderName || redemption.bankAccountNumber) && (
+          <div className="card" style={{ marginBottom: 20 }}>
+            <SectionLabel>Bank Details</SectionLabel>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px 24px' }}>
+              <InfoRow label="Bank Name" value={redemption.bankName} />
+              <InfoRow label="Account Holder" value={redemption.bankAccountHolderName} />
+              <InfoRow
+                label="Account Number"
+                value={redemption.bankAccountNumber
+                  ? '••••' + redemption.bankAccountNumber.slice(-4)
+                  : undefined}
+              />
+              <InfoRow label="Routing Number" value={redemption.bankRoutingNumber} />
+            </div>
+          </div>
+        )}
+
         {/* DocuSign section */}
         {redemption.docuSignEnvelopeId && (
           <div className="card" style={{ marginTop: 20 }}>

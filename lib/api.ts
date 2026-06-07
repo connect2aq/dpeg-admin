@@ -36,6 +36,8 @@ export const api = {
   get: <T>(path: string) => request<T>(path),
   put: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
+  delete: <T>(path: string) =>
+    request<T>(path, { method: "DELETE" }),
 };
 
 export interface AdminUser {
@@ -204,6 +206,10 @@ export interface RedemptionDetail extends RedemptionListItem {
   docuSignSentAt?: string;
   docuSignCompletedAt?: string;
   docuSignSignersJson?: string;
+  bankName?: string;
+  bankAccountHolderName?: string;
+  bankAccountNumber?: string;
+  bankRoutingNumber?: string;
 }
 
 export interface AuditLogItem {
@@ -483,7 +489,19 @@ export const adminApi = {
     api.get<ApiResponse<BankDetails>>('/bank-details'),
   saveBankDetails: (dto: BankDetails) =>
     api.put<ApiResponse<string>>('/bank-details', dto),
+  getNotificationEmails: () =>
+    api.get<ApiResponse<NotificationEmail[]>>('/notification-emails'),
+  addNotificationEmail: (emailAddress: string, label?: string) =>
+    api.post<ApiResponse<NotificationEmail>>('/notification-emails', { emailAddress, label }),
+  deleteNotificationEmail: (id: number) =>
+    api.delete<ApiResponse<string>>(`/notification-emails/${id}`),
 };
+
+export interface NotificationEmail {
+  id: number;
+  emailAddress: string;
+  label?: string;
+}
 
 export interface BankDetails {
   id?: number;
