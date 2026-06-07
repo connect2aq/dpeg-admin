@@ -495,6 +495,17 @@ export const adminApi = {
     api.post<ApiResponse<NotificationEmail>>('/notification-emails', { emailAddress, label }),
   deleteNotificationEmail: (id: number) =>
     api.delete<ApiResponse<string>>(`/notification-emails/${id}`),
+  distributions: (params: Record<string, string | number>) => {
+    const q = new URLSearchParams(params as Record<string, string>).toString();
+    return api.get<ApiResponse<PagedResult<DistributionListItem>>>(`/distributions?${q}`);
+  },
+  markDistributionPaid: (id: number, paidDate: string) =>
+    api.post<ApiResponse<string>>(`/distributions/${id}/mark-paid`, { paidDate }),
+  statements: (params: Record<string, string | number>) => {
+    const q = new URLSearchParams(params as Record<string, string>).toString();
+    return api.get<ApiResponse<PagedResult<StatementListItem>>>(`/statements?${q}`);
+  },
+  statementPdfUrl: (id: number) => `${BASE}/statements/${id}/pdf`,
 };
 
 export interface NotificationEmail {
@@ -510,4 +521,31 @@ export interface BankDetails {
   accountNumber: string;
   routingSwiftCode: string;
   address: string;
+}
+
+export interface DistributionListItem {
+  id: number;
+  applicationId: number;
+  investorName: string;
+  investorEmail?: string;
+  distributionMonth: string;
+  totalNetAmount: number;
+  hasMismatch: boolean;
+  paymentStatus: string;
+  paidAt?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  createdOn: string;
+}
+
+export interface StatementListItem {
+  id: number;
+  applicationId: number;
+  investorName: string;
+  investorEmail?: string;
+  statementType: string;
+  periodStart?: string;
+  periodEnd?: string;
+  generatedOn: string;
+  hasPdf: boolean;
 }
