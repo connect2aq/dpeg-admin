@@ -506,6 +506,15 @@ export const adminApi = {
     return api.get<ApiResponse<PagedResult<StatementListItem>>>(`/statements?${q}`);
   },
   statementPdfUrl: (id: number) => `${BASE}/statements/${id}/pdf`,
+  odooLogs: (params: Record<string, string | number>) => {
+    const q = new URLSearchParams(params as Record<string, string>).toString();
+    return api.get<ApiResponse<PagedResult<OdooLogItem>>>(`/odoo-logs?${q}`);
+  },
+  odooLog: (id: number) => api.get<ApiResponse<OdooLogDetail>>(`/odoo-logs/${id}`),
+  dailyInterestLogs: (params: Record<string, string | number>) => {
+    const q = new URLSearchParams(params as Record<string, string>).toString();
+    return api.get<ApiResponse<PagedResult<DailyInterestItem>>>(`/daily-interest?${q}`);
+  },
 };
 
 export interface NotificationEmail {
@@ -548,4 +557,41 @@ export interface StatementListItem {
   periodEnd?: string;
   generatedOn: string;
   hasPdf: boolean;
+}
+
+export interface OdooLogItem {
+  id: number;
+  correlationId: string;
+  direction: string;
+  endpoint: string;
+  httpStatusCode?: number;
+  attemptNumber: number;
+  isSuccess: boolean;
+  errorMessage?: string;
+  durationMs?: number;
+  entityType?: string;
+  entityId?: string;
+  createdOn: string;
+}
+
+export interface OdooLogDetail extends OdooLogItem {
+  requestPayloadJson?: string;
+  responsePayloadJson?: string;
+}
+
+export interface DailyInterestItem {
+  id: number;
+  applicationId: number;
+  investorName: string;
+  investorEmail?: string;
+  date: string;
+  units: number;
+  capital: number;
+  annualRate: number;
+  netInterest: number;
+  odooInterestId?: string;
+  odooStatus?: string;
+  odooResponseMsg?: string;
+  includedInMonthlyDistribution: boolean;
+  createdOn: string;
 }

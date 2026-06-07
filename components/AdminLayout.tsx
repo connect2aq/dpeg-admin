@@ -12,6 +12,8 @@ const NAV = [
   { href: "/redemptions", label: "Redemptions", icon: "↩" },
   { href: "/distributions", label: "Distributions", icon: "$" },
   { href: "/statements", label: "Statements", icon: "≡" },
+  { href: "/daily-interest", label: "Daily Interest", icon: "%" },
+  { href: "/odoo-logs", label: "Odoo Logs", icon: "⇄" },
   { href: "/docusign", label: "DocuSign", icon: "✍" },
   { href: "/audit-log", label: "Audit Log", icon: "🔍" },
   { href: "/settings", label: "Settings", icon: "⚙" },
