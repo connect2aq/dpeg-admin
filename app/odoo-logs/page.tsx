@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { adminApi, type OdooLogItem, type OdooLogDetail, type PagedResult } from '@/lib/api';
 
@@ -146,57 +146,58 @@ export default function OdooLogsPage() {
                     <tr><td colSpan={9} style={{ ...td, textAlign: 'center', color: '#9ca3af', padding: 32 }}>No logs found</td></tr>
                   )}
                   {result?.items.map(log => (
-                    <tr key={log.id} style={{ background: log.isSuccess ? undefined : '#fff8f8' }}>
-                      <td style={{ ...td, whiteSpace: 'nowrap', fontSize: 12, color: '#6b7280' }}>
-                        {new Date(log.createdOn).toLocaleString()}
-                      </td>
-                      <td style={td}><DirectionBadge dir={log.direction} /></td>
-                      <td style={{ ...td, maxWidth: 220 }}>
-                        <span style={{ fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}>{log.endpoint}</span>
-                      </td>
-                      <td style={td}>
-                        {log.entityType && <div style={{ fontSize: 12, fontWeight: 600 }}>{log.entityType}</div>}
-                        {log.entityId && <div style={{ fontSize: 11, color: '#9ca3af' }}>#{log.entityId}</div>}
-                      </td>
-                      <td style={{ ...td, fontWeight: 600 }}>{log.httpStatusCode ?? '—'}</td>
-                      <td style={{ ...td, textAlign: 'center' }}>{log.attemptNumber}</td>
-                      <td style={{ ...td, whiteSpace: 'nowrap' }}>{log.durationMs != null ? `${log.durationMs}ms` : '—'}</td>
-                      <td style={td}>
-                        <Badge ok={log.isSuccess} />
-                        {log.errorMessage && (
-                          <div style={{ fontSize: 11, color: '#dc2626', marginTop: 3, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                            title={log.errorMessage}>{log.errorMessage}</div>
-                        )}
-                      </td>
-                      <td style={td}>
-                        <button onClick={() => viewDetail(log.id)}
-                          style={{ fontSize: 12, color: '#0f2342', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                          {loadingDetail && detail?.id !== log.id ? '…' : detail?.id === log.id ? 'Close' : 'View'}
-                        </button>
-                      </td>
-                    </tr>
+                    <React.Fragment key={log.id}>
+                      <tr style={{ background: log.isSuccess ? undefined : '#fff8f8' }}>
+                        <td style={{ ...td, whiteSpace: 'nowrap', fontSize: 12, color: '#6b7280' }}>
+                          {new Date(log.createdOn).toLocaleString()}
+                        </td>
+                        <td style={td}><DirectionBadge dir={log.direction} /></td>
+                        <td style={{ ...td, maxWidth: 220 }}>
+                          <span style={{ fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}>{log.endpoint}</span>
+                        </td>
+                        <td style={td}>
+                          {log.entityType && <div style={{ fontSize: 12, fontWeight: 600 }}>{log.entityType}</div>}
+                          {log.entityId && <div style={{ fontSize: 11, color: '#9ca3af' }}>#{log.entityId}</div>}
+                        </td>
+                        <td style={{ ...td, fontWeight: 600 }}>{log.httpStatusCode ?? '—'}</td>
+                        <td style={{ ...td, textAlign: 'center' }}>{log.attemptNumber}</td>
+                        <td style={{ ...td, whiteSpace: 'nowrap' }}>{log.durationMs != null ? `${log.durationMs}ms` : '—'}</td>
+                        <td style={td}>
+                          <Badge ok={log.isSuccess} />
+                          {log.errorMessage && (
+                            <div style={{ fontSize: 11, color: '#dc2626', marginTop: 3, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                              title={log.errorMessage}>{log.errorMessage}</div>
+                          )}
+                        </td>
+                        <td style={td}>
+                          <button onClick={() => viewDetail(log.id)}
+                            style={{ fontSize: 12, color: '#0f2342', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                            {loadingDetail && detail?.id !== log.id ? '…' : detail?.id === log.id ? 'Close' : 'View'}
+                          </button>
+                        </td>
+                      </tr>
+                      {detail?.id === log.id && (
+                        <tr>
+                          <td colSpan={9} style={{ padding: '12px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                            <div style={{ display: 'flex', gap: 32 }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Request</div>
+                                <PayloadViewer label="payload" json={detail.data.requestPayloadJson} />
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Response</div>
+                                <PayloadViewer label="payload" json={detail.data.responsePayloadJson} />
+                              </div>
+                              <div>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Correlation ID</div>
+                                <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#374151' }}>{detail.data.correlationId}</span>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))}
-                  {/* Inline detail row */}
-                  {detail && result?.items.some(i => i.id === detail.id) && (
-                    <tr>
-                      <td colSpan={9} style={{ padding: '12px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                        <div style={{ display: 'flex', gap: 32 }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Request</div>
-                            <PayloadViewer label="payload" json={detail.data.requestPayloadJson} />
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Response</div>
-                            <PayloadViewer label="payload" json={detail.data.responsePayloadJson} />
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Correlation ID</div>
-                            <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#374151' }}>{detail.data.correlationId}</span>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
