@@ -33,7 +33,7 @@ export default function RedemptionsPage() {
 
   return (
     <AdminLayout>
-      <div style={{ padding: '32px 36px' }}>
+      <div className="page-content">
         <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0e3416', marginBottom: 24 }}>Redemption Requests</h1>
 
         {/* Filters */}
@@ -43,24 +43,24 @@ export default function RedemptionsPage() {
             placeholder="Search by name or email…"
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
-            style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, minWidth: 240 }}
+            style={{ flex: '1 1 220px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}
           />
           <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}
-            style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
+            style={{ flex: '1 1 130px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
             {STATUSES.map(s => <option key={s} value={s}>{s || 'All Statuses'}</option>)}
           </select>
           <input
             type="date"
             value={from}
             onChange={e => { setFrom(e.target.value); setPage(1); }}
-            style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}
+            style={{ flex: '1 1 140px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}
             title="From date"
           />
           <input
             type="date"
             value={to}
             onChange={e => { setTo(e.target.value); setPage(1); }}
-            style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}
+            style={{ flex: '1 1 140px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}
             title="To date"
           />
           {(search || from || to) && (
@@ -76,7 +76,8 @@ export default function RedemptionsPage() {
             <div style={{ padding: 32, color: '#64748b' }}>Loading...</div>
           ) : result ? (
             <>
-              <table>
+              <div className="table-scroll">
+              <table style={{ minWidth: 1050 }}>
                 <thead>
                   <tr>
                     <th>ID</th>
@@ -115,8 +116,9 @@ export default function RedemptionsPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderTop: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap', gap: 8 }}>
                 <span style={{ fontSize: 13, color: '#64748b' }}>
                   {result.totalCount} requests · Page {result.page} of {result.totalPages}
                 </span>

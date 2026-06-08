@@ -85,6 +85,7 @@ export interface UserListItem {
   currentOnboardingStep: number;
   createdOn: string;
   applicationCount: number;
+  isTestUser: boolean;
 }
 
 export interface UserDetail extends UserListItem {
@@ -434,6 +435,8 @@ export const adminApi = {
   user: (id: number) => api.get<ApiResponse<UserDetail>>(`/users/${id}`),
   updateUserStatus: (id: number, status: string) =>
     api.put<ApiResponse<string>>(`/users/${id}/status`, { status }),
+  setUserIsTest: (id: number, isTestUser: boolean) =>
+    api.put<ApiResponse<string>>(`/users/${id}/is-test`, { isTestUser }),
   applications: (params: Record<string, string | number>) => {
     const q = new URLSearchParams(params as Record<string, string>).toString();
     return api.get<ApiResponse<PagedResult<ApplicationListItem>>>(
@@ -511,6 +514,11 @@ export const adminApi = {
     return api.get<ApiResponse<PagedResult<OdooLogItem>>>(`/odoo-logs?${q}`);
   },
   odooLog: (id: number) => api.get<ApiResponse<OdooLogDetail>>(`/odoo-logs/${id}`),
+  emailLogs: (params: Record<string, string | number>) => {
+    const q = new URLSearchParams(params as Record<string, string>).toString();
+    return api.get<ApiResponse<PagedResult<EmailLogItem>>>(`/email-logs?${q}`);
+  },
+  emailLog: (id: number) => api.get<ApiResponse<EmailLogDetail>>(`/email-logs/${id}`),
   dailyInterestLogs: (params: Record<string, string | number>) => {
     const q = new URLSearchParams(params as Record<string, string>).toString();
     return api.get<ApiResponse<PagedResult<DailyInterestItem>>>(`/daily-interest?${q}`);
@@ -577,6 +585,23 @@ export interface OdooLogItem {
 export interface OdooLogDetail extends OdooLogItem {
   requestPayloadJson?: string;
   responsePayloadJson?: string;
+}
+
+export interface EmailLogItem {
+  id: number;
+  sentAtUtc: string;
+  method: string;
+  toAddresses: string;
+  subject?: string;
+  success: boolean;
+  failureReason?: string;
+  userId?: number;
+  userEmail?: string;
+  correlationId?: string;
+}
+
+export interface EmailLogDetail extends EmailLogItem {
+  body?: string;
 }
 
 export interface DailyInterestItem {

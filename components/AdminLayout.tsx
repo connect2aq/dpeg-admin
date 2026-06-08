@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import Image from "next/image";
 
@@ -14,6 +14,7 @@ const NAV = [
   { href: "/statements", label: "Statements", icon: "≡" },
   { href: "/daily-interest", label: "Daily Interest", icon: "%" },
   { href: "/odoo-logs", label: "Odoo Logs", icon: "⇄" },
+  { href: "/email-logs", label: "Email Logs", icon: "✉" },
   { href: "/docusign", label: "DocuSign", icon: "✍" },
   { href: "/audit-log", label: "Audit Log", icon: "🔍" },
   { href: "/settings", label: "Settings", icon: "⚙" },
@@ -28,6 +29,7 @@ export default function AdminLayout({
   const { user, logout, loading } = useAdminAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
@@ -48,9 +50,15 @@ export default function AdminLayout({
 
   return (
     <div className="flex h-screen overflow-hidden">
+      {/* Mobile overlay — closes sidebar on tap */}
+      <div
+        className={`sidebar-overlay${mobileOpen ? ' visible' : ''}`}
+        onClick={() => setMobileOpen(false)}
+      />
+
       {/* ── Sidebar ───────────────────────────────────────── */}
       <aside
-        className="flex-shrink-0 flex flex-col"
+        className={`sidebar-nav flex-shrink-0 flex flex-col${mobileOpen ? ' open' : ''}`}
         style={{
           width: "var(--sidebar-width)",
           background: "var(--forest)",
@@ -93,6 +101,7 @@ export default function AdminLayout({
               key={href}
               href={href}
               className={`sidebar-link ${pathname.startsWith(href) ? "active" : ""}`}
+              onClick={() => setMobileOpen(false)}
             >
               <span style={{ fontSize: 15, width: 20, flexShrink: 0 }}>
                 {icon}
@@ -159,9 +168,20 @@ export default function AdminLayout({
 
       {/* ── Main content ──────────────────────────────────── */}
       <main
-        className="flex-1 overflow-auto"
+        className="flex-1 overflow-y-auto"
         style={{ background: "var(--bg-page)" }}
       >
+        {/* Mobile top bar — only visible below 768px */}
+        <div className="mobile-topbar">
+          <button
+            className="hamburger-btn"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Open menu"
+          >
+            ☰
+          </button>
+          <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--forest)' }}>DPEG Admin</span>
+        </div>
         {children}
       </main>
     </div>

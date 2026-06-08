@@ -13,6 +13,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [showTest, setShowTest] = useState(false);
   const [page, setPage] = useState(1);
 
   const load = useCallback(() => {
@@ -21,9 +22,14 @@ export default function UsersPage() {
     if (search) params.search = search;
     if (status) params.status = status;
     adminApi.users(params)
-      .then(r => { if (r.success) setResult(r.data); })
+      .then(r => {
+        if (r.success) {
+          const items = showTest ? r.data.items : r.data.items.filter(u => !u.isTestUser);
+          setResult({ ...r.data, items });
+        }
+      })
       .finally(() => setLoading(false));
-  }, [page, search, status]);
+  }, [page, search, status, showTest]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -35,7 +41,7 @@ export default function UsersPage() {
         <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0e3416', marginBottom: 24 }}>Users</h1>
 
         {/* Filters */}
-        <form onSubmit={onSearch} style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+        <form onSubmit={onSearch} style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
           <input
             type="text"
             value={search}
@@ -50,6 +56,15 @@ export default function UsersPage() {
           >
             {STATUSES.map(s => <option key={s} value={s}>{s || 'All Statuses'}</option>)}
           </select>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#64748b', cursor: 'pointer', userSelect: 'none' }}>
+            <input
+              type="checkbox"
+              checked={showTest}
+              onChange={e => { setShowTest(e.target.checked); setPage(1); }}
+              style={{ width: 14, height: 14, cursor: 'pointer' }}
+            />
+            Show test users
+          </label>
           <button type="submit" className="btn-primary">Search</button>
         </form>
 
@@ -77,7 +92,24 @@ export default function UsersPage() {
                     <tr><td colSpan={8} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No users found</td></tr>
                   ) : result.items.map(u => (
                     <tr key={u.id}>
-                      <td style={{ fontWeight: 600 }}>{u.firstName} {u.lastName}</td>
+                      <td style={{ fontWeight: 600 }}>
+                        {u.firstName} {u.lastName}
+                        {u.isTestUser && (
+                          <span style={{
+                            marginLeft: 8,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            background: '#fef3c7',
+                            color: '#92400e',
+                            border: '1px solid #fbbf24',
+                            borderRadius: 4,
+                            padding: '1px 5px',
+                            verticalAlign: 'middle',
+                          }}>TEST</span>
+                        )}
+                      </td>
                       <td style={{ color: '#64748b' }}>{u.email}</td>
                       <td><StatusBadge status={u.status} /></td>
                       <td>

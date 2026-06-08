@@ -14,8 +14,10 @@ export default function UserDetailPage() {
   const [user, setUser] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [togglingTest, setTogglingTest] = useState(false);
   const [newStatus, setNewStatus] = useState('');
   const [msg, setMsg] = useState('');
+  const [testMsg, setTestMsg] = useState('');
 
   useEffect(() => {
     adminApi.user(Number(id))
@@ -33,6 +35,17 @@ export default function UserDetailPage() {
     setTimeout(() => setMsg(''), 3000);
   };
 
+  const toggleTestUser = async () => {
+    if (!user) return;
+    const newVal = !user.isTestUser;
+    setTogglingTest(true);
+    const r = await adminApi.setUserIsTest(user.id, newVal);
+    setTestMsg(r.success ? r.data : r.message);
+    if (r.success) setUser(u => u ? { ...u, isTestUser: newVal } : u);
+    setTogglingTest(false);
+    setTimeout(() => setTestMsg(''), 3000);
+  };
+
   if (loading) return <AdminLayout><div style={{ padding: 40, color: '#64748b' }}>Loading...</div></AdminLayout>;
   if (!user) return <AdminLayout><div style={{ padding: 40 }}><p style={{ color: '#ef4444' }}>User not found.</p></div></AdminLayout>;
 
@@ -46,7 +59,22 @@ export default function UserDetailPage() {
 
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 }}>
           <div>
-            <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0f2342' }}>{user.firstName} {user.lastName}</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0f2342' }}>{user.firstName} {user.lastName}</h1>
+              {user.isTestUser && (
+                <span style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  background: '#fef3c7',
+                  color: '#92400e',
+                  border: '1px solid #fbbf24',
+                  borderRadius: 4,
+                  padding: '2px 8px',
+                }}>TEST USER</span>
+              )}
+            </div>
             <p style={{ color: '#64748b', marginTop: 4 }}>{user.email}</p>
           </div>
           <StatusBadge status={user.status} />
@@ -67,6 +95,36 @@ export default function UserDetailPage() {
               {updating ? 'Updating...' : 'Apply'}
             </button>
             {msg && <span style={{ fontSize: 13, color: msg.includes('updated') ? '#10b981' : '#ef4444' }}>{msg}</span>}
+          </div>
+        </div>
+
+        {/* Test user flag */}
+        <div className="card" style={{ marginBottom: 24 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 8 }}>Test User</h2>
+          <p style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>
+            Test users are excluded from dashboard statistics, reports, and Excel exports.
+          </p>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <button
+              onClick={toggleTestUser}
+              disabled={togglingTest}
+              style={{
+                padding: '9px 18px',
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                border: '1.5px solid',
+                cursor: togglingTest ? 'not-allowed' : 'pointer',
+                background: user.isTestUser ? '#fef3c7' : 'white',
+                borderColor: user.isTestUser ? '#fbbf24' : '#e2e8f0',
+                color: user.isTestUser ? '#92400e' : '#475569',
+              }}
+            >
+              {togglingTest ? 'Saving...' : user.isTestUser ? 'Remove test flag' : 'Mark as test user'}
+            </button>
+            {testMsg && (
+              <span style={{ fontSize: 13, color: '#10b981' }}>{testMsg}</span>
+            )}
           </div>
         </div>
 

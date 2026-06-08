@@ -57,6 +57,7 @@ body {
   font-family: "DM Sans", system-ui, sans-serif;
   background: var(--bg-page);
   color: var(--text-body);
+  overflow: hidden; /* prevent body-level scroll; only <main> scrolls */
 }
 
 /* ── Sidebar navigation ─────────────────────────────────── */
@@ -234,4 +235,88 @@ tr:last-child td {
 }
 tr:hover td {
   background: var(--bg-row-hover);
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+
+/* Horizontal-scroll wrapper for wide tables */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Responsive page padding */
+.page-content {
+  padding: 32px 36px;
+}
+
+/* Mobile-only top bar (hamburger + brand) */
+.mobile-topbar {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.hamburger-btn {
+  padding: 6px 9px;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  background: none;
+  cursor: pointer;
+  color: var(--forest);
+  font-size: 17px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* Dim overlay behind open sidebar on mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 40;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .page-content {
+    padding: 16px 14px;
+  }
+
+  .mobile-topbar {
+    display: flex;
+  }
+
+  .sidebar-overlay.visible {
+    display: block;
+  }
+
+  /* Pull sidebar out of flow; slide in/out */
+  .sidebar-nav {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    height: 100dvh;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+  }
+
+  .sidebar-nav.open {
+    transform: translateX(0);
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .page-content {
+    padding: 24px 20px;
+  }
 }

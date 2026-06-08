@@ -32,7 +32,7 @@ export default function ApplicationsPage() {
 
   return (
     <AdminLayout>
-      <div style={{ padding: '32px 36px' }}>
+      <div className="page-content">
         <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0e3416', marginBottom: 24 }}>Applications</h1>
 
         {/* Filters */}
@@ -45,11 +45,11 @@ export default function ApplicationsPage() {
             style={{ flex: '1 1 250px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}
           />
           <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}
-            style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
+            style={{ flex: '1 1 130px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
             {STATUSES.map(s => <option key={s} value={s}>{s || 'All Statuses'}</option>)}
           </select>
           <select value={investorType} onChange={e => { setInvestorType(e.target.value); setPage(1); }}
-            style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
+            style={{ flex: '1 1 130px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
             {TYPES.map(t => <option key={t} value={t}>{t || 'All Types'}</option>)}
           </select>
           <button type="submit" className="btn-primary">Search</button>
@@ -60,7 +60,8 @@ export default function ApplicationsPage() {
             <div style={{ padding: 32, color: '#64748b' }}>Loading...</div>
           ) : result ? (
             <>
-              <table>
+              <div className="table-scroll">
+              <table style={{ minWidth: 900 }}>
                 <thead>
                   <tr>
                     <th>ID / Ref</th>
@@ -102,8 +103,9 @@ export default function ApplicationsPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderTop: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap', gap: 8 }}>
                 <span style={{ fontSize: 13, color: '#64748b' }}>
                   {result.totalCount} applications · Page {result.page} of {result.totalPages}
                 </span>
