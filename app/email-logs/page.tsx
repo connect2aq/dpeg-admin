@@ -158,7 +158,11 @@ export default function EmailLogsPage() {
                           title={row.toAddresses}>{row.toAddresses}</td>
                         <td style={{ padding: '10px 12px', color: '#374151', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                           title={row.subject}>{row.subject ?? '—'}</td>
-                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 12 }}>{row.userEmail ?? '—'}</td>
+                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 12 }}>
+                          {row.userEmail
+                            ? row.userEmail
+                            : <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>{row.toAddresses}</span>}
+                        </td>
                         <td style={{ padding: '10px 12px' }}>
                           <button onClick={() => openDetail(row.id)} style={{
                             fontSize: 12, color: '#0f2342', textDecoration: 'underline',
