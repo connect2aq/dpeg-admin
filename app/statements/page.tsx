@@ -17,6 +17,29 @@ export default function StatementsPage() {
   const [type, setType] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [downloading, setDownloading] = useState<number | null>(null);
+
+  const downloadPdf = async (id: number, investorName: string) => {
+    setDownloading(id);
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+      const res = await fetch(adminApi.statementPdfUrl(id), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error('Failed to download');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `statement_${investorName.replace(/\s+/g, '_')}_${id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('PDF download failed. Please try again.');
+    } finally {
+      setDownloading(null);
+    }
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -107,13 +130,12 @@ export default function StatementsPage() {
                         <td style={colStyle}>{new Date(s.generatedOn).toLocaleDateString()}</td>
                         <td style={colStyle}>
                           {s.hasPdf ? (
-                            <a
-                              href={adminApi.statementPdfUrl(s.id)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: '#0f2342', fontWeight: 600, fontSize: 12, textDecoration: 'underline' }}>
-                              Download
-                            </a>
+                            <button
+                              onClick={() => downloadPdf(s.id, s.investorName)}
+                              disabled={downloading === s.id}
+                              style={{ background: 'none', border: 'none', padding: 0, cursor: downloading === s.id ? 'not-allowed' : 'pointer', color: '#0f2342', fontWeight: 600, fontSize: 12, textDecoration: 'underline', opacity: downloading === s.id ? 0.5 : 1 }}>
+                              {downloading === s.id ? 'Downloading…' : 'Download'}
+                            </button>
                           ) : (
                             <span style={{ fontSize: 12, color: '#9ca3af' }}>Not available</span>
                           )}
