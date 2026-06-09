@@ -34,7 +34,7 @@ export default function LoginPage() {
     >
       {/* DPEG Logo */}
       <Image
-        src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/dpeg_logo_white.svg`}
+        src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/dpeg_logo_white.png`}
         alt="DPEG Logo"
         width={500}
         height={500}

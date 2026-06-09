@@ -87,7 +87,7 @@ export default function AdminLayout({
           </div> */}
 
           <Image
-            src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/dpeg_logo_white.svg`}
+            src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/dpeg_logo_white.png`}
             alt="DPEG Logo"
             width={200}
             height={200}
