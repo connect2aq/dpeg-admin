@@ -19,6 +19,7 @@ const NAV = [
   { href: "/audit-log", label: "Audit Log", icon: "🔍" },
   { href: "/settings", label: "Settings", icon: "⚙" },
   { href: "/historical-import", label: "Historical Import", icon: "⬆" },
+  { href: "/smtp-test", label: "SMTP Test", icon: "✉" },
 ];
 
 export default function AdminLayout({
