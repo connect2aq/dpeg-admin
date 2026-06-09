@@ -5,7 +5,7 @@ import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { adminApi, type UserListItem, type PagedResult } from '@/lib/api';
 
-const STATUSES = ['', 'InProgress', 'UnderReview', 'Active', 'Inactive'];
+const STATUSES = ['', 'InProgress', 'UnderReview', 'Active', 'Inactive', 'Test'];
 const PAGE_SIZE = 20;
 
 export default function UsersPage() {
@@ -13,27 +13,40 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
-  const [showTest, setShowTest] = useState(false);
   const [page, setPage] = useState(1);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
     const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE };
     if (search) params.search = search;
-    if (status) params.status = status;
+    if (status && status !== 'Test') params.status = status;
     adminApi.users(params)
       .then(r => {
         if (r.success) {
-          const items = showTest ? r.data.items : r.data.items.filter(u => !u.isTestUser);
+          const items = status === 'Test' ? r.data.items.filter(u => u.isTestUser) : r.data.items;
           setResult({ ...r.data, items });
         }
       })
       .finally(() => setLoading(false));
-  }, [page, search, status, showTest]);
+  }, [page, search, status]);
 
   useEffect(() => { load(); }, [load]);
 
   const onSearch = (e: React.FormEvent) => { e.preventDefault(); setPage(1); load(); };
+
+  const toggleTestUser = async (u: UserListItem) => {
+    const newVal = !u.isTestUser;
+    setTogglingId(u.id);
+    const r = await adminApi.setUserIsTest(u.id, newVal);
+    if (r.success) {
+      setResult(prev => prev ? {
+        ...prev,
+        items: prev.items.map(item => item.id === u.id ? { ...item, isTestUser: newVal } : item),
+      } : prev);
+    }
+    setTogglingId(null);
+  };
 
   return (
     <AdminLayout>
@@ -56,16 +69,7 @@ export default function UsersPage() {
           >
             {STATUSES.map(s => <option key={s} value={s}>{s || 'All Statuses'}</option>)}
           </select>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#64748b', cursor: 'pointer', userSelect: 'none' }}>
-            <input
-              type="checkbox"
-              checked={showTest}
-              onChange={e => { setShowTest(e.target.checked); setPage(1); }}
-              style={{ width: 14, height: 14, cursor: 'pointer' }}
-            />
-            Show test users
-          </label>
-          <button type="submit" className="btn-primary">Search</button>
+<button type="submit" className="btn-primary">Search</button>
         </form>
 
         {/* Table */}
@@ -121,9 +125,32 @@ export default function UsersPage() {
                       <td style={{ textAlign: 'center' }}>{u.applicationCount}</td>
                       <td style={{ color: '#64748b', fontSize: 13 }}>{new Date(u.createdOn).toLocaleDateString()}</td>
                       <td>
-                        <Link href={`/users/${u.id}`} style={{ color: '#699172', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>
-                          View →
-                        </Link>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <button
+                            onClick={() => toggleTestUser(u)}
+                            disabled={togglingId === u.id}
+                            title={u.isTestUser ? 'Remove test flag' : 'Mark as test user'}
+                            style={{
+                              padding: '3px 8px',
+                              borderRadius: 4,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              border: '1px solid',
+                              cursor: togglingId === u.id ? 'not-allowed' : 'pointer',
+                              background: u.isTestUser ? '#fef3c7' : 'white',
+                              borderColor: u.isTestUser ? '#fbbf24' : '#e2e8f0',
+                              color: u.isTestUser ? '#92400e' : '#94a3b8',
+                              opacity: togglingId === u.id ? 0.6 : 1,
+                            }}
+                          >
+                            Test
+                          </button>
+                          <Link href={`/users/${u.id}`} style={{ color: '#699172', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>
+                            View →
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   ))}
