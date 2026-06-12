@@ -526,9 +526,13 @@ export const adminApi = {
     return api.get<ApiResponse<PagedResult<DailyInterestItem>>>(`/daily-interest?${q}`);
   },
 
-  // ── Admin CRUD: Bulk Delete / Create User ──────────────────────────────
+  // ── Admin CRUD: Bulk Delete ────────────────────────────────────────────
   bulkDeleteUsers: (userIds: number[]) =>
     api.deleteWithBody<ApiResponse<string>>('/users', { userIds }),
+  bulkDeleteApplications: (applicationIds: number[]) =>
+    api.deleteWithBody<ApiResponse<string>>('/applications', { applicationIds }),
+  bulkDeleteRedemptions: (redemptionIds: number[]) =>
+    api.deleteWithBody<ApiResponse<string>>('/redemptions', { redemptionIds }),
   createUser: (dto: CreateUserAdminRequest) =>
     api.post<ApiResponse<UserDetail>>('/users', dto),
 
