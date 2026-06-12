@@ -4,12 +4,15 @@ import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { adminApi, type ApplicationListItem, type PagedResult } from '@/lib/api';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 const STATUSES = ['', 'UnderReview', 'Active', 'Rejected'];
 const TYPES = ['', 'Individual', 'Entity', 'IRA', 'Trust'];
 const PAGE_SIZE = 20;
 
 export default function ApplicationsPage() {
+  const { user: authUser } = useAdminAuth();
+  const isSuperAdmin = (authUser?.adminRole ?? 'SuperAdmin') === 'SuperAdmin';
   const [result, setResult] = useState<PagedResult<ApplicationListItem> | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -70,7 +73,8 @@ export default function ApplicationsPage() {
     if (r.success) {
       setSelected(new Set());
       setShowDeleteConfirm(false);
-      load();
+      if (isSuperAdmin) load();
+      else alert(`Change submitted for approval — ${r.message}`);
     } else {
       alert(r.message || 'Delete failed.');
     }

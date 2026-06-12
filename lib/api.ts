@@ -47,6 +47,7 @@ export interface AdminUser {
   email: string;
   firstName: string;
   lastName: string;
+  adminRole: string; // Maker | Checker | Approver | SuperAdmin
 }
 
 export interface PagedResult<T> {
@@ -565,6 +566,28 @@ export const adminApi = {
     api.get<ApiResponse<UserDistributionItem[]>>(`/users/${userId}/distributions`),
   getUserRedemptions: (userId: number) =>
     api.get<ApiResponse<RedemptionListItem[]>>(`/users/${userId}/redemptions`),
+
+  // ── Maker-Checker-Approver Workflow ────────────────────────────────────
+  getPendingChanges: (params: Record<string, string | number> = {}) => {
+    const q = new URLSearchParams(Object.fromEntries(Object.entries(params).map(([k,v]) => [k, String(v)]))).toString();
+    return api.get<ApiResponse<PagedResult<PendingChangeItem>>>(`/pending-changes${q ? '?' + q : ''}`);
+  },
+  getPendingCounts: () =>
+    api.get<ApiResponse<PendingCounts>>('/pending-changes/counts'),
+  getPendingChange: (id: number) =>
+    api.get<ApiResponse<PendingChangeDetail>>(`/pending-changes/${id}`),
+  getActivePendingForRecord: (entityType: string, entityId: number) =>
+    api.get<ApiResponse<PendingChangeItem | null>>(`/pending-changes/for-record?entityType=${entityType}&entityId=${entityId}`),
+  checkChange: (id: number, note?: string) =>
+    api.post<ApiResponse<string>>(`/pending-changes/${id}/check`, { note }),
+  approveChange: (id: number, note?: string) =>
+    api.post<ApiResponse<string>>(`/pending-changes/${id}/approve`, { note }),
+  rejectChange: (id: number, reason: string) =>
+    api.post<ApiResponse<string>>(`/pending-changes/${id}/reject`, { reason }),
+  cancelChange: (id: number) =>
+    api.post<ApiResponse<string>>(`/pending-changes/${id}/cancel`, {}),
+  setAdminRole: (userId: number, role: string | null) =>
+    api.put<ApiResponse<string>>(`/users/${userId}/admin-role`, { adminRole: role }),
 };
 
 export interface NotificationEmail {
@@ -749,4 +772,42 @@ export interface UserDistributionItem {
   bankName?: string;
   bankAccountNumber?: string;
   createdOn: string;
+}
+
+// ── Maker-Checker-Approver Workflow types ─────────────────────────────────
+
+export interface PendingChangeItem {
+  id: number;
+  operationType: string;
+  entityType: string;
+  entityId?: number;
+  targetUserId?: number;
+  description: string;
+  status: string; // Pending | Checked | Approved | Rejected | Cancelled
+  makerUserId: number;
+  makerName: string;
+  makerEmail: string;
+  makerNote?: string;
+  createdOn: string;
+  checkerUserId?: number;
+  checkerName?: string;
+  checkerNote?: string;
+  checkedAt?: string;
+  approverUserId?: number;
+  approverName?: string;
+  approverNote?: string;
+  approvedAt?: string;
+  rejectedByUserId?: number;
+  rejectedByName?: string;
+  rejectionReason?: string;
+  rejectedAt?: string;
+}
+
+export interface PendingChangeDetail extends PendingChangeItem {
+  payloadJson: string;
+}
+
+export interface PendingCounts {
+  pendingForChecker: number;
+  checkedForApprover: number;
 }

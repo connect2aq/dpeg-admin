@@ -4,6 +4,7 @@ import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { adminApi, type UserListItem, type PagedResult, type CreateUserAdminRequest } from '@/lib/api';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 const STATUSES = ['', 'InProgress', 'UnderReview', 'Active', 'Inactive', 'Test'];
 const PAGE_SIZE = 20;
@@ -11,6 +12,8 @@ const PAGE_SIZE = 20;
 const emptyCreateForm: CreateUserAdminRequest = { firstName: '', lastName: '', email: '', password: '' };
 
 export default function UsersPage() {
+  const { user: authUser } = useAdminAuth();
+  const isSuperAdmin = (authUser?.adminRole ?? 'SuperAdmin') === 'SuperAdmin';
   const [result, setResult] = useState<PagedResult<UserListItem> | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -88,7 +91,8 @@ export default function UsersPage() {
     if (r.success) {
       setSelected(new Set());
       setShowDeleteConfirm(false);
-      load();
+      if (isSuperAdmin) load();
+      else setDeleteMsg(`Change submitted for approval — ${r.message}`);
     } else {
       setDeleteMsg(r.message || 'Delete failed.');
     }
@@ -280,7 +284,7 @@ export default function UsersPage() {
                 disabled={deleting}
                 style={{ padding: '10px 20px', background: '#b91c1c', color: 'white', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 14, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.7 : 1 }}
               >
-                {deleting ? 'Deleting...' : 'Confirm Delete'}
+                {deleting ? 'Processing...' : isSuperAdmin ? 'Confirm Delete' : 'Submit for Approval'}
               </button>
             </div>
           </div>

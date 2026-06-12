@@ -4,11 +4,14 @@ import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { adminApi, type RedemptionListItem, type PagedResult } from '@/lib/api';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 const STATUSES = ['', 'UnderReview', 'Active', 'Rejected', 'Redeemed'];
 const PAGE_SIZE = 20;
 
 export default function RedemptionsPage() {
+  const { user: authUser } = useAdminAuth();
+  const isSuperAdmin = (authUser?.adminRole ?? 'SuperAdmin') === 'SuperAdmin';
   const [result, setResult] = useState<PagedResult<RedemptionListItem> | null>(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('');
@@ -70,7 +73,8 @@ export default function RedemptionsPage() {
     if (r.success) {
       setSelected(new Set());
       setShowDeleteConfirm(false);
-      load();
+      if (isSuperAdmin) load();
+      else alert(`Change submitted for approval — ${r.message}`);
     } else {
       alert(r.message || 'Delete failed.');
     }

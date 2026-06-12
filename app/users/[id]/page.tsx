@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import {
   adminApi,
   type UserDetail,
@@ -88,6 +89,9 @@ function ModalOverlay({ title, onClose, children }: { title: string; onClose: ()
 export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
   const userId = Number(id);
+  const { user: authUser } = useAdminAuth();
+  const adminRole = authUser?.adminRole ?? 'SuperAdmin';
+  const isSuperAdmin = adminRole === 'SuperAdmin';
 
   const [user, setUser] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,6 +100,9 @@ export default function UserDetailPage() {
   const [newStatus, setNewStatus] = useState('');
   const [msg, setMsg] = useState('');
   const [testMsg, setTestMsg] = useState('');
+  const [roleChanging, setRoleChanging] = useState(false);
+  const [roleMsg, setRoleMsg] = useState('');
+  const [pendingMsg, setPendingMsg] = useState(''); // shown when non-SuperAdmin submits
 
   // Redemptions & distributions for this user
   const [userRedemptions, setUserRedemptions] = useState<RedemptionListItem[]>([]);
@@ -222,12 +229,18 @@ export default function UserDetailPage() {
     setInvMsg('');
     if (invModal === 'create') {
       const r = await adminApi.createApplication(userId, invForm);
-      if (r.success) { setInvModal(null); loadUser(); }
-      else setInvMsg(r.message || 'Failed to create investment.');
+      if (r.success) {
+        setInvModal(null);
+        if (isSuperAdmin) loadUser();
+        else { setPendingMsg(`Change submitted for approval — ${r.message}`); }
+      } else setInvMsg(r.message || 'Failed to create investment.');
     } else if (editingInvId) {
       const r = await adminApi.updateApplicationFull(editingInvId, invForm);
-      if (r.success) { setInvModal(null); loadUser(); }
-      else setInvMsg(r.message || 'Failed to update investment.');
+      if (r.success) {
+        setInvModal(null);
+        if (isSuperAdmin) loadUser();
+        else { setPendingMsg(`Change submitted for approval — ${r.message}`); }
+      } else setInvMsg(r.message || 'Failed to update investment.');
     }
     setInvSubmitting(false);
   };
@@ -236,8 +249,11 @@ export default function UserDetailPage() {
     if (!confirmDeleteInvId) return;
     setDeletingInv(true);
     const r = await adminApi.deleteApplication(confirmDeleteInvId);
-    if (r.success) { setConfirmDeleteInvId(null); loadUser(); }
-    else alert(r.message || 'Delete failed.');
+    if (r.success) {
+      setConfirmDeleteInvId(null);
+      if (isSuperAdmin) loadUser();
+      else setPendingMsg(`Delete request submitted for approval — ${r.message}`);
+    } else alert(r.message || 'Delete failed.');
     setDeletingInv(false);
   };
 
@@ -285,22 +301,30 @@ export default function UserDetailPage() {
     setRedeemMsg('');
     if (redeemModal === 'create') {
       const r = await adminApi.createRedemption(redeemForm);
-      if (r.success) { setRedeemModal(null); loadRedemptions(); }
-      else setRedeemMsg(r.message || 'Failed to create redemption.');
+      if (r.success) {
+        setRedeemModal(null);
+        if (isSuperAdmin) loadRedemptions();
+        else setPendingMsg(`Change submitted for approval — ${r.message}`);
+      } else setRedeemMsg(r.message || 'Failed to create redemption.');
     } else if (editingRedeemId) {
       const r = await adminApi.updateRedemptionFull(editingRedeemId, redeemForm);
-      if (r.success) { setRedeemModal(null); loadRedemptions(); }
-      else setRedeemMsg(r.message || 'Failed to update redemption.');
+      if (r.success) {
+        setRedeemModal(null);
+        if (isSuperAdmin) loadRedemptions();
+        else setPendingMsg(`Change submitted for approval — ${r.message}`);
+      } else setRedeemMsg(r.message || 'Failed to update redemption.');
     }
     setRedeemSubmitting(false);
   };
 
   const deleteRedemption = async (redeemId: number) => {
-    if (!window.confirm('Delete this redemption record?')) return;
+    if (!window.confirm(isSuperAdmin ? 'Delete this redemption record?' : 'Submit delete request for approval?')) return;
     setDeletingRedeemId(redeemId);
     const r = await adminApi.deleteRedemption(redeemId);
-    if (r.success) loadRedemptions();
-    else alert(r.message || 'Delete failed.');
+    if (r.success) {
+      if (isSuperAdmin) loadRedemptions();
+      else setPendingMsg(`Delete request submitted for approval — ${r.message}`);
+    } else alert(r.message || 'Delete failed.');
     setDeletingRedeemId(null);
   };
 
@@ -346,22 +370,30 @@ export default function UserDetailPage() {
     };
     if (distModal === 'create') {
       const r = await adminApi.createDistribution(payload);
-      if (r.success) { setDistModal(null); loadDistributions(); }
-      else setDistMsg(r.message || 'Failed to create distribution.');
+      if (r.success) {
+        setDistModal(null);
+        if (isSuperAdmin) loadDistributions();
+        else setPendingMsg(`Change submitted for approval — ${r.message}`);
+      } else setDistMsg(r.message || 'Failed to create distribution.');
     } else if (editingDistId) {
       const r = await adminApi.updateDistribution(editingDistId, payload);
-      if (r.success) { setDistModal(null); loadDistributions(); }
-      else setDistMsg(r.message || 'Failed to update distribution.');
+      if (r.success) {
+        setDistModal(null);
+        if (isSuperAdmin) loadDistributions();
+        else setPendingMsg(`Change submitted for approval — ${r.message}`);
+      } else setDistMsg(r.message || 'Failed to update distribution.');
     }
     setDistSubmitting(false);
   };
 
   const deleteDistribution = async (distId: number) => {
-    if (!window.confirm('Delete this distribution record?')) return;
+    if (!window.confirm(isSuperAdmin ? 'Delete this distribution record?' : 'Submit delete request for approval?')) return;
     setDeletingDistId(distId);
     const r = await adminApi.deleteDistribution(distId);
-    if (r.success) loadDistributions();
-    else alert(r.message || 'Delete failed.');
+    if (r.success) {
+      if (isSuperAdmin) loadDistributions();
+      else setPendingMsg(`Delete request submitted for approval — ${r.message}`);
+    } else alert(r.message || 'Delete failed.');
     setDeletingDistId(null);
   };
 
@@ -426,6 +458,52 @@ export default function UserDetailPage() {
             {testMsg && <span style={{ fontSize: 13, color: '#10b981' }}>{testMsg}</span>}
           </div>
         </div>
+
+        {/* Pending change toast */}
+        {pendingMsg && (
+          <div style={{ background: '#fffbeb', border: '1.5px solid #fbbf24', borderRadius: 8, padding: '12px 16px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 13, color: '#92400e', fontWeight: 600 }}>⏳ {pendingMsg}</span>
+            <button onClick={() => setPendingMsg('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 16 }}>×</button>
+          </div>
+        )}
+
+        {/* Admin Role Management — SuperAdmin only */}
+        {isSuperAdmin && (
+          <div className="card" style={{ marginBottom: 24 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 8 }}>Admin Role</h2>
+            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>
+              Set the admin workflow role for this user. Only SuperAdmin can change roles.
+            </p>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <select
+                id="adminRoleSelect"
+                defaultValue={(user as unknown as { adminRole?: string }).adminRole ?? ''}
+                style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 6, fontSize: 13, background: 'white' }}
+              >
+                <option value="">No admin role</option>
+                <option value="Maker">Maker</option>
+                <option value="Checker">Checker</option>
+                <option value="Approver">Approver</option>
+                <option value="SuperAdmin">SuperAdmin</option>
+              </select>
+              <button
+                className="btn-primary"
+                disabled={roleChanging}
+                onClick={async () => {
+                  const sel = (document.getElementById('adminRoleSelect') as HTMLSelectElement).value;
+                  setRoleChanging(true);
+                  const r = await adminApi.setAdminRole(userId, sel || null);
+                  setRoleMsg(r.success ? 'Role updated.' : r.message);
+                  setRoleChanging(false);
+                  setTimeout(() => setRoleMsg(''), 3000);
+                }}
+              >
+                {roleChanging ? 'Saving...' : 'Set Role'}
+              </button>
+              {roleMsg && <span style={{ fontSize: 13, color: roleMsg === 'Role updated.' ? '#10b981' : '#ef4444' }}>{roleMsg}</span>}
+            </div>
+          </div>
+        )}
 
         {/* Account details */}
         <div className="card" style={{ marginBottom: 24 }}>
@@ -675,7 +753,9 @@ export default function UserDetailPage() {
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button type="button" className="btn-secondary" onClick={() => setInvModal(null)} disabled={invSubmitting}>Cancel</button>
               <button type="submit" disabled={invSubmitting} style={{ padding: '10px 22px', background: '#0f2342', color: 'white', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 14, cursor: invSubmitting ? 'not-allowed' : 'pointer', opacity: invSubmitting ? 0.7 : 1 }}>
-                {invSubmitting ? 'Saving...' : invModal === 'create' ? 'Create Investment' : 'Save Changes'}
+                {invSubmitting ? 'Saving...' : isSuperAdmin
+                  ? (invModal === 'create' ? 'Create Investment' : 'Save Changes')
+                  : (invModal === 'create' ? 'Submit for Approval' : 'Submit Change for Approval')}
               </button>
             </div>
           </form>
@@ -745,7 +825,9 @@ export default function UserDetailPage() {
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button type="button" className="btn-secondary" onClick={() => setRedeemModal(null)} disabled={redeemSubmitting}>Cancel</button>
               <button type="submit" disabled={redeemSubmitting} style={{ padding: '10px 22px', background: '#0f2342', color: 'white', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 14, cursor: redeemSubmitting ? 'not-allowed' : 'pointer', opacity: redeemSubmitting ? 0.7 : 1 }}>
-                {redeemSubmitting ? 'Saving...' : redeemModal === 'create' ? 'Create Redemption' : 'Save Changes'}
+                {redeemSubmitting ? 'Saving...' : isSuperAdmin
+                  ? (redeemModal === 'create' ? 'Create Redemption' : 'Save Changes')
+                  : (redeemModal === 'create' ? 'Submit for Approval' : 'Submit Change for Approval')}
               </button>
             </div>
           </form>
@@ -794,7 +876,9 @@ export default function UserDetailPage() {
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button type="button" className="btn-secondary" onClick={() => setDistModal(null)} disabled={distSubmitting}>Cancel</button>
               <button type="submit" disabled={distSubmitting} style={{ padding: '10px 22px', background: '#0f2342', color: 'white', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 14, cursor: distSubmitting ? 'not-allowed' : 'pointer', opacity: distSubmitting ? 0.7 : 1 }}>
-                {distSubmitting ? 'Saving...' : distModal === 'create' ? 'Create Distribution' : 'Save Changes'}
+                {distSubmitting ? 'Saving...' : isSuperAdmin
+                  ? (distModal === 'create' ? 'Create Distribution' : 'Save Changes')
+                  : (distModal === 'create' ? 'Submit for Approval' : 'Submit Change for Approval')}
               </button>
             </div>
           </form>

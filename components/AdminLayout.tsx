@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { adminApi } from "@/lib/api";
 import Image from "next/image";
 
 const NAV = [
@@ -31,6 +32,19 @@ export default function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [pendingBadge, setPendingBadge] = useState(0);
+
+  const adminRole = user?.adminRole ?? 'SuperAdmin';
+
+  useEffect(() => {
+    if (!user) return;
+    adminApi.getPendingCounts().then(r => {
+      if (!r.success || !r.data) return;
+      if (adminRole === 'Checker') setPendingBadge(r.data.pendingForChecker);
+      else if (adminRole === 'Approver') setPendingBadge(r.data.checkedForApprover);
+      else if (adminRole === 'SuperAdmin') setPendingBadge(r.data.pendingForChecker + r.data.checkedForApprover);
+    }).catch(() => {});
+  }, [user, adminRole]);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
@@ -97,6 +111,25 @@ export default function AdminLayout({
 
         {/* Navigation */}
         <nav style={{ flex: 1, padding: "14px 12px" }}>
+          {/* Pending Approvals — visible to Checker, Approver, SuperAdmin */}
+          {adminRole !== 'Maker' && (
+            <Link
+              href="/pending-approvals"
+              className={`sidebar-link ${pathname.startsWith('/pending-approvals') ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+              style={{ position: 'relative' }}
+            >
+              <span style={{ fontSize: 15, width: 20, flexShrink: 0 }}>⏳</span>
+              Pending Approvals
+              {pendingBadge > 0 && (
+                <span style={{
+                  marginLeft: 'auto', background: '#b8923a', color: 'white',
+                  borderRadius: 10, fontSize: 10, fontWeight: 700,
+                  padding: '1px 6px', minWidth: 18, textAlign: 'center'
+                }}>{pendingBadge}</span>
+              )}
+            </Link>
+          )}
           {NAV.map(({ href, label, icon }) => (
             <Link
               key={href}
@@ -135,10 +168,13 @@ export default function AdminLayout({
               fontSize: 13.5,
               color: "#ffffff",
               fontWeight: 600,
-              marginBottom: 10,
+              marginBottom: 2,
             }}
           >
             {user.firstName} {user.lastName}
+          </div>
+          <div style={{ fontSize: 10.5, color: '#b8923a', fontWeight: 600, marginBottom: 8, letterSpacing: '0.04em' }}>
+            {adminRole}
           </div>
           <button
             onClick={() => {
