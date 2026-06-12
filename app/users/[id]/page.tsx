@@ -104,6 +104,13 @@ export default function UserDetailPage() {
   const [roleMsg, setRoleMsg] = useState('');
   const [pendingMsg, setPendingMsg] = useState(''); // shown when non-SuperAdmin submits
 
+  // Password change / reset state
+  const [pwCurrent, setPwCurrent] = useState('');
+  const [pwNew, setPwNew] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
   // Redemptions & distributions for this user
   const [userRedemptions, setUserRedemptions] = useState<RedemptionListItem[]>([]);
   const [userDistributions, setUserDistributions] = useState<UserDistributionItem[]>([]);
@@ -504,6 +511,82 @@ export default function UserDetailPage() {
             </div>
           </div>
         )}
+
+        {/* Change / Reset Password */}
+        {(authUser?.userId === userId || isSuperAdmin) && (() => {
+          const isOwn = authUser?.userId === userId;
+          const handlePw = async () => {
+            if (pwNew !== pwConfirm) { setPwMsg({ ok: false, text: 'New passwords do not match.' }); return; }
+            if (pwNew.length < 8) { setPwMsg({ ok: false, text: 'Password must be at least 8 characters.' }); return; }
+            setPwSaving(true);
+            const r = isOwn
+              ? await adminApi.changePassword(userId, pwCurrent, pwNew)
+              : await adminApi.resetPassword(userId, pwNew);
+            setPwMsg({ ok: r.success, text: r.success ? (isOwn ? 'Password changed.' : 'Password reset.') : (r.message || 'Failed.') });
+            if (r.success) { setPwCurrent(''); setPwNew(''); setPwConfirm(''); }
+            setPwSaving(false);
+            setTimeout(() => setPwMsg(null), 4000);
+          };
+          return (
+            <div className="card" style={{ marginBottom: 24 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 8 }}>
+                {isOwn ? 'Change Password' : 'Reset Password'}
+              </h2>
+              <p style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>
+                {isOwn ? 'Enter your current password and choose a new one.' : 'Set a new password for this admin account.'}
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 360 }}>
+                {isOwn && (
+                  <div>
+                    <label style={labelStyle}>Current Password</label>
+                    <input
+                      type="password"
+                      value={pwCurrent}
+                      onChange={e => setPwCurrent(e.target.value)}
+                      style={inputStyle}
+                      autoComplete="current-password"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label style={labelStyle}>New Password</label>
+                  <input
+                    type="password"
+                    value={pwNew}
+                    onChange={e => setPwNew(e.target.value)}
+                    style={inputStyle}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={pwConfirm}
+                    onChange={e => setPwConfirm(e.target.value)}
+                    style={inputStyle}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <button
+                    className="btn-primary"
+                    onClick={handlePw}
+                    disabled={pwSaving}
+                    style={{ opacity: pwSaving ? 0.7 : 1 }}
+                  >
+                    {pwSaving ? 'Saving...' : isOwn ? 'Change Password' : 'Reset Password'}
+                  </button>
+                  {pwMsg && (
+                    <span style={{ fontSize: 13, color: pwMsg.ok ? '#10b981' : '#ef4444', fontWeight: 600 }}>
+                      {pwMsg.text}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Account details */}
         <div className="card" style={{ marginBottom: 24 }}>

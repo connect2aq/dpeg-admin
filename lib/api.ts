@@ -588,6 +588,10 @@ export const adminApi = {
     api.post<ApiResponse<string>>(`/pending-changes/${id}/cancel`, {}),
   setAdminRole: (userId: number, role: string | null) =>
     api.put<ApiResponse<string>>(`/users/${userId}/admin-role`, { adminRole: role }),
+  changePassword: (userId: number, currentPassword: string, newPassword: string) =>
+    api.put<ApiResponse<string>>(`/users/${userId}/change-password`, { currentPassword, newPassword }),
+  resetPassword: (userId: number, newPassword: string) =>
+    api.put<ApiResponse<string>>(`/users/${userId}/reset-password`, { newPassword }),
 };
 
 export interface NotificationEmail {
