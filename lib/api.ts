@@ -38,6 +38,8 @@ export const api = {
     request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
   delete: <T>(path: string) =>
     request<T>(path, { method: "DELETE" }),
+  deleteWithBody: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: "DELETE", body: JSON.stringify(body) }),
 };
 
 export interface AdminUser {
@@ -523,6 +525,42 @@ export const adminApi = {
     const q = new URLSearchParams(params as Record<string, string>).toString();
     return api.get<ApiResponse<PagedResult<DailyInterestItem>>>(`/daily-interest?${q}`);
   },
+
+  // ── Admin CRUD: Bulk Delete / Create User ──────────────────────────────
+  bulkDeleteUsers: (userIds: number[]) =>
+    api.deleteWithBody<ApiResponse<string>>('/users', { userIds }),
+  createUser: (dto: CreateUserAdminRequest) =>
+    api.post<ApiResponse<UserDetail>>('/users', dto),
+
+  // ── Admin CRUD: Investment (Application) ──────────────────────────────
+  createApplication: (userId: number, dto: CreateApplicationRequest) =>
+    api.post<ApiResponse<ApplicationDetail>>(`/users/${userId}/applications`, dto),
+  updateApplicationFull: (id: number, dto: CreateApplicationRequest) =>
+    api.put<ApiResponse<string>>(`/applications/${id}/full`, dto),
+  deleteApplication: (id: number) =>
+    api.delete<ApiResponse<string>>(`/applications/${id}`),
+
+  // ── Admin CRUD: Redemption ─────────────────────────────────────────────
+  createRedemption: (dto: CreateRedemptionAdminRequest) =>
+    api.post<ApiResponse<RedemptionDetail>>('/redemptions', dto),
+  updateRedemptionFull: (id: number, dto: CreateRedemptionAdminRequest) =>
+    api.put<ApiResponse<string>>(`/redemptions/${id}/full`, dto),
+  deleteRedemption: (id: number) =>
+    api.delete<ApiResponse<string>>(`/redemptions/${id}`),
+
+  // ── Admin CRUD: Distribution ───────────────────────────────────────────
+  createDistribution: (dto: CreateDistributionRequest) =>
+    api.post<ApiResponse<UserDistributionItem>>('/distributions', dto),
+  updateDistribution: (id: number, dto: CreateDistributionRequest) =>
+    api.put<ApiResponse<string>>(`/distributions/${id}`, dto),
+  deleteDistribution: (id: number) =>
+    api.delete<ApiResponse<string>>(`/distributions/${id}`),
+
+  // ── User-scoped reads ──────────────────────────────────────────────────
+  getUserDistributions: (userId: number) =>
+    api.get<ApiResponse<UserDistributionItem[]>>(`/users/${userId}/distributions`),
+  getUserRedemptions: (userId: number) =>
+    api.get<ApiResponse<RedemptionListItem[]>>(`/users/${userId}/redemptions`),
 };
 
 export interface NotificationEmail {
@@ -618,5 +656,93 @@ export interface DailyInterestItem {
   odooStatus?: string;
   odooResponseMsg?: string;
   includedInMonthlyDistribution: boolean;
+  createdOn: string;
+}
+
+// ── Admin CRUD request/response types ─────────────────────────────────────
+
+export interface CreateUserAdminRequest {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+}
+
+export interface CreateApplicationRequest {
+  investorType: string;
+  investmentType?: string;
+  entitySubType?: string;
+  effectiveDate?: string;
+  submittedAt?: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  dateOfBirth?: string;
+  streetAddress?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  citizenship?: string;
+  employer?: string;
+  entityName?: string;
+  ein?: string;
+  stateFormation?: string;
+  signatoryName?: string;
+  signatoryTitle?: string;
+  numUnits: number;
+  totalAmount: number;
+  ppmRefNO?: number;
+  paymentMethod?: string;
+  distributionPreference?: string;
+  bankName?: string;
+  accHolder?: string;
+  routingNumber?: string;
+  accNumber?: string;
+}
+
+export interface CreateRedemptionAdminRequest {
+  trancheApplicationId?: number;
+  sellingPartnerName?: string;
+  investorType: string;
+  entityName?: string;
+  signatoryName?: string;
+  signatoryTitle?: string;
+  totalUnitsOwned?: string;
+  unitsToRedeem?: string;
+  originalPurchaseDate?: string;
+  aggregatePurchasePrice?: string;
+  proratedPreferredReturn?: string;
+  effectiveDate?: string;
+  printedName?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  addressLine3?: string;
+  email?: string;
+  status?: string;
+}
+
+export interface CreateDistributionRequest {
+  applicationId: number;
+  userId: number;
+  distributionMonth: string;
+  totalNetAmount: number;
+  paymentStatus: string;
+  paidAt?: string;
+  bankName?: string;
+  bankAccountHolderName?: string;
+  bankAccountNumber?: string;
+  bankRoutingNumber?: string;
+}
+
+export interface UserDistributionItem {
+  id: number;
+  applicationId: number;
+  ppmRefNO?: number;
+  distributionMonth: string;
+  totalNetAmount: number;
+  paymentStatus: string;
+  paidAt?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
   createdOn: string;
 }
