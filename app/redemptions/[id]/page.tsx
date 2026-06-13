@@ -44,6 +44,7 @@ export default function RedemptionDetailPage() {
   const [dsError, setDsError] = useState('');
   const [dsSending, setDsSending] = useState(false);
   const [dsSendMsg, setDsSendMsg] = useState('');
+  const [dsDownloading, setDsDownloading] = useState(false);
 
   useEffect(() => {
     adminApi.redemption(Number(id))
@@ -87,6 +88,18 @@ export default function RedemptionDetailPage() {
     }
     setDsSending(false);
     setTimeout(() => setDsSendMsg(''), 5000);
+  };
+
+  const downloadDsDocument = async () => {
+    if (!redemption?.docuSignEnvelopeId) return;
+    setDsDownloading(true);
+    try {
+      await adminApi.downloadDocuSignDocument(redemption.docuSignEnvelopeId);
+    } catch {
+      alert('Failed to download document. Please try again.');
+    } finally {
+      setDsDownloading(false);
+    }
   };
 
   if (loading) return <AdminLayout><div style={{ padding: 40, color: '#64748b' }}>Loading...</div></AdminLayout>;
@@ -230,6 +243,12 @@ export default function RedemptionDetailPage() {
                   style={{ padding: '4px 10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, color: '#94a3b8', cursor: dsLoading ? 'default' : 'pointer', opacity: dsLoading ? 0.6 : 1 }}>
                   {dsLoading ? 'Refreshing…' : 'Refresh from DocuSign'}
                 </button>
+                {isCompleted && (
+                  <button onClick={downloadDsDocument} disabled={dsDownloading}
+                    style={{ padding: '6px 14px', background: '#0f2342', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', cursor: dsDownloading ? 'default' : 'pointer', opacity: dsDownloading ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>⬇</span>{dsDownloading ? 'Downloading…' : 'Download PDF'}
+                  </button>
+                )}
               </div>
             </div>
 

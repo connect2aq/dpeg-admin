@@ -83,6 +83,7 @@ export default function ApplicationDetailPage() {
   const [dsSyncMsg, setDsSyncMsg] = useState('');
   const [dsSending, setDsSending] = useState(false);
   const [dsSendMsg, setDsSendMsg] = useState('');
+  const [dsDownloading, setDsDownloading] = useState(false);
 
   useEffect(() => {
     adminApi.application(Number(id))
@@ -170,6 +171,18 @@ export default function ApplicationDetailPage() {
     }
     setDsSending(false);
     setTimeout(() => setDsSendMsg(''), 5000);
+  };
+
+  const downloadDsDocument = async () => {
+    if (!app?.docuSignEnvelopeId) return;
+    setDsDownloading(true);
+    try {
+      await adminApi.downloadDocuSignDocument(app.docuSignEnvelopeId);
+    } catch {
+      alert('Failed to download document. Please try again.');
+    } finally {
+      setDsDownloading(false);
+    }
   };
 
   const syncDsDate = async () => {
@@ -442,6 +455,12 @@ export default function ApplicationDetailPage() {
                   )}
                   {dsSyncMsg && (
                     <span style={{ fontSize: 12, color: dsSyncMsg.includes('set') || dsSyncMsg.includes('Set') ? '#10b981' : '#ef4444' }}>{dsSyncMsg}</span>
+                  )}
+                  {isCompleted && (
+                    <button onClick={downloadDsDocument} disabled={dsDownloading}
+                      style={{ padding: '6px 14px', background: '#0f2342', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', cursor: dsDownloading ? 'default' : 'pointer', opacity: dsDownloading ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>⬇</span>{dsDownloading ? 'Downloading…' : 'Download PDF'}
+                    </button>
                   )}
                 </div>
               </div>

@@ -471,6 +471,17 @@ export const adminApi = {
     api.get<ApiResponse<DocuSignEnvelopeStatus>>(
       `/docusign-envelopes/${envelopeId}/status`,
     ),
+  downloadDocuSignDocument: async (envelopeId: string): Promise<void> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+    const res = await fetch(`${BASE}/docusign-envelopes/${envelopeId}/document`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Download failed');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  },
   redemptions: (params: Record<string, string | number>) => {
     const q = new URLSearchParams(params as Record<string, string>).toString();
     return api.get<ApiResponse<PagedResult<RedemptionListItem>>>(
