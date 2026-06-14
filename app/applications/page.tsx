@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { adminApi, type ApplicationListItem, type PagedResult } from '@/lib/api';
@@ -13,10 +14,11 @@ const PAGE_SIZE = 20;
 export default function ApplicationsPage() {
   const { user: authUser } = useAdminAuth();
   const isSuperAdmin = (authUser?.adminRole ?? 'SuperAdmin') === 'SuperAdmin';
+  const searchParams = useSearchParams();
   const [result, setResult] = useState<PagedResult<ApplicationListItem> | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState(() => searchParams.get('status') ?? '');
   const [investorType, setInvestorType] = useState('');
   const [page, setPage] = useState(1);
 

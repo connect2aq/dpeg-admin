@@ -64,17 +64,30 @@ export interface DashboardStats {
   activeInvestors: number;
   totalDepositors: number;
   totalInvestmentFiles: number;
+  totalDepositCount: number;
   // Application pipeline
   pendingReviews: number;
   totalApplications: number;
   pendingRedemptions: number;
-  // AUM & capital flows
+  // AUM & capital flows — all-time (since inception)
   totalAUM: number;
   totalUnits: number;
   totalDeployedCommencement: number;
   totalWithdrawnCommencement: number;
+  interestPaidCommencement: number;
+  // AUM & capital flows — date range
+  totalDepositedDateRange: number;
+  totalWithdrawnDateRange: number;
+  interestPaidDateRange: number;
+  // YTD (legacy)
   ytdDeployed: number;
   ytdWithdrawn: number;
+  // Manually entered management figures
+  deployedAmount?: number;
+  bankAccountBalance?: number;
+  // Date range reflected back
+  dateRangeFrom?: string;
+  dateRangeTo?: string;
   recentApplications: ApplicationSummary[];
 }
 
@@ -97,6 +110,8 @@ export interface UserDetail extends UserListItem {
 
 export interface ApplicationSummary {
   id: number;
+  userId?: number;
+  investorName?: string;
   investorType: string;
   investmentType?: string;
   status: string;
@@ -429,7 +444,14 @@ export const adminApi = {
         lastName: string;
       }>
     >("/login", { email, password }),
-  dashboard: () => api.get<ApiResponse<DashboardStats>>("/dashboard"),
+  dashboard: (params?: { from?: string; to?: string }) => {
+    const qs = params && (params.from || params.to)
+      ? '?' + new URLSearchParams(Object.fromEntries(
+          Object.entries(params).filter(([, v]) => v != null)
+        ) as Record<string, string>)
+      : '';
+    return api.get<ApiResponse<DashboardStats>>(`/dashboard${qs}`);
+  },
   dashboardTrends: () => api.get<ApiResponse<DashboardTrends>>("/dashboard/trends"),
   users: (params: Record<string, string | number>) => {
     const q = new URLSearchParams(params as Record<string, string>).toString();
@@ -618,6 +640,8 @@ export interface BankDetails {
   accountNumber: string;
   routingSwiftCode: string;
   address: string;
+  deployedAmount?: number;
+  bankAccountBalance?: number;
 }
 
 export interface DistributionListItem {

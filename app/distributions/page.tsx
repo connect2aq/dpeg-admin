@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { adminApi, type DistributionListItem, type PagedResult } from '@/lib/api';
@@ -10,9 +11,10 @@ const MONTH_NAMES = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug',
 const PAGE_SIZE = 20;
 
 export default function DistributionsPage() {
+  const searchParams = useSearchParams();
   const [result, setResult] = useState<PagedResult<DistributionListItem> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState(() => searchParams.get('status') ?? '');
   const [month, setMonth] = useState('');
   const [year, setYear] = useState('');
   const [page, setPage] = useState(1);

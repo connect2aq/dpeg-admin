@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { adminApi, type RedemptionListItem, type PagedResult } from '@/lib/api';
@@ -12,9 +13,10 @@ const PAGE_SIZE = 20;
 export default function RedemptionsPage() {
   const { user: authUser } = useAdminAuth();
   const isSuperAdmin = (authUser?.adminRole ?? 'SuperAdmin') === 'SuperAdmin';
+  const searchParams = useSearchParams();
   const [result, setResult] = useState<PagedResult<RedemptionListItem> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState(() => searchParams.get('status') ?? '');
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
