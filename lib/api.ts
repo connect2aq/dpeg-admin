@@ -586,6 +586,16 @@ export const adminApi = {
   deleteRedemption: (id: number) =>
     api.delete<ApiResponse<string>>(`/redemptions/${id}`),
 
+  // ── Manual distribution run ───────────────────────────────────────────
+  simulateDistribution: (asOfDate: string) =>
+    api.post<ApiResponse<DistributionRunResult[]>>('/distributions/simulate', { asOfDate }),
+  executeDistribution: (asOfDate: string) =>
+    api.post<ApiResponse<DistributionRunResult[]>>('/distributions/execute', { asOfDate }),
+  pushDistributionToOdoo: (id: number) =>
+    api.post<ApiResponse<{ ok: boolean; msg: string }>>(`/distributions/${id}/push-odoo`, {}),
+  batchPushToOdoo: (ids: number[]) =>
+    api.post<ApiResponse<{ pushed: number; failed: number }>>('/distributions/batch-push-odoo', { ids }),
+
   // ── Admin CRUD: Distribution ───────────────────────────────────────────
   createDistribution: (dto: CreateDistributionRequest) =>
     api.post<ApiResponse<UserDistributionItem>>('/distributions', dto),
@@ -657,6 +667,22 @@ export interface DistributionListItem {
   bankName?: string;
   bankAccountNumber?: string;
   createdOn: string;
+}
+
+export interface DistributionRunResult {
+  applicationId: number;
+  investorName: string;
+  investorEmail: string;
+  ppmRefNo: string;
+  totalNetAmount: number;
+  recalculatedAmount: number;
+  hasMismatch: boolean;
+  totalDays: number;
+  priorMonthCatchUpAmount: number;
+  bankName: string;
+  bankAccountNumber: string;
+  alreadyRan: boolean;
+  distributionLogId: number | null;
 }
 
 export interface StatementListItem {
