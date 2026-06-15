@@ -586,6 +586,10 @@ export const adminApi = {
   deleteRedemption: (id: number) =>
     api.delete<ApiResponse<string>>(`/redemptions/${id}`),
 
+  // ── Bulk catch-up ─────────────────────────────────────────────────────
+  runBulkCatchUp: (from: string, to: string) =>
+    api.post<ApiResponse<{ appsProcessed: number; logsCreated: number }>>('/distributions/catch-up', { from, to }),
+
   // ── Manual distribution run ───────────────────────────────────────────
   simulateDistribution: (asOfDate: string) =>
     api.post<ApiResponse<DistributionRunResult[]>>('/distributions/simulate', { asOfDate }),

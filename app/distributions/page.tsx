@@ -14,6 +14,17 @@ function todayStr() {
   return new Date().toISOString().split('T')[0];
 }
 
+function firstOfMonthStr() {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+}
+
+function yesterdayStr() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split('T')[0];
+}
+
 export default function DistributionsPage() {
   const searchParams = useSearchParams();
   const [result, setResult] = useState<PagedResult<DistributionListItem> | null>(null);
@@ -24,6 +35,13 @@ export default function DistributionsPage() {
   const [page, setPage] = useState(1);
   const [markingId, setMarkingId] = useState<number | null>(null);
   const [paidDateInput, setPaidDateInput] = useState<{ [id: number]: string }>({});
+
+  // Catch-up state
+  const [catchUpFrom, setCatchUpFrom] = useState(firstOfMonthStr());
+  const [catchUpTo, setCatchUpTo] = useState(yesterdayStr());
+  const [catchUpLoading, setCatchUpLoading] = useState(false);
+  const [catchUpResult, setCatchUpResult] = useState<{ appsProcessed: number; logsCreated: number } | null>(null);
+  const [catchUpError, setCatchUpError] = useState<string | null>(null);
 
   // Run distribution state
   const [runDate, setRunDate] = useState(todayStr());
@@ -55,6 +73,16 @@ export default function DistributionsPage() {
     const r = await adminApi.markDistributionPaid(id, paidDate);
     setMarkingId(null);
     if (r.success) load();
+  };
+
+  const handleCatchUp = async () => {
+    setCatchUpLoading(true);
+    setCatchUpResult(null);
+    setCatchUpError(null);
+    const r = await adminApi.runBulkCatchUp(catchUpFrom, catchUpTo);
+    setCatchUpLoading(false);
+    if (r.success) setCatchUpResult(r.data);
+    else setCatchUpError('Catch-up failed. Check the date range and try again.');
   };
 
   const handlePreview = async () => {
@@ -129,9 +157,47 @@ export default function DistributionsPage() {
       <div style={{ padding: '32px 36px' }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0e3416', marginBottom: 24 }}>Monthly Distributions</h1>
 
+        {/* Catch-Up Panel */}
+        <div style={{ background: '#fefce8', border: '1.5px solid #fde68a', borderRadius: 12, padding: '20px 24px', marginBottom: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#92400e', marginBottom: 10 }}>Step 1 — Backfill Missing Daily Interest</div>
+          <div style={{ fontSize: 13, color: '#78350f', marginBottom: 14 }}>
+            Run this first if daily interest logs are missing for a date range (e.g. newly activated investors).
+            Creates logs for all active investors where no log exists yet, and sends each one to Odoo.
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={{ fontSize: 13, color: '#78350f', fontWeight: 500 }}>From</label>
+            <input
+              type="date"
+              value={catchUpFrom}
+              onChange={e => { setCatchUpFrom(e.target.value); setCatchUpResult(null); }}
+              style={{ padding: '9px 12px', border: '1.5px solid #fde68a', borderRadius: 8, fontSize: 14, background: '#fffbeb' }}
+            />
+            <label style={{ fontSize: 13, color: '#78350f', fontWeight: 500 }}>To</label>
+            <input
+              type="date"
+              value={catchUpTo}
+              onChange={e => { setCatchUpTo(e.target.value); setCatchUpResult(null); }}
+              style={{ padding: '9px 12px', border: '1.5px solid #fde68a', borderRadius: 8, fontSize: 14, background: '#fffbeb' }}
+            />
+            <button
+              onClick={handleCatchUp}
+              disabled={catchUpLoading}
+              style={{ padding: '9px 20px', background: '#b45309', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: catchUpLoading ? 'not-allowed' : 'pointer', opacity: catchUpLoading ? 0.6 : 1 }}>
+              {catchUpLoading ? 'Running…' : 'Run Catch-Up'}
+            </button>
+          </div>
+          {catchUpError && <div style={{ marginTop: 10, fontSize: 13, color: '#dc2626' }}>{catchUpError}</div>}
+          {catchUpResult && (
+            <div style={{ marginTop: 10, padding: '8px 14px', background: '#f0fdf4', borderRadius: 8, fontSize: 13, color: '#15803d', fontWeight: 500, display: 'inline-block' }}>
+              ✓ Catch-up complete — {catchUpResult.appsProcessed} investor{catchUpResult.appsProcessed !== 1 ? 's' : ''} updated, {catchUpResult.logsCreated} new log{catchUpResult.logsCreated !== 1 ? 's' : ''} created.
+              {catchUpResult.logsCreated > 0 && ' Now run Preview below to see updated amounts.'}
+            </div>
+          )}
+        </div>
+
         {/* Run Distribution Panel */}
         <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: '20px 24px', marginBottom: 28 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 14 }}>Run Distribution</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 14 }}>Step 2 — Run Distribution</div>
           <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>
             Pick a date to calculate distributions for all active investors from the 1st of that month up to the chosen date.
             <br />Preview shows projected amounts without saving. Execute saves records and lets you push to Odoo.
