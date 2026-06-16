@@ -60,6 +60,8 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
   const afterInterest = remaining - stats.interestPaidCommencement;
   const hasDeployed   = stats.deployedAmount != null;
   const available     = hasDeployed ? afterInterest - (stats.deployedAmount ?? 0) : null;
+  const hasBank       = stats.bankAccountBalance != null;
+  const variance      = hasDeployed && hasBank ? (stats.bankAccountBalance ?? 0) - (available ?? 0) : null;
 
   const box = (label: string, value: string, accent: string, muted?: boolean) => (
     <div style={{
@@ -116,6 +118,14 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
         {hasDeployed
           ? box("Available", fmt(available ?? 0), "#699172")
           : box("Available", "Not entered", "#b8923a", true)}
+        {hasBank && (
+          <>
+            {variance != null
+              ? arrow("Variance", `${variance >= 0 ? "+" : "−"}${fmt(Math.abs(variance))}`, variance >= 0 ? "#10b981" : "#ef4444")
+              : arrow("vs Available", "N/A", "#94a3b8", true)}
+            {box("Bank Account Balance", fmt(stats.bankAccountBalance ?? 0), "#64748b")}
+          </>
+        )}
         {!hasDeployed && (
           <div style={{ fontSize: 11, color: "#b8923a", alignSelf: "flex-end", paddingBottom: 4, flexBasis: "100%", marginTop: 8 }}>
             ⚠ Enter today&apos;s Deployed Amount in Admin → Settings → Daily Balances to complete this flow.
