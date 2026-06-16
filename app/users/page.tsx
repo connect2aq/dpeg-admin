@@ -22,6 +22,7 @@ export default function UsersPage() {
   const [status, setStatus] = useState(() => searchParams.get('status') ?? '');
   const [page, setPage] = useState(1);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<'investors' | 'admins'>('investors');
 
   // Multi-select state
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -40,6 +41,7 @@ export default function UsersPage() {
     const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE };
     if (search) params.search = search;
     if (status && status !== 'Test') params.status = status;
+    if (viewMode === 'admins') params.isAdmin = 'true';
     adminApi.users(params)
       .then(r => {
         if (r.success) {
@@ -48,9 +50,15 @@ export default function UsersPage() {
         }
       })
       .finally(() => setLoading(false));
-  }, [page, search, status]);
+  }, [page, search, status, viewMode]);
 
   useEffect(() => { load(); }, [load]);
+
+  const switchView = (mode: 'investors' | 'admins') => {
+    setViewMode(mode);
+    setPage(1);
+    setSelected(new Set());
+  };
 
   const onSearch = (e: React.FormEvent) => { e.preventDefault(); setPage(1); load(); };
 
@@ -122,7 +130,25 @@ export default function UsersPage() {
   return (
     <AdminLayout>
       <div style={{ padding: '32px 36px' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0e3416', marginBottom: 24 }}>Users</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0e3416', marginBottom: 16 }}>Users</h1>
+
+        {/* View toggle */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+          {(['investors', 'admins'] as const).map(mode => (
+            <button
+              key={mode}
+              onClick={() => switchView(mode)}
+              style={{
+                padding: '8px 16px', fontSize: 13, fontWeight: 700, borderRadius: 8, cursor: 'pointer',
+                border: viewMode === mode ? '1.5px solid #0e3416' : '1.5px solid #e2e8f0',
+                background: viewMode === mode ? '#0e3416' : 'white',
+                color: viewMode === mode ? 'white' : '#64748b',
+              }}
+            >
+              {mode === 'investors' ? 'Investors' : 'Admin Users'}
+            </button>
+          ))}
+        </div>
 
         {/* Filters */}
         <form onSubmit={onSearch} style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -144,26 +170,33 @@ export default function UsersPage() {
         </form>
 
         {/* Action toolbar */}
-        <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
-          <button
-            className="btn-primary"
-            onClick={() => { setCreateForm(emptyCreateForm); setCreateMsg(''); setShowCreateModal(true); }}
-            style={{ fontSize: 13 }}
-          >
-            + Create User
-          </button>
-          {selected.size > 0 && (
+        {viewMode === 'investors' && (
+          <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
             <button
-              onClick={() => { setDeleteMsg(''); setShowDeleteConfirm(true); }}
-              style={{
-                padding: '8px 16px', fontSize: 13, fontWeight: 600, borderRadius: 6,
-                background: '#fee2e2', color: '#b91c1c', border: '1.5px solid #fca5a5', cursor: 'pointer',
-              }}
+              className="btn-primary"
+              onClick={() => { setCreateForm(emptyCreateForm); setCreateMsg(''); setShowCreateModal(true); }}
+              style={{ fontSize: 13 }}
             >
-              Delete Selected ({selected.size})
+              + Create User
             </button>
-          )}
-        </div>
+            {selected.size > 0 && (
+              <button
+                onClick={() => { setDeleteMsg(''); setShowDeleteConfirm(true); }}
+                style={{
+                  padding: '8px 16px', fontSize: 13, fontWeight: 600, borderRadius: 6,
+                  background: '#fee2e2', color: '#b91c1c', border: '1.5px solid #fca5a5', cursor: 'pointer',
+                }}
+              >
+                Delete Selected ({selected.size})
+              </button>
+            )}
+          </div>
+        )}
+        {viewMode === 'admins' && (
+          <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
+            Admin accounts manage the portal itself (Maker / Checker / Approver / SuperAdmin). Click into a row to change role or reset password.
+          </p>
+        )}
 
         {/* Table */}
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -174,36 +207,46 @@ export default function UsersPage() {
               <table>
                 <thead>
                   <tr>
-                    <th style={{ width: 40, textAlign: 'center' }}>
-                      <input
-                        type="checkbox"
-                        checked={allOnPageSelected}
-                        ref={el => { if (el) el.indeterminate = someOnPageSelected && !allOnPageSelected; }}
-                        onChange={toggleSelectAll}
-                      />
-                    </th>
+                    {viewMode === 'investors' && (
+                      <th style={{ width: 40, textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={allOnPageSelected}
+                          ref={el => { if (el) el.indeterminate = someOnPageSelected && !allOnPageSelected; }}
+                          onChange={toggleSelectAll}
+                        />
+                      </th>
+                    )}
                     <th>Name</th>
                     <th>Email</th>
                     <th>Status</th>
-                    <th>Email Verified</th>
-                    <th>Step</th>
-                    <th>Applications</th>
+                    {viewMode === 'investors' ? (
+                      <>
+                        <th>Email Verified</th>
+                        <th>Step</th>
+                        <th>Applications</th>
+                      </>
+                    ) : (
+                      <th>Admin Role</th>
+                    )}
                     <th>Registered</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {result.items.length === 0 ? (
-                    <tr><td colSpan={9} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No users found</td></tr>
+                    <tr><td colSpan={viewMode === 'investors' ? 9 : 6} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No users found</td></tr>
                   ) : result.items.map(u => (
                     <tr key={u.id} style={{ background: selected.has(u.id) ? '#fef9ec' : undefined }}>
-                      <td style={{ textAlign: 'center' }}>
-                        <input
-                          type="checkbox"
-                          checked={selected.has(u.id)}
-                          onChange={() => toggleSelect(u.id)}
-                        />
-                      </td>
+                      {viewMode === 'investors' && (
+                        <td style={{ textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={selected.has(u.id)}
+                            onChange={() => toggleSelect(u.id)}
+                          />
+                        </td>
+                      )}
                       <td style={{ fontWeight: 600 }}>
                         {u.firstName} {u.lastName}
                         {u.isTestUser && (
@@ -216,16 +259,29 @@ export default function UsersPage() {
                       </td>
                       <td style={{ color: '#64748b' }}>{u.email}</td>
                       <td><StatusBadge status={u.status} /></td>
-                      <td>
-                        <span style={{ color: u.emailVerified ? '#10b981' : '#94a3b8', fontWeight: 600, fontSize: 12 }}>
-                          {u.emailVerified ? '✓ Verified' : '✗ Pending'}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'center' }}>{u.currentOnboardingStep}/7</td>
-                      <td style={{ textAlign: 'center' }}>{u.applicationCount}</td>
+                      {viewMode === 'investors' ? (
+                        <>
+                          <td>
+                            <span style={{ color: u.emailVerified ? '#10b981' : '#94a3b8', fontWeight: 600, fontSize: 12 }}>
+                              {u.emailVerified ? '✓ Verified' : '✗ Pending'}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>{u.currentOnboardingStep}/7</td>
+                          <td style={{ textAlign: 'center' }}>{u.applicationCount}</td>
+                        </>
+                      ) : (
+                        <td>
+                          <span style={{
+                            padding: '2px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700,
+                            textTransform: 'uppercase', letterSpacing: '0.03em',
+                            background: '#e0e7ff', color: '#3730a3',
+                          }}>{u.adminRole ?? '—'}</span>
+                        </td>
+                      )}
                       <td style={{ color: '#64748b', fontSize: 13 }}>{new Date(u.createdOn).toLocaleDateString()}</td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {viewMode === 'investors' && (
                           <button
                             onClick={() => toggleTestUser(u)}
                             disabled={togglingId === u.id}
@@ -242,6 +298,7 @@ export default function UsersPage() {
                           >
                             Test
                           </button>
+                          )}
                           <Link href={`/users/${u.id}`} style={{ color: '#699172', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>
                             View →
                           </Link>

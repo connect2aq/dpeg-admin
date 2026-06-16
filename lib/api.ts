@@ -102,6 +102,7 @@ export interface UserListItem {
   createdOn: string;
   applicationCount: number;
   isTestUser: boolean;
+  adminRole?: string;
 }
 
 export interface UserDetail extends UserListItem {
