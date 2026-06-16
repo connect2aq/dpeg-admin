@@ -86,7 +86,9 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
 
   return (
     <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "20px 24px", marginBottom: 4 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>Balance Flow (Since Inception)</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>
+        Balance Flow (Since Inception){stats.balanceAsAtDate && ` — Balance as at ${new Date(stats.balanceAsAtDate).toLocaleDateString()}`}
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
         {box("Total Deposits", fmt(stats.totalDeployedCommencement), "#0e3416")}
         {arrow(`−${fmt(stats.totalWithdrawnCommencement)}`)}
@@ -99,7 +101,7 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
           : box("Available", "Not entered", "#b8923a", true)}
         {!hasDeployed && (
           <div style={{ fontSize: 11, color: "#b8923a", alignSelf: "flex-end", paddingBottom: 4, flexBasis: "100%", marginTop: 8 }}>
-            ⚠ Enter Deployed Amount in Admin → Settings → Bank Details to complete this flow.
+            ⚠ Enter today&apos;s Deployed Amount in Admin → Settings → Daily Balances to complete this flow.
           </div>
         )}
       </div>
@@ -177,10 +179,10 @@ export default function DashboardPage() {
               <KpiCard label="Total Redeemed Amount" value={fmt(stats.totalWithdrawnCommencement)} sub="From commencement" color="#6366f1" href="/redemptions?status=Active" />
               <KpiCard label="Interest Paid to Date" value={fmt(stats.interestPaidCommencement)} sub="All distribution payments made" color="#10b981" href="/distributions" />
               {stats.deployedAmount != null && (
-                <KpiCard label="Deployed in Projects" value={fmt(stats.deployedAmount)} sub="Currently deployed externally" color="#b8923a" />
+                <KpiCard label="Deployed in Projects" value={fmt(stats.deployedAmount)} sub={stats.balanceAsAtDate ? `As at ${new Date(stats.balanceAsAtDate).toLocaleDateString()}` : "Currently deployed externally"} color="#b8923a" href="/settings" />
               )}
               {stats.bankAccountBalance != null && (
-                <KpiCard label="Bank Account Balance" value={fmt(stats.bankAccountBalance)} sub="As at last update" color="#64748b" />
+                <KpiCard label="Bank Account Balance" value={fmt(stats.bankAccountBalance)} sub={stats.balanceAsAtDate ? `As at ${new Date(stats.balanceAsAtDate).toLocaleDateString()}` : "As at last update"} color="#64748b" href="/settings" />
               )}
             </div>
 

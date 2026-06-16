@@ -85,6 +85,7 @@ export interface DashboardStats {
   // Manually entered management figures
   deployedAmount?: number;
   bankAccountBalance?: number;
+  balanceAsAtDate?: string;
   // Date range reflected back
   dateRangeFrom?: string;
   dateRangeTo?: string;
@@ -530,6 +531,10 @@ export const adminApi = {
     api.get<ApiResponse<BankDetails>>('/bank-details'),
   saveBankDetails: (dto: BankDetails) =>
     api.put<ApiResponse<string>>('/bank-details', dto),
+  getDailyBalances: () =>
+    api.get<ApiResponse<DailyBalanceLog[]>>('/daily-balances'),
+  saveDailyBalance: (dto: DailyBalanceLog) =>
+    api.put<ApiResponse<string>>('/daily-balances', dto),
   getNotificationEmails: () =>
     api.get<ApiResponse<NotificationEmail[]>>('/notification-emails'),
   addNotificationEmail: (emailAddress: string, label?: string) =>
@@ -658,8 +663,14 @@ export interface BankDetails {
   accountNumber: string;
   routingSwiftCode: string;
   address: string;
-  deployedAmount?: number;
-  bankAccountBalance?: number;
+}
+
+export interface DailyBalanceLog {
+  id?: number;
+  date: string;
+  bankAccountBalance: number;
+  deployedAmount: number;
+  notes?: string;
 }
 
 export interface DistributionListItem {

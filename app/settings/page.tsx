@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import AdminLayout from '@/components/AdminLayout';
-import { adminApi, type BankDetails, type NotificationEmail } from '@/lib/api';
+import { adminApi, type BankDetails, type NotificationEmail, type DailyBalanceLog } from '@/lib/api';
 
 const EMPTY: BankDetails = {
   beneficiaryName: '',
@@ -9,6 +9,15 @@ const EMPTY: BankDetails = {
   accountNumber: '',
   routingSwiftCode: '',
   address: '',
+};
+
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
+const EMPTY_BALANCE: DailyBalanceLog = {
+  date: todayIso(),
+  bankAccountBalance: 0,
+  deployedAmount: 0,
+  notes: '',
 };
 
 export default function SettingsPage() {
@@ -24,6 +33,15 @@ export default function SettingsPage() {
   const [addingEmail, setAddingEmail] = useState(false);
   const [emailMsg, setEmailMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
+  const [balances, setBalances] = useState<DailyBalanceLog[]>([]);
+  const [balanceForm, setBalanceForm] = useState<DailyBalanceLog>(EMPTY_BALANCE);
+  const [balanceLoading, setBalanceLoading] = useState(true);
+  const [balanceSaving, setBalanceSaving] = useState(false);
+  const [balanceMsg, setBalanceMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  const loadBalances = () =>
+    adminApi.getDailyBalances().then(r => { if (r.success && r.data) setBalances(r.data); });
+
   useEffect(() => {
     adminApi.getBankDetails()
       .then(r => { if (r.success && r.data) setForm({ ...EMPTY, ...r.data }); })
@@ -31,7 +49,23 @@ export default function SettingsPage() {
     adminApi.getNotificationEmails()
       .then(r => { if (r.success && r.data) setNotifEmails(r.data); })
       .finally(() => setNotifLoading(false));
+    loadBalances().finally(() => setBalanceLoading(false));
   }, []);
+
+  const saveBalance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBalanceSaving(true);
+    setBalanceMsg(null);
+    try {
+      const r = await adminApi.saveDailyBalance(balanceForm);
+      setBalanceMsg({ text: r.success ? 'Daily balance saved.' : (r.message ?? 'Save failed.'), ok: r.success });
+      if (r.success) await loadBalances();
+    } catch {
+      setBalanceMsg({ text: 'An error occurred. Please try again.', ok: false });
+    } finally {
+      setBalanceSaving(false);
+    }
+  };
 
   const addEmail = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,6 +183,82 @@ export default function SettingsPage() {
             </form>
           )}
         </div>
+        {/* Daily Balances */}
+        <div className="card" style={{ marginTop: 28 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 6 }}>Daily Balances</h2>
+          <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>
+            Enter the closing Bank Account Balance and Deployed Amount for a given date. One entry per day —
+            saving again for the same date overwrites that day&apos;s entry. The dashboard uses the most recent entry.
+          </p>
+
+          {balanceLoading ? (
+            <p style={{ color: '#64748b', fontSize: 14 }}>Loading…</p>
+          ) : (
+            <>
+              <form onSubmit={saveBalance} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 20 }}>
+                <div>
+                  <label style={labelStyle}>Date</label>
+                  <input type="date" style={inputStyle} value={balanceForm.date.slice(0, 10)}
+                    onChange={e => setBalanceForm(f => ({ ...f, date: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Bank Account Balance</label>
+                  <input type="number" step="0.01" style={inputStyle} value={balanceForm.bankAccountBalance}
+                    onChange={e => setBalanceForm(f => ({ ...f, bankAccountBalance: parseFloat(e.target.value) || 0 }))} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Deployed in Projects</label>
+                  <input type="number" step="0.01" style={inputStyle} value={balanceForm.deployedAmount}
+                    onChange={e => setBalanceForm(f => ({ ...f, deployedAmount: parseFloat(e.target.value) || 0 }))} />
+                </div>
+                <div style={{ flex: '1 1 200px' }}>
+                  <label style={labelStyle}>Notes (optional)</label>
+                  <input style={inputStyle} value={balanceForm.notes ?? ''}
+                    onChange={e => setBalanceForm(f => ({ ...f, notes: e.target.value }))} />
+                </div>
+                <button type="submit" disabled={balanceSaving}
+                  style={{ padding: '9px 18px', background: '#0f2342', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: balanceSaving ? 'not-allowed' : 'pointer', opacity: balanceSaving ? 0.7 : 1 }}>
+                  {balanceSaving ? 'Saving…' : 'Save Entry'}
+                </button>
+              </form>
+
+              {balanceMsg && (
+                <div style={{ marginBottom: 16, fontSize: 13, color: balanceMsg.ok ? '#15803d' : '#b91c1c' }}>{balanceMsg.text}</div>
+              )}
+
+              {balances.length > 0 && (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr>
+                        {['Date', 'Bank Account Balance', 'Deployed Amount', 'Notes', ''].map(h => (
+                          <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: '#6b7280', fontWeight: 600, borderBottom: '1.5px solid #e2e8f0' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {balances.map(b => (
+                        <tr key={b.date}>
+                          <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>{new Date(b.date).toLocaleDateString()}</td>
+                          <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>${b.bankAccountBalance.toLocaleString()}</td>
+                          <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>${b.deployedAmount.toLocaleString()}</td>
+                          <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9', color: '#64748b' }}>{b.notes || '—'}</td>
+                          <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>
+                            <button onClick={() => setBalanceForm({ ...b, date: b.date.slice(0, 10) })}
+                              style={{ padding: '3px 10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 5, fontSize: 12, color: '#0f2342', cursor: 'pointer' }}>
+                              Edit
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
         {/* Notification Emails */}
         <div className="card" style={{ marginTop: 28 }}>
           <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 6 }}>Admin Notification Emails</h2>
