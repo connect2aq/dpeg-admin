@@ -163,19 +163,26 @@ export default function AdminLayout({
           >
             Signed in as
           </div>
-          <div
-            style={{
-              fontSize: 13.5,
-              color: "#ffffff",
-              fontWeight: 600,
-              marginBottom: 2,
-            }}
+          <Link
+            href={`/users/${user.userId}`}
+            onClick={() => setMobileOpen(false)}
+            title="View my account (change password, etc.)"
+            style={{ textDecoration: "none", display: "block" }}
           >
-            {user.firstName} {user.lastName}
-          </div>
-          <div style={{ fontSize: 10.5, color: '#b8923a', fontWeight: 600, marginBottom: 8, letterSpacing: '0.04em' }}>
-            {adminRole}
-          </div>
+            <div
+              style={{
+                fontSize: 13.5,
+                color: "#ffffff",
+                fontWeight: 600,
+                marginBottom: 2,
+              }}
+            >
+              {user.firstName} {user.lastName}
+            </div>
+            <div style={{ fontSize: 10.5, color: '#b8923a', fontWeight: 600, marginBottom: 8, letterSpacing: '0.04em' }}>
+              {adminRole} · My Account
+            </div>
+          </Link>
           <button
             onClick={() => {
               logout();
