@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
-import { adminApi, type ApplicationListItem, type PagedResult } from '@/lib/api';
+import { PendingBadge } from '@/components/PendingBadge';
+import { InvestmentEditModal } from '@/components/InvestmentEditModal';
+import { adminApi, type ApplicationListItem, type PagedResult, type PendingChangeItem } from '@/lib/api';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 const STATUSES = ['', 'UnderReview', 'Active', 'Rejected'];
@@ -26,6 +28,12 @@ export default function ApplicationsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const [pendingMap, setPendingMap] = useState<Record<number, PendingChangeItem>>({});
+  const [editingAppId, setEditingAppId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [deletingOne, setDeletingOne] = useState(false);
+  const [toast, setToast] = useState('');
+
   const selectAllRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
@@ -35,7 +43,21 @@ export default function ApplicationsPage() {
     if (status) params.status = status;
     if (investorType) params.investorType = investorType;
     adminApi.applications(params)
-      .then(r => { if (r.success) setResult(r.data); })
+      .then(r => {
+        if (r.success) {
+          setResult(r.data);
+          const ids = r.data.items.map(a => a.id);
+          if (ids.length > 0) {
+            adminApi.getActivePendingForRecords('Investment', ids).then(pr => {
+              if (pr.success) {
+                const map: Record<number, PendingChangeItem> = {};
+                pr.data.forEach(p => { if (p.entityId) map[p.entityId] = p; });
+                setPendingMap(map);
+              }
+            });
+          } else setPendingMap({});
+        }
+      })
       .finally(() => setLoading(false));
   }, [page, search, status, investorType]);
 
@@ -83,6 +105,18 @@ export default function ApplicationsPage() {
     setDeleting(false);
   };
 
+  const handleDeleteOne = async () => {
+    if (!confirmDeleteId) return;
+    setDeletingOne(true);
+    const r = await adminApi.deleteApplication(confirmDeleteId);
+    if (r.success) {
+      setConfirmDeleteId(null);
+      if (isSuperAdmin) load();
+      else { setToast(`Delete request submitted for approval — ${r.message}`); load(); }
+    } else alert(r.message || 'Delete failed.');
+    setDeletingOne(false);
+  };
+
   const pageIds = result?.items.map(a => a.id) ?? [];
   const allPageSelected = pageIds.length > 0 && pageIds.every(id => selected.has(id));
 
@@ -100,6 +134,13 @@ export default function ApplicationsPage() {
             </button>
           )}
         </div>
+
+        {toast && (
+          <div style={{ background: '#fffbeb', border: '1.5px solid #fbbf24', borderRadius: 8, padding: '12px 16px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 13, color: '#92400e', fontWeight: 600 }}>⏳ {toast}</span>
+            <button onClick={() => setToast('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 16 }}>×</button>
+          </div>
+        )}
 
         {/* Filters */}
         <form onSubmit={e => { e.preventDefault(); setPage(1); load(); }} style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
@@ -127,7 +168,7 @@ export default function ApplicationsPage() {
           ) : result ? (
             <>
               <div className="table-scroll">
-              <table style={{ minWidth: 920 }}>
+              <table style={{ minWidth: 980 }}>
                 <thead>
                   <tr>
                     <th style={{ width: 40, padding: '12px 8px 12px 16px' }}>
@@ -177,10 +218,17 @@ export default function ApplicationsPage() {
                       <td>{a.investorType}</td>
                       <td>{a.numUnits ?? '—'}</td>
                       <td style={{ fontWeight: 600 }}>{a.totalAmount ? `$${a.totalAmount.toLocaleString()}` : '—'}</td>
-                      <td><StatusBadge status={a.status} /></td>
+                      <td>
+                        <StatusBadge status={a.status} />
+                        {pendingMap[a.id] && <PendingBadge item={pendingMap[a.id]} />}
+                      </td>
                       <td style={{ color: '#64748b', fontSize: 13 }}>{a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : '—'}</td>
                       <td>
-                        <Link href={`/applications/${a.id}`} style={{ color: '#699172', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>View →</Link>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                          <Link href={`/applications/${a.id}`} style={{ color: '#699172', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>View</Link>
+                          <button onClick={() => setEditingAppId(a.id)} style={{ fontSize: 13, color: '#0f2342', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Edit</button>
+                          <button onClick={() => setConfirmDeleteId(a.id)} style={{ fontSize: 13, color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Delete</button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -205,7 +253,7 @@ export default function ApplicationsPage() {
         </div>
       </div>
 
-      {/* Delete confirmation modal */}
+      {/* Bulk delete confirmation modal */}
       {showDeleteConfirm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ background: 'white', borderRadius: 12, padding: 32, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
@@ -226,6 +274,42 @@ export default function ApplicationsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Single-record delete confirmation modal */}
+      {confirmDeleteId && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: 'white', borderRadius: 12, padding: 32, width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0f2342', marginBottom: 10 }}>Delete Application #{confirmDeleteId}?</h2>
+            <p style={{ fontSize: 14, color: '#64748b', marginBottom: 6 }}>
+              This will permanently delete the application and all associated data (interest logs, distribution logs, statements, linked redemptions).
+            </p>
+            <p style={{ fontSize: 13, color: '#b91c1c', fontWeight: 600, marginBottom: 20 }}>This cannot be undone.</p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button className="btn-secondary" onClick={() => setConfirmDeleteId(null)} disabled={deletingOne}>Cancel</button>
+              <button
+                onClick={handleDeleteOne}
+                disabled={deletingOne}
+                style={{ padding: '10px 20px', background: '#b91c1c', color: 'white', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 14, cursor: deletingOne ? 'not-allowed' : 'pointer', opacity: deletingOne ? 0.7 : 1 }}
+              >
+                {deletingOne ? 'Deleting...' : 'Confirm Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit modal */}
+      {editingAppId && (
+        <InvestmentEditModal
+          applicationId={editingAppId}
+          isSuperAdmin={isSuperAdmin}
+          onClose={() => setEditingAppId(null)}
+          onSaved={(pendingSubmitted, message) => {
+            if (pendingSubmitted) setToast(message);
+            load();
+          }}
+        />
       )}
     </AdminLayout>
   );

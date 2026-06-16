@@ -625,6 +625,8 @@ export const adminApi = {
     api.get<ApiResponse<PendingChangeDetail>>(`/pending-changes/${id}`),
   getActivePendingForRecord: (entityType: string, entityId: number) =>
     api.get<ApiResponse<PendingChangeItem | null>>(`/pending-changes/for-record?entityType=${entityType}&entityId=${entityId}`),
+  getActivePendingForRecords: (entityType: string, entityIds: number[]) =>
+    api.get<ApiResponse<PendingChangeItem[]>>(`/pending-changes/for-records?entityType=${entityType}&entityIds=${entityIds.join(',')}`),
   checkChange: (id: number, note?: string) =>
     api.post<ApiResponse<string>>(`/pending-changes/${id}/check`, { note }),
   approveChange: (id: number, note?: string) =>

@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
+import { PendingBadge } from '@/components/PendingBadge';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import {
   adminApi,
@@ -14,6 +15,7 @@ import {
   type CreateApplicationRequest,
   type CreateRedemptionAdminRequest,
   type CreateDistributionRequest,
+  type PendingChangeItem,
 } from '@/lib/api';
 
 const USER_STATUSES = ['InProgress', 'UnderReview', 'Active', 'Inactive'];
@@ -115,6 +117,10 @@ export default function UserDetailPage() {
   const [userRedemptions, setUserRedemptions] = useState<RedemptionListItem[]>([]);
   const [userDistributions, setUserDistributions] = useState<UserDistributionItem[]>([]);
 
+  // Pending-change badges (persist across navigation, unlike the transient pendingMsg toast)
+  const [invPendingMap, setInvPendingMap] = useState<Record<number, PendingChangeItem>>({});
+  const [redeemPendingMap, setRedeemPendingMap] = useState<Record<number, PendingChangeItem>>({});
+
   // Investment modal state
   const [invModal, setInvModal] = useState<'create' | 'edit' | null>(null);
   const [invForm, setInvForm] = useState<CreateApplicationRequest>(emptyInvForm());
@@ -157,6 +163,30 @@ export default function UserDetailPage() {
   }, [userId]);
 
   useEffect(() => { loadUser(); loadRedemptions(); loadDistributions(); }, [loadUser, loadRedemptions, loadDistributions]);
+
+  useEffect(() => {
+    const ids = user?.applications.map(a => a.id) ?? [];
+    if (ids.length === 0) { setInvPendingMap({}); return; }
+    adminApi.getActivePendingForRecords('Investment', ids).then(r => {
+      if (r.success) {
+        const map: Record<number, PendingChangeItem> = {};
+        r.data.forEach(p => { if (p.entityId) map[p.entityId] = p; });
+        setInvPendingMap(map);
+      }
+    });
+  }, [user]);
+
+  useEffect(() => {
+    const ids = userRedemptions.map(r => r.id);
+    if (ids.length === 0) { setRedeemPendingMap({}); return; }
+    adminApi.getActivePendingForRecords('Redemption', ids).then(r => {
+      if (r.success) {
+        const map: Record<number, PendingChangeItem> = {};
+        r.data.forEach(p => { if (p.entityId) map[p.entityId] = p; });
+        setRedeemPendingMap(map);
+      }
+    });
+  }, [userRedemptions]);
 
   const updateStatus = async () => {
     if (!user || newStatus === user.status) return;
@@ -631,7 +661,10 @@ export default function UserDetailPage() {
                       <td>{a.investorType}</td>
                       <td>{a.numUnits ?? '—'}</td>
                       <td>{a.totalAmount ? `$${a.totalAmount.toLocaleString()}` : '—'}</td>
-                      <td><StatusBadge status={a.status} /></td>
+                      <td>
+                        <StatusBadge status={a.status} />
+                        {invPendingMap[a.id] && <PendingBadge item={invPendingMap[a.id]} />}
+                      </td>
                       <td style={{ color: '#64748b', fontSize: 13 }}>{a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : '—'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -670,7 +703,10 @@ export default function UserDetailPage() {
                       <td style={{ fontWeight: 600 }}>{r.sellingPartnerName || r.email || '—'}</td>
                       <td>{r.unitsToRedeem ?? '—'}</td>
                       <td style={{ fontSize: 13, color: '#64748b' }}>{r.effectiveDate || '—'}</td>
-                      <td><StatusBadge status={r.status} /></td>
+                      <td>
+                        <StatusBadge status={r.status} />
+                        {redeemPendingMap[r.id] && <PendingBadge item={redeemPendingMap[r.id]} />}
+                      </td>
                       <td>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button onClick={() => openEditRedemption(r.id)} style={{ fontSize: 12, color: '#0f2342', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Edit</button>
