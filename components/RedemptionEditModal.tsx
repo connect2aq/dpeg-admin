@@ -1,13 +1,12 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { adminApi, type CreateRedemptionAdminRequest } from '@/lib/api';
-
-const INVESTOR_TYPES = ['Individual', 'Entity', 'IRA', 'Trust'];
-const APP_STATUSES = ['Active', 'UnderReview', 'Rejected'];
+import { useEffect, useMemo, useState } from 'react';
+import { adminApi, type ApplicationDetail, type CreateRedemptionAdminRequest } from '@/lib/api';
+import { calculateRedemption } from '@/lib/redemptionCalculations';
+import { BankDetailsPanel, RedemptionSummaryPanel } from '@/components/RedemptionSummaryPanels';
 
 const inputStyle = { width: '100%', padding: '8px 11px', border: '1.5px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' as const };
 const labelStyle = { fontSize: 11, fontWeight: 700 as const, color: '#475569', display: 'block' as const, marginBottom: 3, textTransform: 'uppercase' as const, letterSpacing: '0.04em' };
-const selectStyle = { ...inputStyle, background: 'white' };
+const readOnlyBoxStyle = { ...inputStyle, background: '#f8fafc', color: '#475569' };
 
 function FormField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -33,12 +32,13 @@ export function RedemptionEditModal({ redemptionId, isSuperAdmin, onClose, onSav
   onSaved: (pendingSubmitted: boolean, message: string) => void;
 }) {
   const [form, setForm] = useState<CreateRedemptionAdminRequest | null>(null);
+  const [trancheDetail, setTrancheDetail] = useState<ApplicationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
-    adminApi.redemption(redemptionId).then(r => {
+    adminApi.redemption(redemptionId).then(async r => {
       if (!r.success || !r.data) { setMsg('Failed to load redemption.'); setLoading(false); return; }
       const d = r.data;
       setForm({
@@ -61,16 +61,33 @@ export function RedemptionEditModal({ redemptionId, isSuperAdmin, onClose, onSav
         email: d.email || '',
         status: d.status || 'Active',
       });
+      if (d.trancheApplicationId) {
+        const ar = await adminApi.application(d.trancheApplicationId);
+        if (ar.success) setTrancheDetail(ar.data);
+      }
       setLoading(false);
     });
   }, [redemptionId]);
+
+  const calc = useMemo(() => calculateRedemption({
+    totalUnitsOwned: form?.totalUnitsOwned || '0',
+    unitsToRedeem: form?.unitsToRedeem || '0',
+    originalPurchaseDate: form?.originalPurchaseDate || '',
+    effectiveDate: form?.effectiveDate || '',
+    investmentTypeName: trancheDetail?.investmentType || '',
+  }), [form?.totalUnitsOwned, form?.unitsToRedeem, form?.originalPurchaseDate, form?.effectiveDate, trancheDetail?.investmentType]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form) return;
     setSubmitting(true);
     setMsg('');
-    const r = await adminApi.updateRedemptionFull(redemptionId, form);
+    const payload: CreateRedemptionAdminRequest = {
+      ...form,
+      aggregatePurchasePrice: form.unitsToRedeem ? String(calc.aggregatePurchasePrice) : form.aggregatePurchasePrice,
+      proratedPreferredReturn: form.unitsToRedeem ? String(calc.proratedPreferredReturn) : form.proratedPreferredReturn,
+    };
+    const r = await adminApi.updateRedemptionFull(redemptionId, payload);
     if (r.success) {
       onSaved(!isSuperAdmin, r.message || 'Saved.');
       onClose();
@@ -98,46 +115,55 @@ export function RedemptionEditModal({ redemptionId, isSuperAdmin, onClose, onSav
                 </div>
               )}
 
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                <div>
+                  <label style={labelStyle}>Investor Type</label>
+                  <div style={readOnlyBoxStyle}>{form.investorType || '—'}</div>
+                </div>
+                <div>
+                  <label style={labelStyle}>Total Units Owned</label>
+                  <div style={readOnlyBoxStyle}>{form.totalUnitsOwned || '—'}</div>
+                </div>
+                <div>
+                  <label style={labelStyle}>Status</label>
+                  <div style={readOnlyBoxStyle}>{form.status || 'Active'}</div>
+                </div>
+              </div>
+
+              <SectionTitle>Bank Details</SectionTitle>
+              <BankDetailsPanel
+                bankName={trancheDetail?.investment?.bankName}
+                accHolder={trancheDetail?.investment?.accHolder}
+                accNumber={trancheDetail?.investment?.accNumber}
+                routingNumber={trancheDetail?.investment?.routingNumber}
+              />
+
               <SectionTitle>Redemption Details</SectionTitle>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                <FormField label="Investor Type *">
-                  <select required style={selectStyle} value={form.investorType} onChange={e => setForm(f => f && ({ ...f, investorType: e.target.value }))}>
-                    {INVESTOR_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                <FormField label="Units to Redeem *">
+                  <input
+                    required
+                    type="number"
+                    min={1}
+                    max={trancheDetail?.investment?.numUnits ?? undefined}
+                    style={inputStyle}
+                    value={form.unitsToRedeem || ''}
+                    onChange={e => setForm(f => f && ({ ...f, unitsToRedeem: e.target.value }))}
+                  />
                 </FormField>
-                <FormField label="Status">
-                  <select style={selectStyle} value={form.status || 'Active'} onChange={e => setForm(f => f && ({ ...f, status: e.target.value }))}>
-                    {APP_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                <FormField label="Effective Date *">
+                  <input
+                    required
+                    type="date"
+                    style={inputStyle}
+                    value={form.effectiveDate || ''}
+                    onChange={e => setForm(f => f && ({ ...f, effectiveDate: e.target.value }))}
+                  />
                 </FormField>
-                <FormField label="Selling Partner Name"><input style={inputStyle} value={form.sellingPartnerName || ''} onChange={e => setForm(f => f && ({ ...f, sellingPartnerName: e.target.value }))} /></FormField>
-                <FormField label="Printed Name / Signature"><input style={inputStyle} value={form.printedName || ''} onChange={e => setForm(f => f && ({ ...f, printedName: e.target.value }))} /></FormField>
-                <FormField label="Total Units Owned"><input style={inputStyle} value={form.totalUnitsOwned || ''} onChange={e => setForm(f => f && ({ ...f, totalUnitsOwned: e.target.value }))} /></FormField>
-                <FormField label="Units to Redeem"><input style={inputStyle} value={form.unitsToRedeem || ''} onChange={e => setForm(f => f && ({ ...f, unitsToRedeem: e.target.value }))} /></FormField>
-                <FormField label="Original Purchase Date"><input style={inputStyle} value={form.originalPurchaseDate || ''} onChange={e => setForm(f => f && ({ ...f, originalPurchaseDate: e.target.value }))} /></FormField>
-                <FormField label="Effective Date"><input style={inputStyle} value={form.effectiveDate || ''} onChange={e => setForm(f => f && ({ ...f, effectiveDate: e.target.value }))} /></FormField>
-                <FormField label="Aggregate Purchase Price ($)"><input style={inputStyle} value={form.aggregatePurchasePrice || ''} onChange={e => setForm(f => f && ({ ...f, aggregatePurchasePrice: e.target.value }))} /></FormField>
-                <FormField label="Prorated Preferred Return ($)"><input style={inputStyle} value={form.proratedPreferredReturn || ''} onChange={e => setForm(f => f && ({ ...f, proratedPreferredReturn: e.target.value }))} /></FormField>
-                <FormField label="Email"><input type="email" style={inputStyle} value={form.email || ''} onChange={e => setForm(f => f && ({ ...f, email: e.target.value }))} /></FormField>
               </div>
 
-              {form.investorType !== 'Individual' && (
-                <>
-                  <SectionTitle>Entity / Signatory</SectionTitle>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                    <FormField label="Entity Name"><input style={inputStyle} value={form.entityName || ''} onChange={e => setForm(f => f && ({ ...f, entityName: e.target.value }))} /></FormField>
-                    <FormField label="Signatory Name"><input style={inputStyle} value={form.signatoryName || ''} onChange={e => setForm(f => f && ({ ...f, signatoryName: e.target.value }))} /></FormField>
-                    <FormField label="Signatory Title"><input style={inputStyle} value={form.signatoryTitle || ''} onChange={e => setForm(f => f && ({ ...f, signatoryTitle: e.target.value }))} /></FormField>
-                  </div>
-                </>
-              )}
-
-              <SectionTitle>Address</SectionTitle>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginBottom: 16 }}>
-                <FormField label="Address Line 1"><input style={inputStyle} value={form.addressLine1 || ''} onChange={e => setForm(f => f && ({ ...f, addressLine1: e.target.value }))} /></FormField>
-                <FormField label="Address Line 2"><input style={inputStyle} value={form.addressLine2 || ''} onChange={e => setForm(f => f && ({ ...f, addressLine2: e.target.value }))} /></FormField>
-                <FormField label="Address Line 3"><input style={inputStyle} value={form.addressLine3 || ''} onChange={e => setForm(f => f && ({ ...f, addressLine3: e.target.value }))} /></FormField>
-              </div>
+              <SectionTitle>Redemption Summary</SectionTitle>
+              <RedemptionSummaryPanel calc={calc} />
 
               {msg && <p style={{ color: '#b91c1c', fontSize: 13, marginBottom: 12 }}>{msg}</p>}
               <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>

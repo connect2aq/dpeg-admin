@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
@@ -9,7 +9,7 @@ import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import {
   adminApi,
   type UserDetail,
-  type ApplicationSummary,
+  type ApplicationDetail,
   type RedemptionListItem,
   type UserDistributionItem,
   type CreateApplicationRequest,
@@ -17,6 +17,8 @@ import {
   type CreateDistributionRequest,
   type PendingChangeItem,
 } from '@/lib/api';
+import { calculateRedemption } from '@/lib/redemptionCalculations';
+import { BankDetailsPanel, RedemptionSummaryPanel } from '@/components/RedemptionSummaryPanels';
 
 const USER_STATUSES = ['InProgress', 'UnderReview', 'Active', 'Inactive'];
 const INVESTOR_TYPES = ['Individual', 'Entity', 'IRA', 'Trust'];
@@ -25,7 +27,6 @@ const ENTITY_SUB_TYPES = ['LLC', 'Corporation', 'LP_GP', 'PensionFund', 'BankBro
 const PAYMENT_METHODS = ['WireTransfer', 'CertifiedCheck'];
 const DIST_PREFS = ['WireToBank', 'Reinvest'];
 const PAYMENT_STATUSES = ['Pending', 'Sent', 'Paid', 'Failed'];
-const APP_STATUSES = ['Active', 'UnderReview', 'Rejected'];
 
 const emptyInvForm = (): CreateApplicationRequest => ({
   investorType: 'Individual', investmentType: '', entitySubType: '',
@@ -56,6 +57,7 @@ const emptyDistForm = (userId: number): CreateDistributionRequest => ({
 const inputStyle = { width: '100%', padding: '8px 11px', border: '1.5px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' as const };
 const labelStyle = { fontSize: 11, fontWeight: 700 as const, color: '#475569', display: 'block' as const, marginBottom: 3, textTransform: 'uppercase' as const, letterSpacing: '0.04em' };
 const selectStyle = { ...inputStyle, background: 'white' };
+const readOnlyBoxStyle = { ...inputStyle, background: '#f8fafc', color: '#475569' };
 
 function FormField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -137,6 +139,8 @@ export default function UserDetailPage() {
   const [redeemSubmitting, setRedeemSubmitting] = useState(false);
   const [redeemMsg, setRedeemMsg] = useState('');
   const [deletingRedeemId, setDeletingRedeemId] = useState<number | null>(null);
+  const [trancheDetail, setTrancheDetail] = useState<ApplicationDetail | null>(null);
+  const [trancheLoading, setTrancheLoading] = useState(false);
 
   // Distribution modal state
   const [distModal, setDistModal] = useState<'create' | 'edit' | null>(null);
@@ -298,9 +302,47 @@ export default function UserDetailPage() {
 
   const openCreateRedemption = () => {
     setRedeemForm(emptyRedeemForm());
+    setTrancheDetail(null);
     setEditingRedeemId(null);
     setRedeemMsg('');
     setRedeemModal('create');
+  };
+
+  // Populate the read-only investment/bank fields from the selected tranche's full detail
+  const loadTrancheDetail = async (appId: number, investorTypeFromList?: string) => {
+    setTrancheLoading(true);
+    const r = await adminApi.application(appId);
+    setTrancheLoading(false);
+    if (!r.success || !r.data) { setTrancheDetail(null); return; }
+    const app = r.data;
+    setTrancheDetail(app);
+    const isEntity = (investorTypeFromList ?? app.investorType) === 'Entity';
+    setRedeemForm(f => ({
+      ...f,
+      trancheApplicationId: appId,
+      investorType: app.investorType || f.investorType,
+      totalUnitsOwned: app.investment?.numUnits != null ? String(app.investment.numUnits) : f.totalUnitsOwned,
+      originalPurchaseDate: app.effectiveDate ? app.effectiveDate.slice(0, 10) : f.originalPurchaseDate,
+      sellingPartnerName: isEntity
+        ? (app.investorProfile?.entityName || f.sellingPartnerName)
+        : `${app.investorProfile?.firstName || ''} ${app.investorProfile?.lastName || ''}`.trim() || f.sellingPartnerName,
+      entityName: app.investorProfile?.entityName || f.entityName,
+      signatoryName: app.investorProfile?.signatoryName || f.signatoryName,
+      signatoryTitle: app.investorProfile?.signatoryTitle || f.signatoryTitle,
+      email: app.investorProfile?.email || f.email,
+      effectiveDate: f.effectiveDate || new Date().toISOString().slice(0, 10),
+    }));
+  };
+
+  const onTrancheChange = (appIdStr: string) => {
+    const id = Number(appIdStr);
+    if (!id) {
+      setTrancheDetail(null);
+      setRedeemForm(f => ({ ...f, trancheApplicationId: undefined }));
+      return;
+    }
+    const app = user?.applications.find(a => a.id === id);
+    loadTrancheDetail(id, app?.investorType);
   };
 
   const openEditRedemption = async (redeemId: number) => {
@@ -330,21 +372,36 @@ export default function UserDetailPage() {
     setEditingRedeemId(redeemId);
     setRedeemMsg('');
     setRedeemModal('edit');
+    if (d.trancheApplicationId) await loadTrancheDetail(d.trancheApplicationId, d.investorType);
+    else setTrancheDetail(null);
   };
+
+  const redeemCalc = useMemo(() => calculateRedemption({
+    totalUnitsOwned: redeemForm.totalUnitsOwned || '0',
+    unitsToRedeem: redeemForm.unitsToRedeem || '0',
+    originalPurchaseDate: redeemForm.originalPurchaseDate || '',
+    effectiveDate: redeemForm.effectiveDate || '',
+    investmentTypeName: trancheDetail?.investmentType || '',
+  }), [redeemForm.totalUnitsOwned, redeemForm.unitsToRedeem, redeemForm.originalPurchaseDate, redeemForm.effectiveDate, trancheDetail?.investmentType]);
 
   const submitRedemption = async (e: React.FormEvent) => {
     e.preventDefault();
     setRedeemSubmitting(true);
     setRedeemMsg('');
+    const payload: CreateRedemptionAdminRequest = {
+      ...redeemForm,
+      aggregatePurchasePrice: redeemForm.unitsToRedeem ? String(redeemCalc.aggregatePurchasePrice) : redeemForm.aggregatePurchasePrice,
+      proratedPreferredReturn: redeemForm.unitsToRedeem ? String(redeemCalc.proratedPreferredReturn) : redeemForm.proratedPreferredReturn,
+    };
     if (redeemModal === 'create') {
-      const r = await adminApi.createRedemption(redeemForm);
+      const r = await adminApi.createRedemption(payload);
       if (r.success) {
         setRedeemModal(null);
         if (isSuperAdmin) loadRedemptions();
         else setPendingMsg(`Change submitted for approval — ${r.message}`);
       } else setRedeemMsg(r.message || 'Failed to create redemption.');
     } else if (editingRedeemId) {
-      const r = await adminApi.updateRedemptionFull(editingRedeemId, redeemForm);
+      const r = await adminApi.updateRedemptionFull(editingRedeemId, payload);
       if (r.success) {
         setRedeemModal(null);
         if (isSuperAdmin) loadRedemptions();
@@ -434,18 +491,6 @@ export default function UserDetailPage() {
     setDeletingDistId(null);
   };
 
-  // ── When tranche selection changes in redemption form ─────────────────────
-  const onTrancheChange = (appId: string) => {
-    const id = Number(appId);
-    const app = user?.applications.find(a => a.id === id);
-    setRedeemForm(f => ({
-      ...f,
-      trancheApplicationId: id || undefined,
-      investorType: app?.investorType || f.investorType,
-      totalUnitsOwned: app?.numUnits ? String(app.numUnits) : f.totalUnitsOwned,
-    }));
-  };
-
   if (loading) return <AdminLayout><div style={{ padding: 40, color: '#64748b' }}>Loading...</div></AdminLayout>;
   if (!user) return <AdminLayout><div style={{ padding: 40 }}><p style={{ color: '#ef4444' }}>User not found.</p></div></AdminLayout>;
 
@@ -514,7 +559,7 @@ export default function UserDetailPage() {
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <select
                 id="adminRoleSelect"
-                defaultValue={(user as unknown as { adminRole?: string }).adminRole ?? ''}
+                defaultValue={user.adminRole ?? ''}
                 style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 6, fontSize: 13, background: 'white' }}
               >
                 <option value="">No admin role</option>
@@ -542,8 +587,8 @@ export default function UserDetailPage() {
           </div>
         )}
 
-        {/* Change / Reset Password */}
-        {(authUser?.userId === userId || isSuperAdmin) && (() => {
+        {/* Change / Reset Password — admin accounts only; investors use the public forgot-password flow */}
+        {(authUser?.userId === userId || (isSuperAdmin && user.isAdmin)) && (() => {
           const isOwn = authUser?.userId === userId;
           const handlePw = async () => {
             if (pwNew !== pwConfirm) { setPwMsg({ ok: false, text: 'New passwords do not match.' }); return; }
@@ -887,9 +932,9 @@ export default function UserDetailPage() {
           <form onSubmit={submitRedemption}>
             <SectionTitle>Investment Tranche</SectionTitle>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <FormField label="Tranche Investment">
-                <select style={selectStyle} value={redeemForm.trancheApplicationId ?? ''} onChange={e => onTrancheChange(e.target.value)}>
-                  <option value="">— None —</option>
+              <FormField label="Tranche Investment *">
+                <select required style={selectStyle} value={redeemForm.trancheApplicationId ?? ''} onChange={e => onTrancheChange(e.target.value)}>
+                  <option value="">— Select —</option>
                   {user.applications.map(a => (
                     <option key={a.id} value={a.id}>
                       PPM#{a.ppmRefNO ?? a.id} – {a.numUnits} units {a.totalAmount ? `($${a.totalAmount.toLocaleString()})` : ''}
@@ -897,53 +942,68 @@ export default function UserDetailPage() {
                   ))}
                 </select>
               </FormField>
-              <FormField label="Investor Type *">
-                <select required style={selectStyle} value={redeemForm.investorType} onChange={e => setRedeemForm(f => ({ ...f, investorType: e.target.value }))}>
-                  {INVESTOR_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </FormField>
+              <div>
+                <label style={labelStyle}>Investor Type</label>
+                <div style={readOnlyBoxStyle}>{redeemForm.investorType || '—'}</div>
+              </div>
             </div>
 
-            <SectionTitle>Redemption Details</SectionTitle>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <FormField label="Selling Partner Name"><input style={inputStyle} value={redeemForm.sellingPartnerName || ''} onChange={e => setRedeemForm(f => ({ ...f, sellingPartnerName: e.target.value }))} /></FormField>
-              <FormField label="Printed Name / Signature"><input style={inputStyle} value={redeemForm.printedName || ''} onChange={e => setRedeemForm(f => ({ ...f, printedName: e.target.value }))} /></FormField>
-              <FormField label="Total Units Owned"><input style={inputStyle} value={redeemForm.totalUnitsOwned || ''} onChange={e => setRedeemForm(f => ({ ...f, totalUnitsOwned: e.target.value }))} /></FormField>
-              <FormField label="Units to Redeem"><input style={inputStyle} value={redeemForm.unitsToRedeem || ''} onChange={e => setRedeemForm(f => ({ ...f, unitsToRedeem: e.target.value }))} /></FormField>
-              <FormField label="Original Purchase Date"><input style={inputStyle} value={redeemForm.originalPurchaseDate || ''} onChange={e => setRedeemForm(f => ({ ...f, originalPurchaseDate: e.target.value }))} /></FormField>
-              <FormField label="Effective Date"><input style={inputStyle} value={redeemForm.effectiveDate || ''} onChange={e => setRedeemForm(f => ({ ...f, effectiveDate: e.target.value }))} /></FormField>
-              <FormField label="Aggregate Purchase Price ($)"><input style={inputStyle} value={redeemForm.aggregatePurchasePrice || ''} onChange={e => setRedeemForm(f => ({ ...f, aggregatePurchasePrice: e.target.value }))} /></FormField>
-              <FormField label="Prorated Preferred Return ($)"><input style={inputStyle} value={redeemForm.proratedPreferredReturn || ''} onChange={e => setRedeemForm(f => ({ ...f, proratedPreferredReturn: e.target.value }))} /></FormField>
-              <FormField label="Email"><input type="email" style={inputStyle} value={redeemForm.email || ''} onChange={e => setRedeemForm(f => ({ ...f, email: e.target.value }))} /></FormField>
-              <FormField label="Status">
-                <select style={selectStyle} value={redeemForm.status || 'Active'} onChange={e => setRedeemForm(f => ({ ...f, status: e.target.value }))}>
-                  {APP_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </FormField>
-            </div>
+            {trancheLoading && <p style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>Loading investment details…</p>}
 
-            {redeemForm.investorType !== 'Individual' && (
+            {redeemForm.trancheApplicationId && !trancheLoading && (
               <>
-                <SectionTitle>Entity / Signatory</SectionTitle>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                  <FormField label="Entity Name"><input style={inputStyle} value={redeemForm.entityName || ''} onChange={e => setRedeemForm(f => ({ ...f, entityName: e.target.value }))} /></FormField>
-                  <FormField label="Signatory Name"><input style={inputStyle} value={redeemForm.signatoryName || ''} onChange={e => setRedeemForm(f => ({ ...f, signatoryName: e.target.value }))} /></FormField>
-                  <FormField label="Signatory Title"><input style={inputStyle} value={redeemForm.signatoryTitle || ''} onChange={e => setRedeemForm(f => ({ ...f, signatoryTitle: e.target.value }))} /></FormField>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                  <div>
+                    <label style={labelStyle}>Total Units Owned</label>
+                    <div style={readOnlyBoxStyle}>{redeemForm.totalUnitsOwned || '—'}</div>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Status</label>
+                    <div style={readOnlyBoxStyle}>{redeemForm.status || 'Active'}</div>
+                  </div>
                 </div>
+
+                <SectionTitle>Bank Details</SectionTitle>
+                <BankDetailsPanel
+                  bankName={trancheDetail?.investment?.bankName}
+                  accHolder={trancheDetail?.investment?.accHolder}
+                  accNumber={trancheDetail?.investment?.accNumber}
+                  routingNumber={trancheDetail?.investment?.routingNumber}
+                />
+
+                <SectionTitle>Redemption Details</SectionTitle>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                  <FormField label="Units to Redeem *">
+                    <input
+                      required
+                      type="number"
+                      min={1}
+                      max={trancheDetail?.investment?.numUnits ?? undefined}
+                      style={inputStyle}
+                      value={redeemForm.unitsToRedeem || ''}
+                      onChange={e => setRedeemForm(f => ({ ...f, unitsToRedeem: e.target.value }))}
+                    />
+                  </FormField>
+                  <FormField label="Effective Date *">
+                    <input
+                      required
+                      type="date"
+                      style={inputStyle}
+                      value={redeemForm.effectiveDate || ''}
+                      onChange={e => setRedeemForm(f => ({ ...f, effectiveDate: e.target.value }))}
+                    />
+                  </FormField>
+                </div>
+
+                <SectionTitle>Redemption Summary</SectionTitle>
+                <RedemptionSummaryPanel calc={redeemCalc} />
               </>
             )}
-
-            <SectionTitle>Address</SectionTitle>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginBottom: 16 }}>
-              <FormField label="Address Line 1"><input style={inputStyle} value={redeemForm.addressLine1 || ''} onChange={e => setRedeemForm(f => ({ ...f, addressLine1: e.target.value }))} /></FormField>
-              <FormField label="Address Line 2"><input style={inputStyle} value={redeemForm.addressLine2 || ''} onChange={e => setRedeemForm(f => ({ ...f, addressLine2: e.target.value }))} /></FormField>
-              <FormField label="Address Line 3"><input style={inputStyle} value={redeemForm.addressLine3 || ''} onChange={e => setRedeemForm(f => ({ ...f, addressLine3: e.target.value }))} /></FormField>
-            </div>
 
             {redeemMsg && <p style={{ color: '#b91c1c', fontSize: 13, marginBottom: 12 }}>{redeemMsg}</p>}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button type="button" className="btn-secondary" onClick={() => setRedeemModal(null)} disabled={redeemSubmitting}>Cancel</button>
-              <button type="submit" disabled={redeemSubmitting} style={{ padding: '10px 22px', background: '#0f2342', color: 'white', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 14, cursor: redeemSubmitting ? 'not-allowed' : 'pointer', opacity: redeemSubmitting ? 0.7 : 1 }}>
+              <button type="submit" disabled={redeemSubmitting || !redeemForm.trancheApplicationId} style={{ padding: '10px 22px', background: '#0f2342', color: 'white', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 14, cursor: redeemSubmitting ? 'not-allowed' : 'pointer', opacity: redeemSubmitting ? 0.7 : 1 }}>
                 {redeemSubmitting ? 'Saving...' : isSuperAdmin
                   ? (redeemModal === 'create' ? 'Create Redemption' : 'Save Changes')
                   : (redeemModal === 'create' ? 'Submit for Approval' : 'Submit Change for Approval')}
