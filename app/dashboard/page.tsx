@@ -77,10 +77,27 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
     </div>
   );
 
-  const arrow = (label: string) => (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 6px", color: "#94a3b8", fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
-      <span style={{ fontSize: 18 }}>→</span>
-      <span style={{ marginTop: 2 }}>{label}</span>
+  const arrow = (label: string, amount: string, color: string, muted?: boolean) => (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 4px", flexShrink: 0, gap: 6 }}>
+      <span style={{ fontSize: 16, color: "#cbd5e1" }}>→</span>
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 1,
+        background: muted ? "#f1f5f9" : `${color}1a`,
+        border: `1px solid ${muted ? "#e2e8f0" : `${color}40`}`,
+        borderRadius: 999,
+        padding: "4px 12px",
+        whiteSpace: "nowrap",
+      }}>
+        <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: muted ? "#94a3b8" : color }}>
+          {label}
+        </span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: muted ? "#94a3b8" : color }}>
+          {amount}
+        </span>
+      </div>
     </div>
   );
 
@@ -91,11 +108,11 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
         {box("Total Deposits", fmt(stats.totalDeployedCommencement), "#0e3416")}
-        {arrow(`−${fmt(stats.totalWithdrawnCommencement)}`)}
+        {arrow("Redeemed", `−${fmt(stats.totalWithdrawnCommencement)}`, "#ef4444")}
         {box("Remaining", fmt(remaining), "#6366f1")}
-        {arrow(`−${fmt(stats.interestPaidCommencement)}`)}
+        {arrow("Interest Paid", `−${fmt(stats.interestPaidCommencement)}`, "#f59e0b")}
         {box("After Interest", fmt(afterInterest), "#10b981")}
-        {arrow(hasDeployed ? `−${fmt(stats.deployedAmount ?? 0)}` : "−Deployed")}
+        {arrow("Deployed", hasDeployed ? `−${fmt(stats.deployedAmount ?? 0)}` : "Pending", "#8b5cf6", !hasDeployed)}
         {hasDeployed
           ? box("Available", fmt(available ?? 0), "#699172")
           : box("Available", "Not entered", "#b8923a", true)}
