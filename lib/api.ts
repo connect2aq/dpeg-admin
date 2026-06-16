@@ -219,6 +219,8 @@ export interface RedemptionDetail extends RedemptionListItem {
   printedName?: string;
   originalPurchaseDate?: string;
   proratedPreferredReturn?: string;
+  distributionClawback?: string;
+  netAggregatePrice?: string;
   addressLine1?: string;
   addressLine2?: string;
   addressLine3?: string;
@@ -586,6 +588,10 @@ export const adminApi = {
     api.delete<ApiResponse<string>>(`/applications/${id}`),
 
   // ── Admin CRUD: Redemption ─────────────────────────────────────────────
+  getRedemptionPreview: (trancheApplicationId: number, unitsToRedeem: number, effectiveDate: string) =>
+    api.get<ApiResponse<RedemptionCalculationPreview>>(
+      `/redemption-preview?trancheApplicationId=${trancheApplicationId}&unitsToRedeem=${unitsToRedeem}&effectiveDate=${effectiveDate}`,
+    ),
   createRedemption: (dto: CreateRedemptionAdminRequest) =>
     api.post<ApiResponse<RedemptionDetail>>('/redemptions', dto),
   updateRedemptionFull: (id: number, dto: CreateRedemptionAdminRequest) =>
@@ -823,6 +829,8 @@ export interface CreateRedemptionAdminRequest {
   originalPurchaseDate?: string;
   aggregatePurchasePrice?: string;
   proratedPreferredReturn?: string;
+  distributionClawback?: string;
+  netAggregatePrice?: string;
   effectiveDate?: string;
   printedName?: string;
   addressLine1?: string;
@@ -830,6 +838,23 @@ export interface CreateRedemptionAdminRequest {
   addressLine3?: string;
   email?: string;
   status?: string;
+}
+
+export interface RedemptionCalculationPreview {
+  totalUnits: number;
+  redeemUnits: number;
+  originalPurchasePrice: number;
+  daysInvested: number;
+  monthsInvested: number;
+  yearsInvested: number;
+  isShortTerm: boolean;
+  returnPerUnit: number;
+  proratedPreferredReturn: number;
+  aggregatePurchasePrice: number;
+  isEarlyExit: boolean;
+  completedMonthsDistributed: number;
+  distributionClawback: number;
+  netAggregatePrice: number;
 }
 
 export interface CreateDistributionRequest {

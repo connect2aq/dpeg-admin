@@ -1,8 +1,15 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { adminApi, type ApplicationDetail, type CreateRedemptionAdminRequest } from '@/lib/api';
-import { calculateRedemption } from '@/lib/redemptionCalculations';
+import { type RedemptionCalculations } from '@/lib/redemptionCalculations';
 import { BankDetailsPanel, RedemptionSummaryPanel } from '@/components/RedemptionSummaryPanels';
+
+const EMPTY_CALC: RedemptionCalculations = {
+  totalUnits: 0, redeemUnits: 0, originalPurchasePrice: 0, daysInvested: 0, monthsInvested: 0,
+  yearsInvested: 0, isShortTerm: false, returnPerUnit: 0, proratedPreferredReturn: 0,
+  aggregatePurchasePrice: 0, isEarlyExit: false, completedMonthsDistributed: 0,
+  distributionClawback: 0, netAggregatePrice: 0,
+};
 
 const inputStyle = { width: '100%', padding: '8px 11px', border: '1.5px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' as const };
 const labelStyle = { fontSize: 11, fontWeight: 700 as const, color: '#475569', display: 'block' as const, marginBottom: 3, textTransform: 'uppercase' as const, letterSpacing: '0.04em' };
@@ -69,25 +76,31 @@ export function RedemptionEditModal({ redemptionId, isSuperAdmin, onClose, onSav
     });
   }, [redemptionId]);
 
-  const calc = useMemo(() => calculateRedemption({
-    totalUnitsOwned: form?.totalUnitsOwned || '0',
-    unitsToRedeem: form?.unitsToRedeem || '0',
-    originalPurchaseDate: form?.originalPurchaseDate || '',
-    effectiveDate: form?.effectiveDate || '',
-    investmentTypeName: trancheDetail?.investmentType || '',
-  }), [form?.totalUnitsOwned, form?.unitsToRedeem, form?.originalPurchaseDate, form?.effectiveDate, trancheDetail?.investmentType]);
+  const [calc, setCalc] = useState<RedemptionCalculations>(EMPTY_CALC);
+
+  useEffect(() => {
+    const trancheId = form?.trancheApplicationId;
+    const units = parseInt(form?.unitsToRedeem || '0') || 0;
+    if (!trancheId || units <= 0 || !form?.effectiveDate) {
+      setCalc(EMPTY_CALC);
+      return;
+    }
+    const timer = setTimeout(() => {
+      adminApi.getRedemptionPreview(trancheId, units, form.effectiveDate!)
+        .then(r => setCalc(r.success && r.data ? r.data : EMPTY_CALC))
+        .catch(() => setCalc(EMPTY_CALC));
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [form?.trancheApplicationId, form?.unitsToRedeem, form?.effectiveDate]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form) return;
     setSubmitting(true);
     setMsg('');
-    const payload: CreateRedemptionAdminRequest = {
-      ...form,
-      aggregatePurchasePrice: form.unitsToRedeem ? String(calc.aggregatePurchasePrice) : form.aggregatePurchasePrice,
-      proratedPreferredReturn: form.unitsToRedeem ? String(calc.proratedPreferredReturn) : form.proratedPreferredReturn,
-    };
-    const r = await adminApi.updateRedemptionFull(redemptionId, payload);
+    // Server recomputes aggregatePurchasePrice/proratedPreferredReturn/distributionClawback/netAggregatePrice
+    // from the linked tranche before saving — the previewed figures here are display-only.
+    const r = await adminApi.updateRedemptionFull(redemptionId, form);
     if (r.success) {
       onSaved(!isSuperAdmin, r.message || 'Saved.');
       onClose();

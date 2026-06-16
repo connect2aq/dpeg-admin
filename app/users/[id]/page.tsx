@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
@@ -17,7 +17,7 @@ import {
   type CreateDistributionRequest,
   type PendingChangeItem,
 } from '@/lib/api';
-import { calculateRedemption } from '@/lib/redemptionCalculations';
+import { type RedemptionCalculations } from '@/lib/redemptionCalculations';
 import { BankDetailsPanel, RedemptionSummaryPanel } from '@/components/RedemptionSummaryPanels';
 
 const USER_STATUSES = ['InProgress', 'UnderReview', 'Active', 'Inactive'];
@@ -27,6 +27,13 @@ const ENTITY_SUB_TYPES = ['LLC', 'Corporation', 'LP_GP', 'PensionFund', 'BankBro
 const PAYMENT_METHODS = ['WireTransfer', 'CertifiedCheck'];
 const DIST_PREFS = ['WireToBank', 'Reinvest'];
 const PAYMENT_STATUSES = ['Pending', 'Sent', 'Paid', 'Failed'];
+
+const EMPTY_CALC: RedemptionCalculations = {
+  totalUnits: 0, redeemUnits: 0, originalPurchasePrice: 0, daysInvested: 0, monthsInvested: 0,
+  yearsInvested: 0, isShortTerm: false, returnPerUnit: 0, proratedPreferredReturn: 0,
+  aggregatePurchasePrice: 0, isEarlyExit: false, completedMonthsDistributed: 0,
+  distributionClawback: 0, netAggregatePrice: 0,
+};
 
 const emptyInvForm = (): CreateApplicationRequest => ({
   investorType: 'Individual', investmentType: '', entitySubType: '',
@@ -376,32 +383,38 @@ export default function UserDetailPage() {
     else setTrancheDetail(null);
   };
 
-  const redeemCalc = useMemo(() => calculateRedemption({
-    totalUnitsOwned: redeemForm.totalUnitsOwned || '0',
-    unitsToRedeem: redeemForm.unitsToRedeem || '0',
-    originalPurchaseDate: redeemForm.originalPurchaseDate || '',
-    effectiveDate: redeemForm.effectiveDate || '',
-    investmentTypeName: trancheDetail?.investmentType || '',
-  }), [redeemForm.totalUnitsOwned, redeemForm.unitsToRedeem, redeemForm.originalPurchaseDate, redeemForm.effectiveDate, trancheDetail?.investmentType]);
+  const [redeemCalc, setRedeemCalc] = useState<RedemptionCalculations>(EMPTY_CALC);
+
+  useEffect(() => {
+    const trancheId = redeemForm.trancheApplicationId;
+    const units = parseInt(redeemForm.unitsToRedeem || '0') || 0;
+    if (!trancheId || units <= 0 || !redeemForm.effectiveDate) {
+      setRedeemCalc(EMPTY_CALC);
+      return;
+    }
+    const timer = setTimeout(() => {
+      adminApi.getRedemptionPreview(trancheId, units, redeemForm.effectiveDate!)
+        .then(r => setRedeemCalc(r.success && r.data ? r.data : EMPTY_CALC))
+        .catch(() => setRedeemCalc(EMPTY_CALC));
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [redeemForm.trancheApplicationId, redeemForm.unitsToRedeem, redeemForm.effectiveDate]);
 
   const submitRedemption = async (e: React.FormEvent) => {
     e.preventDefault();
     setRedeemSubmitting(true);
     setRedeemMsg('');
-    const payload: CreateRedemptionAdminRequest = {
-      ...redeemForm,
-      aggregatePurchasePrice: redeemForm.unitsToRedeem ? String(redeemCalc.aggregatePurchasePrice) : redeemForm.aggregatePurchasePrice,
-      proratedPreferredReturn: redeemForm.unitsToRedeem ? String(redeemCalc.proratedPreferredReturn) : redeemForm.proratedPreferredReturn,
-    };
+    // Server recomputes aggregatePurchasePrice/proratedPreferredReturn/distributionClawback/netAggregatePrice
+    // from the linked tranche before saving — the previewed figures here are display-only.
     if (redeemModal === 'create') {
-      const r = await adminApi.createRedemption(payload);
+      const r = await adminApi.createRedemption(redeemForm);
       if (r.success) {
         setRedeemModal(null);
         if (isSuperAdmin) loadRedemptions();
         else setPendingMsg(`Change submitted for approval — ${r.message}`);
       } else setRedeemMsg(r.message || 'Failed to create redemption.');
     } else if (editingRedeemId) {
-      const r = await adminApi.updateRedemptionFull(editingRedeemId, payload);
+      const r = await adminApi.updateRedemptionFull(editingRedeemId, redeemForm);
       if (r.success) {
         setRedeemModal(null);
         if (isSuperAdmin) loadRedemptions();
