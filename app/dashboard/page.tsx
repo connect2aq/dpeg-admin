@@ -63,25 +63,33 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
   const hasBank       = stats.bankAccountBalance != null;
   const variance      = hasDeployed && hasBank ? (stats.bankAccountBalance ?? 0) - (available ?? 0) : null;
 
-  const box = (label: string, value: string, accent: string, muted?: boolean) => (
-    <div style={{
-      background: muted ? "#f8fafc" : "#fff",
-      border: `1px solid ${muted ? "#e2e8f0" : "#cbd5e1"}`,
-      borderTop: `3px solid ${accent}`,
-      borderRadius: 8,
-      padding: "14px 18px",
-      minWidth: 130,
-      flex: "1 1 130px",
-      opacity: muted ? 0.65 : 1,
-    }}>
-      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: muted ? "#94a3b8" : "#0e3416" }}>{value}</div>
-    </div>
-  );
+  const box = (label: string, value: string, accent: string, muted?: boolean, href?: string) => {
+    const inner = (
+      <div style={{
+        background: muted ? "#f8fafc" : "#fff",
+        border: `1px solid ${muted ? "#e2e8f0" : "#cbd5e1"}`,
+        borderTop: `3px solid ${accent}`,
+        borderRadius: 8,
+        padding: "14px 18px",
+        minWidth: 130,
+        flex: "1 1 130px",
+        opacity: muted ? 0.65 : 1,
+        cursor: href ? "pointer" : "default",
+        transition: "box-shadow 0.15s",
+      }}
+        onMouseEnter={e => { if (href) (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)"; }}
+        onMouseLeave={e => { if (href) (e.currentTarget as HTMLDivElement).style.boxShadow = ""; }}
+      >
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", marginBottom: 6 }}>{label}</div>
+        <div style={{ fontSize: 22, fontWeight: 700, color: muted ? "#94a3b8" : "#0e3416" }}>{value}</div>
+        {href && <div style={{ fontSize: 10.5, color: "#699172", marginTop: 6, fontWeight: 600 }}>View details →</div>}
+      </div>
+    );
+    return href ? <Link href={href} style={{ textDecoration: "none" }}>{inner}</Link> : inner;
+  };
 
-  const arrow = (label: string, amount: string, color: string, muted?: boolean) => (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 4px", flexShrink: 0, gap: 6 }}>
-      <span style={{ fontSize: 16, color: "#cbd5e1" }}>→</span>
+  const arrow = (label: string, amount: string, color: string, muted?: boolean, href?: string) => {
+    const chip = (
       <div style={{
         display: "flex",
         flexDirection: "column",
@@ -92,6 +100,7 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
         borderRadius: 999,
         padding: "4px 12px",
         whiteSpace: "nowrap",
+        cursor: href ? "pointer" : "default",
       }}>
         <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: muted ? "#94a3b8" : color }}>
           {label}
@@ -100,8 +109,14 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
           {amount}
         </span>
       </div>
-    </div>
-  );
+    );
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 4px", flexShrink: 0, gap: 6 }}>
+        <span style={{ fontSize: 16, color: "#cbd5e1" }}>→</span>
+        {href ? <Link href={href} style={{ textDecoration: "none" }}>{chip}</Link> : chip}
+      </div>
+    );
+  };
 
   return (
     <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "20px 24px", marginBottom: 4 }}>
@@ -109,12 +124,12 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
         Balance Flow (Since Inception){stats.balanceAsAtDate && ` — Balance as at ${new Date(stats.balanceAsAtDate).toLocaleDateString()}`}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
-        {box("Total Deposits", fmt(stats.totalDeployedCommencement), "#0e3416")}
-        {arrow("Redeemed", `−${fmt(stats.totalWithdrawnCommencement)}`, "#ef4444")}
+        {box("Total Deposits", fmt(stats.totalDeployedCommencement), "#0e3416", false, "/applications?status=Active")}
+        {arrow("Redeemed", `−${fmt(stats.totalWithdrawnCommencement)}`, "#ef4444", false, "/redemptions?status=Active")}
         {box("Remaining", fmt(remaining), "#6366f1")}
-        {arrow("Interest Paid", `−${fmt(stats.interestPaidCommencement)}`, "#f59e0b")}
+        {arrow("Interest Paid", `−${fmt(stats.interestPaidCommencement)}`, "#f59e0b", false, "/distributions")}
         {box("After Interest", fmt(afterInterest), "#10b981")}
-        {arrow("Deployed", hasDeployed ? `−${fmt(stats.deployedAmount ?? 0)}` : "Pending", "#8b5cf6", !hasDeployed)}
+        {arrow("Deployed", hasDeployed ? `−${fmt(stats.deployedAmount ?? 0)}` : "Pending", "#8b5cf6", !hasDeployed, "/settings")}
         {hasDeployed
           ? box("Available", fmt(available ?? 0), "#699172")
           : box("Available", "Not entered", "#b8923a", true)}
@@ -123,7 +138,7 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
             {variance != null
               ? arrow("Variance", `${variance >= 0 ? "+" : "−"}${fmt(Math.abs(variance))}`, variance >= 0 ? "#10b981" : "#ef4444")
               : arrow("vs Available", "N/A", "#94a3b8", true)}
-            {box("Bank Account Balance", fmt(stats.bankAccountBalance ?? 0), "#64748b")}
+            {box("Bank Account Balance", fmt(stats.bankAccountBalance ?? 0), "#64748b", false, "/settings")}
           </>
         )}
         {!hasDeployed && (
@@ -202,16 +217,10 @@ export default function DashboardPage() {
             <SectionLabel>Capital Flows — All Time (Since Inception)</SectionLabel>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 20, marginBottom: 4 }}>
               <KpiCard label="Current AUM" value={fmt(stats.totalAUM)} sub={`${stats.totalUnits} active units`} color="#699172" href="/applications?status=Active" />
-              <KpiCard label="Total Deposit Amount" value={fmt(stats.totalDeployedCommencement)} sub="From commencement" color="#0e3416" href="/applications?status=Active" />
-              <KpiCard label="Total Redeemed Amount" value={fmt(stats.totalWithdrawnCommencement)} sub="From commencement" color="#6366f1" href="/redemptions?status=Active" />
-              <KpiCard label="Interest Paid to Date" value={fmt(stats.interestPaidCommencement)} sub="All distribution payments made" color="#10b981" href="/distributions" />
-              {stats.deployedAmount != null && (
-                <KpiCard label="Deployed in Projects" value={fmt(stats.deployedAmount)} sub={stats.balanceAsAtDate ? `As at ${new Date(stats.balanceAsAtDate).toLocaleDateString()}` : "Currently deployed externally"} color="#b8923a" href="/settings" />
-              )}
-              {stats.bankAccountBalance != null && (
-                <KpiCard label="Bank Account Balance" value={fmt(stats.bankAccountBalance)} sub={stats.balanceAsAtDate ? `As at ${new Date(stats.balanceAsAtDate).toLocaleDateString()}` : "As at last update"} color="#64748b" href="/settings" />
-              )}
             </div>
+            <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 8, marginBottom: 4 }}>
+              Deposit, redemption, interest, and balance figures are shown below in Balance Flow.
+            </p>
 
             {/* Date Range Filter */}
             <SectionLabel>Capital Flows — Date Range</SectionLabel>
