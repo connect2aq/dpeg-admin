@@ -34,6 +34,7 @@ export default function DistributionsPage() {
   const [year, setYear] = useState('');
   const [page, setPage] = useState(1);
   const [markingId, setMarkingId] = useState<number | null>(null);
+  const [historyPushingId, setHistoryPushingId] = useState<number | null>(null);
   const [paidDateInput, setPaidDateInput] = useState<{ [id: number]: string }>({});
 
   // Catch-up state
@@ -77,6 +78,13 @@ export default function DistributionsPage() {
     const r = await adminApi.markDistributionPaid(id, paidDate);
     setMarkingId(null);
     if (r.success) load();
+  };
+
+  const handleHistoryPushOne = async (id: number) => {
+    setHistoryPushingId(id);
+    await adminApi.pushDistributionToOdoo(id);
+    setHistoryPushingId(null);
+    load();
   };
 
   const handleCatchUp = async () => {
@@ -418,6 +426,7 @@ export default function DistributionsPage() {
                     const maskedAcct = d.bankAccountNumber && d.bankAccountNumber.length >= 4
                       ? '••••' + d.bankAccountNumber.slice(-4) : d.bankAccountNumber;
                     const canMarkPaid = d.paymentStatus !== 'Paid';
+                    const canPushOdoo = d.paymentStatus !== 'Sent' && d.paymentStatus !== 'Paid';
                     return (
                       <tr key={d.id} style={{ background: d.hasMismatch ? '#fff7ed' : undefined }}>
                         <td style={colStyle}>
@@ -433,21 +442,31 @@ export default function DistributionsPage() {
                           {d.bankName && <div>{d.bankName}</div>}
                           {maskedAcct && <div style={{ fontSize: 12, color: '#6b7280' }}>{maskedAcct}</div>}
                         </td>
-                        <td style={{ ...colStyle, minWidth: 200 }}>
-                          {canMarkPaid && (
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                              <input type="date"
-                                value={paidDateInput[d.id] || ''}
-                                onChange={e => setPaidDateInput(prev => ({ ...prev, [d.id]: e.target.value }))}
-                                style={{ padding: '5px 8px', border: '1px solid #d1d5db', borderRadius: 5, fontSize: 12 }} />
+                        <td style={{ ...colStyle, minWidth: 220 }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {canPushOdoo && (
                               <button
-                                onClick={() => markPaid(d.id)}
-                                disabled={markingId === d.id}
-                                style={{ padding: '5px 12px', background: '#0f2342', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: markingId === d.id ? 0.6 : 1 }}>
-                                {markingId === d.id ? '…' : 'Mark Paid'}
+                                onClick={() => handleHistoryPushOne(d.id)}
+                                disabled={historyPushingId === d.id}
+                                style={{ padding: '5px 12px', background: '#b8923a', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: historyPushingId === d.id ? 0.6 : 1, alignSelf: 'flex-start' }}>
+                                {historyPushingId === d.id ? '…' : 'Push to Odoo'}
                               </button>
-                            </div>
-                          )}
+                            )}
+                            {canMarkPaid && (
+                              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                <input type="date"
+                                  value={paidDateInput[d.id] || ''}
+                                  onChange={e => setPaidDateInput(prev => ({ ...prev, [d.id]: e.target.value }))}
+                                  style={{ padding: '5px 8px', border: '1px solid #d1d5db', borderRadius: 5, fontSize: 12 }} />
+                                <button
+                                  onClick={() => markPaid(d.id)}
+                                  disabled={markingId === d.id}
+                                  style={{ padding: '5px 12px', background: '#0f2342', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: markingId === d.id ? 0.6 : 1 }}>
+                                  {markingId === d.id ? '…' : 'Mark Paid'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );

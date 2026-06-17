@@ -568,6 +568,8 @@ export const adminApi = {
     const q = new URLSearchParams(params as Record<string, string>).toString();
     return api.get<ApiResponse<PagedResult<DailyInterestItem>>>(`/daily-interest?${q}`);
   },
+  pushDailyInterestToOdoo: (id: number) =>
+    api.post<ApiResponse<{ message: string }>>(`/daily-interest/${id}/push-to-odoo`, {}),
 
   // ── Admin CRUD: Bulk Delete ────────────────────────────────────────────
   bulkDeleteUsers: (userIds: number[]) =>

@@ -24,6 +24,7 @@ export default function DailyInterestPage() {
   const [to, setTo] = useState('');
   const [included, setIncluded] = useState('');
   const [page, setPage] = useState(1);
+  const [pushingDIId, setPushingDIId] = useState<number | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -38,6 +39,13 @@ export default function DailyInterestPage() {
   }, [page, appId, from, to, included]);
 
   useEffect(() => { load(); }, [load]);
+
+  const handlePushDailyInterest = async (id: number) => {
+    setPushingDIId(id);
+    await adminApi.pushDailyInterestToOdoo(id);
+    setPushingDIId(null);
+    load();
+  };
 
   const totalPages = result ? Math.ceil(result.totalCount / PAGE_SIZE) : 1;
 
@@ -100,14 +108,14 @@ export default function DailyInterestPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    {['Date', 'Investor', 'App ID', 'Units', 'Capital', 'Rate', 'Net Interest', 'Odoo ID', 'Odoo Status', 'Distributed'].map(h => (
+                    {['Date', 'Investor', 'App ID', 'Units', 'Capital', 'Rate', 'Net Interest', 'Odoo ID', 'Odoo Status', 'Distributed', 'Action'].map(h => (
                       <th key={h} style={th}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {result?.items.length === 0 && (
-                    <tr><td colSpan={10} style={{ ...td, textAlign: 'center', color: '#9ca3af', padding: 32 }}>No records found</td></tr>
+                    <tr><td colSpan={11} style={{ ...td, textAlign: 'center', color: '#9ca3af', padding: 32 }}>No records found</td></tr>
                   )}
                   {result?.items.map(row => (
                     <tr key={row.id} style={{ background: row.includedInMonthlyDistribution ? '#f8fafc' : undefined }}>
@@ -131,6 +139,16 @@ export default function DailyInterestPage() {
                         }}>
                           {row.includedInMonthlyDistribution ? 'Yes' : 'Pending'}
                         </span>
+                      </td>
+                      <td style={td}>
+                        {row.odooStatus !== 'Success' && (
+                          <button
+                            onClick={() => handlePushDailyInterest(row.id)}
+                            disabled={pushingDIId === row.id}
+                            style={{ padding: '4px 11px', background: '#b8923a', color: '#fff', border: 'none', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: pushingDIId === row.id ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                            {pushingDIId === row.id ? '…' : 'Push to Odoo'}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
