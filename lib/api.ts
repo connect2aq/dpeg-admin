@@ -614,6 +614,10 @@ export const adminApi = {
     api.post<ApiResponse<{ ok: boolean; msg: string }>>(`/distributions/${id}/push-odoo`, {}),
   batchPushToOdoo: (ids: number[]) =>
     api.post<ApiResponse<{ pushed: number; failed: number }>>('/distributions/batch-push-odoo', { ids }),
+  bulkMarkDistributionPaid: (ids: number[], paidDate: string) =>
+    api.post<ApiResponse<{ marked: number; failed: number }>>('/distributions/bulk-mark-paid', { ids, paidDate }),
+  bulkPushDailyInterestToOdoo: (ids: number[]) =>
+    api.post<ApiResponse<{ pushed: number; failed: number }>>('/daily-interest/bulk-push-odoo', { ids }),
 
   // ── Admin CRUD: Distribution ───────────────────────────────────────────
   createDistribution: (dto: CreateDistributionRequest) =>

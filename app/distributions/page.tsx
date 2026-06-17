@@ -36,6 +36,13 @@ export default function DistributionsPage() {
   const [markingId, setMarkingId] = useState<number | null>(null);
   const [historyPushingId, setHistoryPushingId] = useState<number | null>(null);
   const [paidDateInput, setPaidDateInput] = useState<{ [id: number]: string }>({});
+  // Bulk selection for history table
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState<Set<number>>(new Set());
+  const [bulkPaidDate, setBulkPaidDate] = useState('');
+  const [bulkPaidDateError, setBulkPaidDateError] = useState(false);
+  const [historyBulkPushing, setHistoryBulkPushing] = useState(false);
+  const [historyBulkMarkingPaid, setHistoryBulkMarkingPaid] = useState(false);
+  const [historyBulkResult, setHistoryBulkResult] = useState<string | null>(null);
 
   // Catch-up state
   const [catchUpFrom, setCatchUpFrom] = useState(firstOfMonthStr());
@@ -85,6 +92,35 @@ export default function DistributionsPage() {
     await adminApi.pushDistributionToOdoo(id);
     setHistoryPushingId(null);
     load();
+  };
+
+  const handleHistoryBulkPush = async () => {
+    const ids = [...selectedHistoryIds];
+    setHistoryBulkPushing(true);
+    setHistoryBulkResult(null);
+    const r = await adminApi.batchPushToOdoo(ids);
+    setHistoryBulkPushing(false);
+    if (r.success) {
+      setHistoryBulkResult(`Pushed ${r.data.pushed} record${r.data.pushed !== 1 ? 's' : ''}${r.data.failed > 0 ? `, ${r.data.failed} failed` : ''}.`);
+      setSelectedHistoryIds(new Set());
+      load();
+    }
+  };
+
+  const handleHistoryBulkMarkPaid = async () => {
+    if (!bulkPaidDate) { setBulkPaidDateError(true); return; }
+    setBulkPaidDateError(false);
+    const ids = [...selectedHistoryIds];
+    setHistoryBulkMarkingPaid(true);
+    setHistoryBulkResult(null);
+    const r = await adminApi.bulkMarkDistributionPaid(ids, bulkPaidDate);
+    setHistoryBulkMarkingPaid(false);
+    if (r.success) {
+      setHistoryBulkResult(`Marked ${r.data.marked} record${r.data.marked !== 1 ? 's' : ''} as paid${r.data.failed > 0 ? `, ${r.data.failed} failed` : ''}.`);
+      setSelectedHistoryIds(new Set());
+      setBulkPaidDate('');
+      load();
+    }
   };
 
   const handleCatchUp = async () => {
@@ -388,20 +424,57 @@ export default function DistributionsPage() {
         )}
 
         {/* Filters */}
-        <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>Distribution History</span>
-          <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}
+          <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); setSelectedHistoryIds(new Set()); }}
             style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
             {STATUSES.map(s => <option key={s} value={s}>{s || 'All Statuses'}</option>)}
           </select>
-          <select value={month} onChange={e => { setMonth(e.target.value); setPage(1); }}
+          <select value={month} onChange={e => { setMonth(e.target.value); setPage(1); setSelectedHistoryIds(new Set()); }}
             style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
             {MONTHS.map((m, i) => <option key={m} value={m}>{m ? MONTH_NAMES[i] : 'All Months'}</option>)}
           </select>
           <input type="number" placeholder="Year (e.g. 2026)" value={year}
-            onChange={e => { setYear(e.target.value); setPage(1); }}
+            onChange={e => { setYear(e.target.value); setPage(1); setSelectedHistoryIds(new Set()); }}
             style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, width: 150 }} />
         </div>
+
+        {/* Bulk action bar */}
+        {selectedHistoryIds.size > 0 && (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12, padding: '10px 16px', background: '#f0f9ff', border: '1.5px solid #bae6fd', borderRadius: 10 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#0369a1' }}>{selectedHistoryIds.size} selected</span>
+            <button
+              onClick={handleHistoryBulkPush}
+              disabled={historyBulkPushing || historyBulkMarkingPaid}
+              style={{ padding: '7px 16px', background: '#b8923a', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: historyBulkPushing ? 0.6 : 1 }}>
+              {historyBulkPushing ? 'Pushing…' : `Push to Odoo (${selectedHistoryIds.size})`}
+            </button>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input
+                type="date"
+                value={bulkPaidDate}
+                onChange={e => { setBulkPaidDate(e.target.value); setBulkPaidDateError(false); }}
+                style={{ padding: '6px 10px', border: `1.5px solid ${bulkPaidDateError ? '#dc2626' : '#d1d5db'}`, borderRadius: 7, fontSize: 13 }}
+              />
+              <button
+                onClick={handleHistoryBulkMarkPaid}
+                disabled={historyBulkMarkingPaid || historyBulkPushing}
+                style={{ padding: '7px 16px', background: '#0f2342', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: historyBulkMarkingPaid ? 0.6 : 1 }}>
+                {historyBulkMarkingPaid ? 'Marking…' : `Mark Paid (${selectedHistoryIds.size})`}
+              </button>
+              {bulkPaidDateError && <span style={{ fontSize: 12, color: '#dc2626' }}>Enter a date first</span>}
+            </div>
+            <button onClick={() => setSelectedHistoryIds(new Set())}
+              style={{ marginLeft: 'auto', padding: '4px 10px', background: 'none', border: '1px solid #94a3b8', borderRadius: 6, fontSize: 12, cursor: 'pointer', color: '#64748b' }}>
+              Clear
+            </button>
+          </div>
+        )}
+        {historyBulkResult && (
+          <div style={{ marginBottom: 10, padding: '8px 14px', background: '#f0fdf4', borderRadius: 8, fontSize: 13, color: '#15803d', fontWeight: 500 }}>
+            ✓ {historyBulkResult}
+          </div>
+        )}
 
         {loading ? (
           <p style={{ color: '#64748b', fontSize: 14 }}>Loading…</p>
@@ -411,6 +484,14 @@ export default function DistributionsPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
+                    <th style={{ ...thStyle, width: 40, textAlign: 'center' }}>
+                      <input type="checkbox"
+                        checked={!!result?.items.length && result.items.every(d => selectedHistoryIds.has(d.id))}
+                        onChange={e => {
+                          if (e.target.checked) setSelectedHistoryIds(new Set(result?.items.map(d => d.id) ?? []));
+                          else setSelectedHistoryIds(new Set());
+                        }} />
+                    </th>
                     {['Investor', 'Month', 'Amount', 'Status', 'Paid At', 'Bank', 'Action'].map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
@@ -418,7 +499,7 @@ export default function DistributionsPage() {
                 </thead>
                 <tbody>
                   {result?.items.length === 0 && (
-                    <tr><td colSpan={7} style={{ ...colStyle, textAlign: 'center', color: '#9ca3af', padding: 32 }}>No distributions found</td></tr>
+                    <tr><td colSpan={8} style={{ ...colStyle, textAlign: 'center', color: '#9ca3af', padding: 32 }}>No distributions found</td></tr>
                   )}
                   {result?.items.map(d => {
                     const monthDate = new Date(d.distributionMonth);
@@ -427,8 +508,17 @@ export default function DistributionsPage() {
                       ? '••••' + d.bankAccountNumber.slice(-4) : d.bankAccountNumber;
                     const canMarkPaid = d.paymentStatus !== 'Paid';
                     const canPushOdoo = d.paymentStatus !== 'Sent' && d.paymentStatus !== 'Paid';
+                    const isSelected = selectedHistoryIds.has(d.id);
                     return (
-                      <tr key={d.id} style={{ background: d.hasMismatch ? '#fff7ed' : undefined }}>
+                      <tr key={d.id} style={{ background: isSelected ? '#eff6ff' : d.hasMismatch ? '#fff7ed' : undefined }}>
+                        <td style={{ ...colStyle, textAlign: 'center', width: 40 }}>
+                          <input type="checkbox" checked={isSelected}
+                            onChange={e => setSelectedHistoryIds(prev => {
+                              const s = new Set(prev);
+                              if (e.target.checked) s.add(d.id); else s.delete(d.id);
+                              return s;
+                            })} />
+                        </td>
                         <td style={colStyle}>
                           <div style={{ fontWeight: 500 }}>{d.investorName}</div>
                           {d.investorEmail && <div style={{ fontSize: 12, color: '#9ca3af' }}>{d.investorEmail}</div>}

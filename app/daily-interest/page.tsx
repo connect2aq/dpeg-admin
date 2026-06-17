@@ -25,6 +25,9 @@ export default function DailyInterestPage() {
   const [included, setIncluded] = useState('');
   const [page, setPage] = useState(1);
   const [pushingDIId, setPushingDIId] = useState<number | null>(null);
+  const [selectedDIIds, setSelectedDIIds] = useState<Set<number>>(new Set());
+  const [diBulkPushing, setDiBulkPushing] = useState(false);
+  const [diBulkResult, setDiBulkResult] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -33,6 +36,7 @@ export default function DailyInterestPage() {
     if (from) params.from = from;
     if (to) params.to = to;
     if (included !== '') params.included = included;
+    setSelectedDIIds(new Set());
     adminApi.dailyInterestLogs(params)
       .then(r => { if (r.success) setResult(r.data); })
       .finally(() => setLoading(false));
@@ -45,6 +49,19 @@ export default function DailyInterestPage() {
     await adminApi.pushDailyInterestToOdoo(id);
     setPushingDIId(null);
     load();
+  };
+
+  const handleBulkPushDailyInterest = async () => {
+    const ids = [...selectedDIIds];
+    setDiBulkPushing(true);
+    setDiBulkResult(null);
+    const r = await adminApi.bulkPushDailyInterestToOdoo(ids);
+    setDiBulkPushing(false);
+    if (r.success) {
+      setDiBulkResult(`Pushed ${r.data.pushed} record${r.data.pushed !== 1 ? 's' : ''}${r.data.failed > 0 ? `, ${r.data.failed} failed` : ''}.`);
+      setSelectedDIIds(new Set());
+      load();
+    }
   };
 
   const totalPages = result ? Math.ceil(result.totalCount / PAGE_SIZE) : 1;
@@ -100,6 +117,28 @@ export default function DailyInterestPage() {
           </div>
         )}
 
+        {/* Bulk action bar */}
+        {selectedDIIds.size > 0 && (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12, padding: '10px 16px', background: '#f0f9ff', border: '1.5px solid #bae6fd', borderRadius: 10 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#0369a1' }}>{selectedDIIds.size} selected</span>
+            <button
+              onClick={handleBulkPushDailyInterest}
+              disabled={diBulkPushing}
+              style={{ padding: '7px 16px', background: '#b8923a', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: diBulkPushing ? 0.6 : 1 }}>
+              {diBulkPushing ? 'Pushing…' : `Push to Odoo (${selectedDIIds.size})`}
+            </button>
+            <button onClick={() => setSelectedDIIds(new Set())}
+              style={{ marginLeft: 'auto', padding: '4px 10px', background: 'none', border: '1px solid #94a3b8', borderRadius: 6, fontSize: 12, cursor: 'pointer', color: '#64748b' }}>
+              Clear
+            </button>
+          </div>
+        )}
+        {diBulkResult && (
+          <div style={{ marginBottom: 10, padding: '8px 14px', background: '#f0fdf4', borderRadius: 8, fontSize: 13, color: '#15803d', fontWeight: 500 }}>
+            ✓ {diBulkResult}
+          </div>
+        )}
+
         {loading ? (
           <p style={{ color: '#64748b', fontSize: 14 }}>Loading…</p>
         ) : (
@@ -108,6 +147,15 @@ export default function DailyInterestPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
+                    <th style={{ ...th, width: 40, textAlign: 'center' }}>
+                      <input type="checkbox"
+                        checked={!!result?.items.length && result.items.filter(r => r.odooStatus !== 'Success').every(r => selectedDIIds.has(r.id))}
+                        onChange={e => {
+                          const pushable = (result?.items ?? []).filter(r => r.odooStatus !== 'Success').map(r => r.id);
+                          if (e.target.checked) setSelectedDIIds(new Set(pushable));
+                          else setSelectedDIIds(new Set());
+                        }} />
+                    </th>
                     {['Date', 'Investor', 'App ID', 'Units', 'Capital', 'Rate', 'Net Interest', 'Odoo ID', 'Odoo Status', 'Distributed', 'Action'].map(h => (
                       <th key={h} style={th}>{h}</th>
                     ))}
@@ -115,10 +163,23 @@ export default function DailyInterestPage() {
                 </thead>
                 <tbody>
                   {result?.items.length === 0 && (
-                    <tr><td colSpan={11} style={{ ...td, textAlign: 'center', color: '#9ca3af', padding: 32 }}>No records found</td></tr>
+                    <tr><td colSpan={12} style={{ ...td, textAlign: 'center', color: '#9ca3af', padding: 32 }}>No records found</td></tr>
                   )}
-                  {result?.items.map(row => (
-                    <tr key={row.id} style={{ background: row.includedInMonthlyDistribution ? '#f8fafc' : undefined }}>
+                  {result?.items.map(row => {
+                    const canPush = row.odooStatus !== 'Success';
+                    const isSelected = selectedDIIds.has(row.id);
+                    return (
+                    <tr key={row.id} style={{ background: isSelected ? '#eff6ff' : row.includedInMonthlyDistribution ? '#f8fafc' : undefined }}>
+                      <td style={{ ...td, textAlign: 'center', width: 40 }}>
+                        {canPush && (
+                          <input type="checkbox" checked={isSelected}
+                            onChange={e => setSelectedDIIds(prev => {
+                              const s = new Set(prev);
+                              if (e.target.checked) s.add(row.id); else s.delete(row.id);
+                              return s;
+                            })} />
+                        )}
+                      </td>
                       <td style={{ ...td, fontWeight: 600, whiteSpace: 'nowrap' }}>{new Date(row.date).toLocaleDateString()}</td>
                       <td style={td}>
                         <div style={{ fontWeight: 500 }}>{row.investorName}</div>
@@ -141,7 +202,7 @@ export default function DailyInterestPage() {
                         </span>
                       </td>
                       <td style={td}>
-                        {row.odooStatus !== 'Success' && (
+                        {canPush && (
                           <button
                             onClick={() => handlePushDailyInterest(row.id)}
                             disabled={pushingDIId === row.id}
@@ -151,7 +212,8 @@ export default function DailyInterestPage() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
