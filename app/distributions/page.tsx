@@ -40,7 +40,7 @@ export default function DistributionsPage() {
   const [catchUpFrom, setCatchUpFrom] = useState(firstOfMonthStr());
   const [catchUpTo, setCatchUpTo] = useState(yesterdayStr());
   const [catchUpLoading, setCatchUpLoading] = useState(false);
-  const [catchUpResult, setCatchUpResult] = useState<{ appsProcessed: number; logsCreated: number } | null>(null);
+  const [catchUpResult, setCatchUpResult] = useState<{ appsProcessed: number; logsCreated: number; errors: string[] } | null>(null);
   const [catchUpError, setCatchUpError] = useState<string | null>(null);
 
   // Run distribution state
@@ -188,9 +188,23 @@ export default function DistributionsPage() {
           </div>
           {catchUpError && <div style={{ marginTop: 10, fontSize: 13, color: '#dc2626' }}>{catchUpError}</div>}
           {catchUpResult && (
-            <div style={{ marginTop: 10, padding: '8px 14px', background: '#f0fdf4', borderRadius: 8, fontSize: 13, color: '#15803d', fontWeight: 500, display: 'inline-block' }}>
-              ✓ Catch-up complete — {catchUpResult.appsProcessed} investor{catchUpResult.appsProcessed !== 1 ? 's' : ''} updated, {catchUpResult.logsCreated} new log{catchUpResult.logsCreated !== 1 ? 's' : ''} created.
-              {catchUpResult.logsCreated > 0 && ' Now run Preview below to see updated amounts.'}
+            <div style={{ marginTop: 10 }}>
+              <div style={{ padding: '8px 14px', background: '#f0fdf4', borderRadius: 8, fontSize: 13, color: '#15803d', fontWeight: 500, display: 'inline-block' }}>
+                ✓ Catch-up complete — {catchUpResult.appsProcessed} investor{catchUpResult.appsProcessed !== 1 ? 's' : ''} updated, {catchUpResult.logsCreated} new log{catchUpResult.logsCreated !== 1 ? 's' : ''} created.
+                {catchUpResult.logsCreated > 0 && ' Now run Preview below to see updated amounts.'}
+              </div>
+              {catchUpResult.errors?.length > 0 && (
+                <div style={{ marginTop: 10, padding: '12px 16px', background: '#fef9c3', border: '1.5px solid #fbbf24', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e', marginBottom: 6 }}>
+                    ⚠ {catchUpResult.errors.length} redemption{catchUpResult.errors.length !== 1 ? 's' : ''} skipped — EffectiveDate missing or invalid. Fix these records manually:
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {catchUpResult.errors.map((e, i) => (
+                      <li key={i} style={{ fontSize: 12, color: '#78350f', marginBottom: 2, fontFamily: 'monospace' }}>{e}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </div>

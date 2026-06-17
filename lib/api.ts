@@ -601,7 +601,7 @@ export const adminApi = {
 
   // ── Bulk catch-up ─────────────────────────────────────────────────────
   runBulkCatchUp: (from: string, to: string) =>
-    api.post<ApiResponse<{ appsProcessed: number; logsCreated: number }>>('/distributions/catch-up', { from, to }),
+    api.post<ApiResponse<{ appsProcessed: number; logsCreated: number; errors: string[] }>>('/distributions/catch-up', { from, to }),
 
   // ── Manual distribution run ───────────────────────────────────────────
   simulateDistribution: (asOfDate: string) =>
