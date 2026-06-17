@@ -52,6 +52,8 @@ export default function DistributionsPage() {
   const [pushedIds, setPushedIds] = useState<Set<number>>(new Set());
   const [markingResultId, setMarkingResultId] = useState<number | null>(null);
   const [markedPaidIds, setMarkedPaidIds] = useState<Set<number>>(new Set());
+  const [resultPaidDateInput, setResultPaidDateInput] = useState<{ [id: number]: string }>({});
+  const [resultPaidDateError, setResultPaidDateError] = useState<Set<number>>(new Set());
   const [batchPushing, setBatchPushing] = useState(false);
   const [batchResult, setBatchResult] = useState<{ pushed: number; failed: number } | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
@@ -108,6 +110,8 @@ export default function DistributionsPage() {
     setPushedIds(new Set());
     setMarkedPaidIds(new Set());
     setMarkingResultId(null);
+    setResultPaidDateInput({});
+    setResultPaidDateError(new Set());
     setRunError(null);
     const r = await adminApi.executeDistribution(runDate);
     setRunLoading(false);
@@ -126,8 +130,14 @@ export default function DistributionsPage() {
   };
 
   const handleMarkOnePaid = async (id: number) => {
+    const paidDate = resultPaidDateInput[id];
+    if (!paidDate) {
+      setResultPaidDateError(prev => new Set([...prev, id]));
+      return;
+    }
+    setResultPaidDateError(prev => { const s = new Set(prev); s.delete(id); return s; });
     setMarkingResultId(id);
-    const r = await adminApi.markDistributionPaid(id, todayStr());
+    const r = await adminApi.markDistributionPaid(id, paidDate);
     setMarkingResultId(null);
     if (r.success) {
       setMarkedPaidIds(prev => new Set([...prev, id]));
@@ -325,25 +335,39 @@ export default function DistributionsPage() {
                                 : <StatusBadge status="Pending" />}
                         </td>
                         {runMode === 'execute' && (
-                          <td style={{ ...colStyle, minWidth: 200 }}>
+                          <td style={{ ...colStyle, minWidth: 260 }}>
                             {!r.alreadyRan && r.distributionLogId !== null && !isPushed && !isMarkedPaid && (
-                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                 <button
                                   onClick={() => handlePushOne(r.distributionLogId!)}
                                   disabled={pushingId === r.distributionLogId || markingResultId === r.distributionLogId}
-                                  style={{ padding: '5px 12px', background: '#b8923a', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: pushingId === r.distributionLogId ? 0.6 : 1 }}>
+                                  style={{ padding: '5px 12px', background: '#b8923a', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: pushingId === r.distributionLogId ? 0.6 : 1, alignSelf: 'flex-start' }}>
                                   {pushingId === r.distributionLogId ? '…' : 'Push to Odoo'}
                                 </button>
-                                <button
-                                  onClick={() => handleMarkOnePaid(r.distributionLogId!)}
-                                  disabled={markingResultId === r.distributionLogId || pushingId === r.distributionLogId}
-                                  style={{ padding: '5px 12px', background: '#0f2342', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: markingResultId === r.distributionLogId ? 0.6 : 1 }}>
-                                  {markingResultId === r.distributionLogId ? '…' : 'Mark Paid'}
-                                </button>
+                                <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
+                                  <input
+                                    type="date"
+                                    value={resultPaidDateInput[r.distributionLogId] || ''}
+                                    onChange={e => {
+                                      setResultPaidDateInput(prev => ({ ...prev, [r.distributionLogId!]: e.target.value }));
+                                      if (e.target.value) setResultPaidDateError(prev => { const s = new Set(prev); s.delete(r.distributionLogId!); return s; });
+                                    }}
+                                    style={{ padding: '4px 7px', border: `1px solid ${resultPaidDateError.has(r.distributionLogId) ? '#dc2626' : '#d1d5db'}`, borderRadius: 5, fontSize: 12 }}
+                                  />
+                                  <button
+                                    onClick={() => handleMarkOnePaid(r.distributionLogId!)}
+                                    disabled={markingResultId === r.distributionLogId || pushingId === r.distributionLogId}
+                                    style={{ padding: '5px 12px', background: '#0f2342', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: markingResultId === r.distributionLogId ? 0.6 : 1 }}>
+                                    {markingResultId === r.distributionLogId ? '…' : 'Mark Paid'}
+                                  </button>
+                                </div>
+                                {resultPaidDateError.has(r.distributionLogId) && (
+                                  <span style={{ fontSize: 11, color: '#dc2626' }}>Please enter a paid date</span>
+                                )}
                               </div>
                             )}
                             {isPushed && <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 600 }}>✓ Sent to Odoo</span>}
-                            {isMarkedPaid && <span style={{ fontSize: 12, color: '#0f2342', fontWeight: 600 }}>✓ Marked Paid</span>}
+                            {isMarkedPaid && <span style={{ fontSize: 12, color: '#0f2342', fontWeight: 600 }}>✓ Marked Paid — {resultPaidDateInput[r.distributionLogId!] || ''}</span>}
                           </td>
                         )}
                       </tr>
