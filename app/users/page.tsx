@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
@@ -13,6 +13,14 @@ const PAGE_SIZE = 20;
 const emptyCreateForm: CreateUserAdminRequest = { firstName: '', lastName: '', email: '', password: '' };
 
 export default function UsersPage() {
+  return (
+    <Suspense fallback={<AdminLayout><div className="page-content" style={{ padding: 32, color: '#64748b' }}>Loading...</div></AdminLayout>}>
+      <UsersContent />
+    </Suspense>
+  );
+}
+
+function UsersContent() {
   const { user: authUser } = useAdminAuth();
   const isSuperAdmin = (authUser?.adminRole ?? 'SuperAdmin') === 'SuperAdmin';
   const searchParams = useSearchParams();

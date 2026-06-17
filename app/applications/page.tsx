@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
@@ -14,6 +14,14 @@ const TYPES = ['', 'Individual', 'Entity', 'IRA', 'Trust'];
 const PAGE_SIZE = 20;
 
 export default function ApplicationsPage() {
+  return (
+    <Suspense fallback={<AdminLayout><div className="page-content" style={{ padding: 32, color: '#64748b' }}>Loading...</div></AdminLayout>}>
+      <ApplicationsContent />
+    </Suspense>
+  );
+}
+
+function ApplicationsContent() {
   const { user: authUser } = useAdminAuth();
   const isSuperAdmin = (authUser?.adminRole ?? 'SuperAdmin') === 'SuperAdmin';
   const searchParams = useSearchParams();
