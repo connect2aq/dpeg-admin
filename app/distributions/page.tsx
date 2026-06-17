@@ -50,6 +50,8 @@ export default function DistributionsPage() {
   const [runLoading, setRunLoading] = useState(false);
   const [pushingId, setPushingId] = useState<number | null>(null);
   const [pushedIds, setPushedIds] = useState<Set<number>>(new Set());
+  const [markingResultId, setMarkingResultId] = useState<number | null>(null);
+  const [markedPaidIds, setMarkedPaidIds] = useState<Set<number>>(new Set());
   const [batchPushing, setBatchPushing] = useState(false);
   const [batchResult, setBatchResult] = useState<{ pushed: number; failed: number } | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
@@ -104,6 +106,8 @@ export default function DistributionsPage() {
     setRunResults(null);
     setBatchResult(null);
     setPushedIds(new Set());
+    setMarkedPaidIds(new Set());
+    setMarkingResultId(null);
     setRunError(null);
     const r = await adminApi.executeDistribution(runDate);
     setRunLoading(false);
@@ -117,6 +121,16 @@ export default function DistributionsPage() {
     setPushingId(null);
     if (r.success) {
       setPushedIds(prev => new Set([...prev, id]));
+      load();
+    }
+  };
+
+  const handleMarkOnePaid = async (id: number) => {
+    setMarkingResultId(id);
+    const r = await adminApi.markDistributionPaid(id, todayStr());
+    setMarkingResultId(null);
+    if (r.success) {
+      setMarkedPaidIds(prev => new Set([...prev, id]));
       load();
     }
   };
@@ -139,7 +153,8 @@ export default function DistributionsPage() {
 
   const totalPages = result ? Math.ceil(result.totalCount / PAGE_SIZE) : 1;
   const pendingPushCount = (runResults ?? []).filter(
-    r => !r.alreadyRan && r.distributionLogId !== null && !pushedIds.has(r.distributionLogId!)
+    r => !r.alreadyRan && r.distributionLogId !== null &&
+         !pushedIds.has(r.distributionLogId!) && !markedPaidIds.has(r.distributionLogId!)
   ).length;
 
   const colStyle: React.CSSProperties = {
@@ -269,7 +284,7 @@ export default function DistributionsPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    {['Investor', 'Month', 'PPM', 'Days', 'Amount', 'Recalculated', 'Bank', 'Status', ...(runMode === 'execute' ? ['Odoo'] : [])].map(h => (
+                    {['Investor', 'Month', 'PPM', 'Days', 'Amount', 'Recalculated', 'Bank', 'Status', ...(runMode === 'execute' ? ['Actions'] : [])].map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
@@ -280,6 +295,7 @@ export default function DistributionsPage() {
                   )}
                   {runResults.map((r, i) => {
                     const isPushed = r.distributionLogId !== null && pushedIds.has(r.distributionLogId);
+                    const isMarkedPaid = r.distributionLogId !== null && markedPaidIds.has(r.distributionLogId);
                     return (
                       <tr key={i} style={{ background: r.alreadyRan ? '#f8fafc' : r.hasMismatch ? '#fff7ed' : undefined }}>
                         <td style={colStyle}>
@@ -309,16 +325,25 @@ export default function DistributionsPage() {
                                 : <StatusBadge status="Pending" />}
                         </td>
                         {runMode === 'execute' && (
-                          <td style={{ ...colStyle, minWidth: 130 }}>
-                            {!r.alreadyRan && r.distributionLogId !== null && !isPushed && (
-                              <button
-                                onClick={() => handlePushOne(r.distributionLogId!)}
-                                disabled={pushingId === r.distributionLogId}
-                                style={{ padding: '5px 12px', background: '#b8923a', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: pushingId === r.distributionLogId ? 0.6 : 1 }}>
-                                {pushingId === r.distributionLogId ? '…' : 'Push to Odoo'}
-                              </button>
+                          <td style={{ ...colStyle, minWidth: 200 }}>
+                            {!r.alreadyRan && r.distributionLogId !== null && !isPushed && !isMarkedPaid && (
+                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                <button
+                                  onClick={() => handlePushOne(r.distributionLogId!)}
+                                  disabled={pushingId === r.distributionLogId || markingResultId === r.distributionLogId}
+                                  style={{ padding: '5px 12px', background: '#b8923a', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: pushingId === r.distributionLogId ? 0.6 : 1 }}>
+                                  {pushingId === r.distributionLogId ? '…' : 'Push to Odoo'}
+                                </button>
+                                <button
+                                  onClick={() => handleMarkOnePaid(r.distributionLogId!)}
+                                  disabled={markingResultId === r.distributionLogId || pushingId === r.distributionLogId}
+                                  style={{ padding: '5px 12px', background: '#0f2342', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: markingResultId === r.distributionLogId ? 0.6 : 1 }}>
+                                  {markingResultId === r.distributionLogId ? '…' : 'Mark Paid'}
+                                </button>
+                              </div>
                             )}
-                            {isPushed && <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 600 }}>✓ Sent</span>}
+                            {isPushed && <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 600 }}>✓ Sent to Odoo</span>}
+                            {isMarkedPaid && <span style={{ fontSize: 12, color: '#0f2342', fontWeight: 600 }}>✓ Marked Paid</span>}
                           </td>
                         )}
                       </tr>
