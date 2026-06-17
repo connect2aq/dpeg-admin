@@ -232,7 +232,8 @@ export default function DistributionsPage() {
               <div style={{ fontSize: 15, fontWeight: 700, color: '#0f2342' }}>
                 {runMode === 'preview' ? 'Preview' : 'Execution'} Results — {runDate}
                 <span style={{ marginLeft: 10, fontSize: 13, fontWeight: 400, color: '#64748b' }}>
-                  {runResults.filter(r => !r.alreadyRan).length} investor{runResults.filter(r => !r.alreadyRan).length !== 1 ? 's' : ''} •{' '}
+                  {runResults.filter(r => !r.alreadyRan).length} record{runResults.filter(r => !r.alreadyRan).length !== 1 ? 's' : ''} across{' '}
+                  {new Set(runResults.filter(r => !r.alreadyRan).map(r => r.applicationId)).size} investor{new Set(runResults.filter(r => !r.alreadyRan).map(r => r.applicationId)).size !== 1 ? 's' : ''} •{' '}
                   ${runResults.filter(r => !r.alreadyRan).reduce((s, r) => s + r.totalNetAmount, 0).toFixed(2)} total
                 </span>
               </div>
@@ -254,14 +255,14 @@ export default function DistributionsPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    {['Investor', 'PPM', 'Days', 'Amount (Logs)', 'Recalculated', 'Catch-Up', 'Bank', 'Status', ...(runMode === 'execute' ? ['Odoo'] : [])].map(h => (
+                    {['Investor', 'Month', 'PPM', 'Days', 'Amount', 'Recalculated', 'Bank', 'Status', ...(runMode === 'execute' ? ['Odoo'] : [])].map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {runResults.length === 0 && (
-                    <tr><td colSpan={9} style={{ ...colStyle, textAlign: 'center', color: '#9ca3af', padding: 32 }}>No investors to distribute for this date</td></tr>
+                    <tr><td colSpan={10} style={{ ...colStyle, textAlign: 'center', color: '#9ca3af', padding: 32 }}>No investors to distribute for this date</td></tr>
                   )}
                   {runResults.map((r, i) => {
                     const isPushed = r.distributionLogId !== null && pushedIds.has(r.distributionLogId);
@@ -273,11 +274,13 @@ export default function DistributionsPage() {
                           {r.hasMismatch && <span style={{ fontSize: 11, color: '#d97706', fontWeight: 600 }}>⚠ Mismatch</span>}
                           {r.alreadyRan && <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>Already ran</span>}
                         </td>
+                        <td style={{ ...colStyle, fontWeight: 500 }}>
+                          {new Date(r.distributionMonth).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                        </td>
                         <td style={{ ...colStyle, color: '#9ca3af' }}>{r.ppmRefNo || '—'}</td>
                         <td style={colStyle}>{r.alreadyRan ? '—' : r.totalDays}</td>
                         <td style={{ ...colStyle, fontWeight: 600 }}>{r.alreadyRan ? '—' : `$${r.totalNetAmount.toFixed(2)}`}</td>
                         <td style={colStyle}>{r.alreadyRan ? '—' : `$${r.recalculatedAmount.toFixed(2)}`}</td>
-                        <td style={colStyle}>{r.alreadyRan || r.priorMonthCatchUpAmount === 0 ? '—' : `$${r.priorMonthCatchUpAmount.toFixed(2)}`}</td>
                         <td style={colStyle}>
                           {r.bankName && <div>{r.bankName}</div>}
                           {r.bankAccountNumber && <div style={{ fontSize: 12, color: '#6b7280' }}>{r.bankAccountNumber}</div>}

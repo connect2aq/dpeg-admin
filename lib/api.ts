@@ -696,6 +696,7 @@ export interface DistributionListItem {
 
 export interface DistributionRunResult {
   applicationId: number;
+  distributionMonth: string;
   investorName: string;
   investorEmail: string;
   ppmRefNo: string;
@@ -703,7 +704,6 @@ export interface DistributionRunResult {
   recalculatedAmount: number;
   hasMismatch: boolean;
   totalDays: number;
-  priorMonthCatchUpAmount: number;
   bankName: string;
   bankAccountNumber: string;
   alreadyRan: boolean;
