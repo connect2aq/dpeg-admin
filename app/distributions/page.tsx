@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -26,6 +26,14 @@ function yesterdayStr() {
 }
 
 export default function DistributionsPage() {
+  return (
+    <Suspense fallback={<AdminLayout><div className="page-content" style={{ padding: 32, color: '#64748b' }}>Loading...</div></AdminLayout>}>
+      <DistributionsContent />
+    </Suspense>
+  );
+}
+
+function DistributionsContent() {
   const searchParams = useSearchParams();
   const [result, setResult] = useState<PagedResult<DistributionListItem> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,6 +44,11 @@ export default function DistributionsPage() {
   const [markingId, setMarkingId] = useState<number | null>(null);
   const [historyPushingId, setHistoryPushingId] = useState<number | null>(null);
   const [paidDateInput, setPaidDateInput] = useState<{ [id: number]: string }>({});
+  // Edit Paid Date
+  const [editingPaidDateId, setEditingPaidDateId] = useState<number | null>(null);
+  const [editPaidDateValue, setEditPaidDateValue] = useState('');
+  const [editPaidDateSaving, setEditPaidDateSaving] = useState(false);
+  const [editPaidDatePendingIds, setEditPaidDatePendingIds] = useState<Set<number>>(new Set());
   // Bulk selection for history table
   const [selectedHistoryIds, setSelectedHistoryIds] = useState<Set<number>>(new Set());
   const [bulkPaidDate, setBulkPaidDate] = useState('');
@@ -92,6 +105,20 @@ export default function DistributionsPage() {
     await adminApi.pushDistributionToOdoo(id);
     setHistoryPushingId(null);
     load();
+  };
+
+  const handleEditPaidDate = async (id: number) => {
+    if (!editPaidDateValue) return;
+    setEditPaidDateSaving(true);
+    const r = await adminApi.editDistributionPaidDate(id, editPaidDateValue);
+    setEditPaidDateSaving(false);
+    setEditingPaidDateId(null);
+    setEditPaidDateValue('');
+    if (r.success && (r.data as { status?: string })?.status === 'Pending') {
+      setEditPaidDatePendingIds(prev => new Set([...prev, id]));
+    } else if (r.success) {
+      load();
+    }
   };
 
   const handleHistoryBulkPush = async () => {
@@ -532,7 +559,7 @@ export default function DistributionsPage() {
                           {d.bankName && <div>{d.bankName}</div>}
                           {maskedAcct && <div style={{ fontSize: 12, color: '#6b7280' }}>{maskedAcct}</div>}
                         </td>
-                        <td style={{ ...colStyle, minWidth: 220 }}>
+                        <td style={{ ...colStyle, minWidth: 240 }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                             {canPushOdoo && (
                               <button
@@ -554,6 +581,37 @@ export default function DistributionsPage() {
                                   style={{ padding: '5px 12px', background: '#0f2342', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: markingId === d.id ? 0.6 : 1 }}>
                                   {markingId === d.id ? '…' : 'Mark Paid'}
                                 </button>
+                              </div>
+                            )}
+                            {/* Edit Paid Date */}
+                            {d.paidAt && editingPaidDateId !== d.id && (
+                              editPaidDatePendingIds.has(d.id)
+                                ? <span style={{ fontSize: 11, color: '#b45309', fontWeight: 600 }}>⏳ Pending approval</span>
+                                : <button
+                                    onClick={() => { setEditingPaidDateId(d.id); setEditPaidDateValue(new Date(d.paidAt!).toISOString().split('T')[0]); }}
+                                    style={{ padding: '3px 10px', background: 'none', border: '1px solid #94a3b8', borderRadius: 5, fontSize: 11, color: '#475569', cursor: 'pointer', alignSelf: 'flex-start' }}>
+                                    ✏ Edit Date
+                                  </button>
+                            )}
+                            {d.paidAt && editingPaidDateId === d.id && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+                                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>New Paid At Date</div>
+                                <input type="date" value={editPaidDateValue}
+                                  onChange={e => setEditPaidDateValue(e.target.value)}
+                                  style={{ padding: '5px 8px', border: '1px solid #d1d5db', borderRadius: 5, fontSize: 12 }} />
+                                <div style={{ display: 'flex', gap: 5 }}>
+                                  <button
+                                    onClick={() => handleEditPaidDate(d.id)}
+                                    disabled={editPaidDateSaving || !editPaidDateValue}
+                                    style={{ padding: '4px 12px', background: '#0f2342', color: '#fff', border: 'none', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: editPaidDateSaving ? 0.6 : 1 }}>
+                                    {editPaidDateSaving ? '…' : 'Save'}
+                                  </button>
+                                  <button
+                                    onClick={() => { setEditingPaidDateId(null); setEditPaidDateValue(''); }}
+                                    style={{ padding: '4px 10px', background: 'none', border: '1px solid #e2e8f0', borderRadius: 5, fontSize: 11, cursor: 'pointer', color: '#64748b' }}>
+                                    Cancel
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </div>
