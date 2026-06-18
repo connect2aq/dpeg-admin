@@ -7,6 +7,7 @@ const INVESTMENT_TYPES = ['ShortTerm', 'LongTerm'];
 const ENTITY_SUB_TYPES = ['LLC', 'Corporation', 'LP_GP', 'PensionFund', 'BankBroker', 'Other'];
 const PAYMENT_METHODS = ['WireTransfer', 'CertifiedCheck'];
 const DIST_PREFS = ['WireToBank', 'Reinvest'];
+const MARITAL_STATUSES = ['single', 'married', 'widowed', 'divorced'];
 
 const inputStyle = { width: '100%', padding: '8px 11px', border: '1.5px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' as const };
 const labelStyle = { fontSize: 11, fontWeight: 700 as const, color: '#475569', display: 'block' as const, marginBottom: 3, textTransform: 'uppercase' as const, letterSpacing: '0.04em' };
@@ -38,6 +39,8 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
   const [form, setForm] = useState<CreateApplicationRequest | null>(null);
   const [ssNumberMasked, setSsNumberMasked] = useState('');
   const [spouseSSNMasked, setSpouseSSNMasked] = useState('');
+  const [dlNoMasked, setDlNoMasked] = useState('');
+  const [taxCertNoMasked, setTaxCertNoMasked] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState('');
@@ -50,6 +53,8 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
       const inv = d.investment;
       setSsNumberMasked(p?.ssNumberMasked || '');
       setSpouseSSNMasked(p?.spouseSSN || '');
+      setDlNoMasked(p?.drivingLicenseNo || '');
+      setTaxCertNoMasked(p?.taxCertificateNo || '');
       setForm({
         investorType: d.investorType || 'Individual',
         investmentType: d.investmentType || '',
@@ -66,6 +71,18 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
         zipCode: p?.zipCode || '',
         citizenship: p?.citizenship || '',
         employer: p?.employer || '',
+        maritalStatus: p?.maritalStatus || '',
+        ownershipType: p?.ownershipType || '',
+        mailingAddress: p?.mailingAddress || '',
+        dayPhone: p?.dayPhone || '',
+        nightPhone: p?.nightPhone || '',
+        spouseFullName: p?.spouseFullName || '',
+        spouseEmail: p?.spouseEmail || '',
+        spouseDateOfBirth: p?.spouseDateOfBirth || '',
+        custodianName: p?.custodianName || '',
+        custodianAcct: p?.custodianAcct || '',
+        custodianPhone: p?.custodianPhone || '',
+        custodianEmail: p?.custodianEmail || '',
         entityName: p?.entityName || '',
         ein: p?.ein || '',
         stateFormation: p?.stateFormation || '',
@@ -100,9 +117,14 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
     setSubmitting(false);
   };
 
+  const isIndividual = form?.investorType === 'Individual';
+  const isMarried = form?.maritalStatus?.toLowerCase() === 'married';
+  const isIRA = form?.investorType === 'IRA';
+  const hasCustodian = !!(form?.custodianName || isIRA);
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, padding: '40px 16px', overflowY: 'auto' }}>
-      <div style={{ background: 'white', borderRadius: 12, width: 680, maxWidth: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', marginBottom: 40 }}>
+      <div style={{ background: 'white', borderRadius: 12, width: 720, maxWidth: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', marginBottom: 40 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid #e2e8f0' }}>
           <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0f2342', margin: 0 }}>Edit Investment</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#94a3b8', lineHeight: 1 }}>×</button>
@@ -112,6 +134,7 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
             <div style={{ padding: 20, color: msg ? '#b91c1c' : '#64748b' }}>{msg || 'Loading...'}</div>
           ) : (
             <form onSubmit={submit}>
+              {/* ── Application ── */}
               <SectionTitle>Application</SectionTitle>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
                 <FormField label="Investor Type *">
@@ -143,19 +166,30 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
                 </FormField>
               </div>
 
+              {/* ── Investor Information ── */}
               <SectionTitle>Investor Information</SectionTitle>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                 <FormField label="First Name *"><input required style={inputStyle} value={form.firstName} onChange={e => setForm(f => f && ({ ...f, firstName: e.target.value }))} /></FormField>
                 <FormField label="Last Name *"><input required style={inputStyle} value={form.lastName} onChange={e => setForm(f => f && ({ ...f, lastName: e.target.value }))} /></FormField>
                 <FormField label="Phone"><input style={inputStyle} value={form.phone || ''} onChange={e => setForm(f => f && ({ ...f, phone: e.target.value }))} /></FormField>
+                <FormField label="Day Phone"><input style={inputStyle} value={form.dayPhone || ''} onChange={e => setForm(f => f && ({ ...f, dayPhone: e.target.value }))} /></FormField>
+                <FormField label="Night Phone"><input style={inputStyle} value={form.nightPhone || ''} onChange={e => setForm(f => f && ({ ...f, nightPhone: e.target.value }))} /></FormField>
                 <FormField label="Date of Birth"><input type="date" style={inputStyle} value={form.dateOfBirth || ''} onChange={e => setForm(f => f && ({ ...f, dateOfBirth: e.target.value }))} /></FormField>
                 <FormField label="Street Address"><input style={inputStyle} value={form.streetAddress || ''} onChange={e => setForm(f => f && ({ ...f, streetAddress: e.target.value }))} /></FormField>
                 <FormField label="City"><input style={inputStyle} value={form.city || ''} onChange={e => setForm(f => f && ({ ...f, city: e.target.value }))} /></FormField>
                 <FormField label="State"><input style={inputStyle} value={form.state || ''} onChange={e => setForm(f => f && ({ ...f, state: e.target.value }))} /></FormField>
                 <FormField label="Zip Code"><input style={inputStyle} value={form.zipCode || ''} onChange={e => setForm(f => f && ({ ...f, zipCode: e.target.value }))} /></FormField>
+                <FormField label="Mailing Address"><input style={inputStyle} value={form.mailingAddress || ''} onChange={e => setForm(f => f && ({ ...f, mailingAddress: e.target.value }))} /></FormField>
                 <FormField label="Citizenship"><input style={inputStyle} value={form.citizenship || ''} onChange={e => setForm(f => f && ({ ...f, citizenship: e.target.value }))} /></FormField>
                 <FormField label="Employer"><input style={inputStyle} value={form.employer || ''} onChange={e => setForm(f => f && ({ ...f, employer: e.target.value }))} /></FormField>
-                {form.investorType === 'Individual' && (
+                <FormField label="Marital Status">
+                  <select style={selectStyle} value={form.maritalStatus || ''} onChange={e => setForm(f => f && ({ ...f, maritalStatus: e.target.value }))}>
+                    <option value="">— Select —</option>
+                    {MARITAL_STATUSES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+                  </select>
+                </FormField>
+                <FormField label="Ownership Type"><input style={inputStyle} value={form.ownershipType || ''} onChange={e => setForm(f => f && ({ ...f, ownershipType: e.target.value }))} /></FormField>
+                {isIndividual && (
                   <FormField label="SSN (leave blank to keep)">
                     <input
                       style={inputStyle}
@@ -166,19 +200,30 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
                     />
                   </FormField>
                 )}
-                {form.investorType === 'Individual' && spouseSSNMasked && (
-                  <FormField label="Spouse SSN (leave blank to keep)">
-                    <input
-                      style={inputStyle}
-                      value={form.spouseSSN || ''}
-                      placeholder={spouseSSNMasked || 'Enter new Spouse SSN to update'}
-                      onChange={e => setForm(f => f && ({ ...f, spouseSSN: e.target.value }))}
-                      autoComplete="off"
-                    />
-                  </FormField>
-                )}
               </div>
 
+              {/* ── Spouse / Joint Tenant ── (Individual + married) */}
+              {isIndividual && isMarried && (
+                <>
+                  <SectionTitle>Spouse / Joint Tenant</SectionTitle>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                    <FormField label="Spouse Full Name"><input style={inputStyle} value={form.spouseFullName || ''} onChange={e => setForm(f => f && ({ ...f, spouseFullName: e.target.value }))} /></FormField>
+                    <FormField label="Spouse Email"><input type="email" style={inputStyle} value={form.spouseEmail || ''} onChange={e => setForm(f => f && ({ ...f, spouseEmail: e.target.value }))} /></FormField>
+                    <FormField label="Spouse Date of Birth"><input type="date" style={inputStyle} value={form.spouseDateOfBirth || ''} onChange={e => setForm(f => f && ({ ...f, spouseDateOfBirth: e.target.value }))} /></FormField>
+                    <FormField label="Spouse SSN (leave blank to keep)">
+                      <input
+                        style={inputStyle}
+                        value={form.spouseSSN || ''}
+                        placeholder={spouseSSNMasked || 'Enter new Spouse SSN to update'}
+                        onChange={e => setForm(f => f && ({ ...f, spouseSSN: e.target.value }))}
+                        autoComplete="off"
+                      />
+                    </FormField>
+                  </div>
+                </>
+              )}
+
+              {/* ── Entity Information ── */}
               {form.investorType !== 'Individual' && (
                 <>
                   <SectionTitle>Entity Information</SectionTitle>
@@ -192,6 +237,46 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
                 </>
               )}
 
+              {/* ── Custodian ── (IRA or existing custodian data) */}
+              {hasCustodian && (
+                <>
+                  <SectionTitle>Custodian</SectionTitle>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                    <FormField label="Custodian Name"><input style={inputStyle} value={form.custodianName || ''} onChange={e => setForm(f => f && ({ ...f, custodianName: e.target.value }))} /></FormField>
+                    <FormField label="Custodian Account"><input style={inputStyle} value={form.custodianAcct || ''} onChange={e => setForm(f => f && ({ ...f, custodianAcct: e.target.value }))} /></FormField>
+                    <FormField label="Custodian Phone"><input style={inputStyle} value={form.custodianPhone || ''} onChange={e => setForm(f => f && ({ ...f, custodianPhone: e.target.value }))} /></FormField>
+                    <FormField label="Custodian Email"><input type="email" style={inputStyle} value={form.custodianEmail || ''} onChange={e => setForm(f => f && ({ ...f, custodianEmail: e.target.value }))} /></FormField>
+                  </div>
+                </>
+              )}
+
+              {/* ── Sensitive IDs ── */}
+              <SectionTitle>Identity Documents</SectionTitle>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <FormField label="Driving License No (leave blank to keep)">
+                  <input
+                    style={inputStyle}
+                    value={form.drivingLicenseNo || ''}
+                    placeholder={dlNoMasked || 'Enter new DL number to update'}
+                    onChange={e => setForm(f => f && ({ ...f, drivingLicenseNo: e.target.value }))}
+                    autoComplete="off"
+                  />
+                </FormField>
+                <FormField label="Driving License State">
+                  <input style={inputStyle} value={form.drivingLicenseState || ''} onChange={e => setForm(f => f && ({ ...f, drivingLicenseState: e.target.value }))} />
+                </FormField>
+                <FormField label="Tax Certificate No (leave blank to keep)">
+                  <input
+                    style={inputStyle}
+                    value={form.taxCertificateNo || ''}
+                    placeholder={taxCertNoMasked || 'Enter new Tax Cert number to update'}
+                    onChange={e => setForm(f => f && ({ ...f, taxCertificateNo: e.target.value }))}
+                    autoComplete="off"
+                  />
+                </FormField>
+              </div>
+
+              {/* ── Investment Details ── */}
               <SectionTitle>Investment Details</SectionTitle>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
                 <FormField label="Units *"><input required type="number" min={1} style={inputStyle} value={form.numUnits || ''} onChange={e => setForm(f => f && ({ ...f, numUnits: Number(e.target.value) }))} /></FormField>
@@ -213,6 +298,7 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
                 </FormField>
               </div>
 
+              {/* ── Bank Details ── */}
               <SectionTitle>Bank Details</SectionTitle>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
                 <FormField label="Bank Name"><input style={inputStyle} value={form.bankName || ''} onChange={e => setForm(f => f && ({ ...f, bankName: e.target.value }))} /></FormField>
