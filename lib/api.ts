@@ -158,6 +158,7 @@ export interface ApplicationDetail extends ApplicationListItem {
     ein?: string;
     // Identity
     dateOfBirth?: string;
+    ssNumberMasked?: string;
     ownershipType?: string;
     // Spouse
     spouseFullName?: string;
@@ -842,6 +843,8 @@ export interface CreateApplicationRequest {
   stateFormation?: string;
   signatoryName?: string;
   signatoryTitle?: string;
+  ssNumber?: string;
+  spouseSSN?: string;
   numUnits: number;
   totalAmount: number;
   ppmRefNO?: number;

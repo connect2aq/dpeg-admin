@@ -40,6 +40,7 @@ function DistributionsContent() {
   const [status, setStatus] = useState(() => searchParams.get('status') ?? '');
   const [month, setMonth] = useState('');
   const [year, setYear] = useState('');
+  const [appIdFilter, setAppIdFilter] = useState('');
   const [page, setPage] = useState(1);
   const [markingId, setMarkingId] = useState<number | null>(null);
   const [historyPushingId, setHistoryPushingId] = useState<number | null>(null);
@@ -85,10 +86,12 @@ function DistributionsContent() {
     if (status) params.status = status;
     if (month)  params.month = month;
     if (year)   params.year = year;
+    const parsedAppId = parseInt(appIdFilter, 10);
+    if (!isNaN(parsedAppId) && parsedAppId > 0) params.applicationId = parsedAppId;
     adminApi.distributions(params)
       .then(r => { if (r.success) setResult(r.data); })
       .finally(() => setLoading(false));
-  }, [page, status, month, year]);
+  }, [page, status, month, year, appIdFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -464,6 +467,9 @@ function DistributionsContent() {
           <input type="number" placeholder="Year (e.g. 2026)" value={year}
             onChange={e => { setYear(e.target.value); setPage(1); setSelectedHistoryIds(new Set()); }}
             style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, width: 150 }} />
+          <input type="number" placeholder="App ID" value={appIdFilter}
+            onChange={e => { setAppIdFilter(e.target.value); setPage(1); setSelectedHistoryIds(new Set()); }}
+            style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, width: 120 }} />
         </div>
 
         {/* Bulk action bar */}
@@ -519,14 +525,14 @@ function DistributionsContent() {
                           else setSelectedHistoryIds(new Set());
                         }} />
                     </th>
-                    {['Investor', 'Month', 'Amount', 'Status', 'Paid At', 'Bank', 'Action'].map(h => (
+                    {['App ID', 'Investor', 'Month', 'Amount', 'Status', 'Paid At', 'Bank', 'Action'].map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {result?.items.length === 0 && (
-                    <tr><td colSpan={8} style={{ ...colStyle, textAlign: 'center', color: '#9ca3af', padding: 32 }}>No distributions found</td></tr>
+                    <tr><td colSpan={9} style={{ ...colStyle, textAlign: 'center', color: '#9ca3af', padding: 32 }}>No distributions found</td></tr>
                   )}
                   {result?.items.map(d => {
                     const monthDate = new Date(d.distributionMonth);
@@ -546,6 +552,7 @@ function DistributionsContent() {
                               return s;
                             })} />
                         </td>
+                        <td style={{ ...colStyle, fontFamily: 'monospace', color: '#64748b', fontSize: 13 }}>{d.applicationId}</td>
                         <td style={colStyle}>
                           <div style={{ fontWeight: 500 }}>{d.investorName}</div>
                           {d.investorEmail && <div style={{ fontSize: 12, color: '#9ca3af' }}>{d.investorEmail}</div>}

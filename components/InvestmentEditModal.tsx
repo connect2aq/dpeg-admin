@@ -36,6 +36,8 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
   onSaved: (pendingSubmitted: boolean, message: string) => void;
 }) {
   const [form, setForm] = useState<CreateApplicationRequest | null>(null);
+  const [ssNumberMasked, setSsNumberMasked] = useState('');
+  const [spouseSSNMasked, setSpouseSSNMasked] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState('');
@@ -46,6 +48,8 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
       const d = r.data;
       const p = d.investorProfile;
       const inv = d.investment;
+      setSsNumberMasked(p?.ssNumberMasked || '');
+      setSpouseSSNMasked(p?.spouseSSN || '');
       setForm({
         investorType: d.investorType || 'Individual',
         investmentType: d.investmentType || '',
@@ -151,6 +155,28 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
                 <FormField label="Zip Code"><input style={inputStyle} value={form.zipCode || ''} onChange={e => setForm(f => f && ({ ...f, zipCode: e.target.value }))} /></FormField>
                 <FormField label="Citizenship"><input style={inputStyle} value={form.citizenship || ''} onChange={e => setForm(f => f && ({ ...f, citizenship: e.target.value }))} /></FormField>
                 <FormField label="Employer"><input style={inputStyle} value={form.employer || ''} onChange={e => setForm(f => f && ({ ...f, employer: e.target.value }))} /></FormField>
+                {form.investorType === 'Individual' && (
+                  <FormField label="SSN (leave blank to keep)">
+                    <input
+                      style={inputStyle}
+                      value={form.ssNumber || ''}
+                      placeholder={ssNumberMasked || 'Enter new SSN to update'}
+                      onChange={e => setForm(f => f && ({ ...f, ssNumber: e.target.value }))}
+                      autoComplete="off"
+                    />
+                  </FormField>
+                )}
+                {form.investorType === 'Individual' && spouseSSNMasked && (
+                  <FormField label="Spouse SSN (leave blank to keep)">
+                    <input
+                      style={inputStyle}
+                      value={form.spouseSSN || ''}
+                      placeholder={spouseSSNMasked || 'Enter new Spouse SSN to update'}
+                      onChange={e => setForm(f => f && ({ ...f, spouseSSN: e.target.value }))}
+                      autoComplete="off"
+                    />
+                  </FormField>
+                )}
               </div>
 
               {form.investorType !== 'Individual' && (
