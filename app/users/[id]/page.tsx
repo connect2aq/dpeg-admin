@@ -35,11 +35,17 @@ const EMPTY_CALC: RedemptionCalculations = {
   distributionClawback: 0, netAggregatePrice: 0,
 };
 
+const MARITAL_STATUSES = ['single', 'married', 'widowed', 'divorced'];
+
 const emptyInvForm = (): CreateApplicationRequest => ({
   investorType: 'Individual', investmentType: '', entitySubType: '',
   effectiveDate: '', submittedAt: '',
   firstName: '', lastName: '', phone: '', dateOfBirth: '', streetAddress: '',
   city: '', state: '', zipCode: '', citizenship: '', employer: '',
+  maritalStatus: '', ownershipType: '', mailingAddress: '',
+  dayPhone: '', nightPhone: '',
+  spouseFullName: '', spouseEmail: '', spouseDateOfBirth: '',
+  custodianName: '', custodianAcct: '', custodianPhone: '', custodianEmail: '',
   entityName: '', ein: '', stateFormation: '', signatoryName: '', signatoryTitle: '',
   numUnits: 0, totalAmount: 0, ppmRefNO: undefined,
   paymentMethod: 'WireTransfer', distributionPreference: 'WireToBank',
@@ -136,6 +142,10 @@ export default function UserDetailPage() {
   const [editingInvId, setEditingInvId] = useState<number | null>(null);
   const [invSubmitting, setInvSubmitting] = useState(false);
   const [invMsg, setInvMsg] = useState('');
+  const [invSSNMasked, setInvSSNMasked] = useState('');
+  const [invSpouseSSNMasked, setInvSpouseSSNMasked] = useState('');
+  const [invDLMasked, setInvDLMasked] = useState('');
+  const [invTaxCertMasked, setInvTaxCertMasked] = useState('');
   const [confirmDeleteInvId, setConfirmDeleteInvId] = useState<number | null>(null);
   const [deletingInv, setDeletingInv] = useState(false);
 
@@ -226,6 +236,7 @@ export default function UserDetailPage() {
     setInvForm(emptyInvForm());
     setEditingInvId(null);
     setInvMsg('');
+    setInvSSNMasked(''); setInvSpouseSSNMasked(''); setInvDLMasked(''); setInvTaxCertMasked('');
     setInvModal('create');
   };
 
@@ -251,6 +262,18 @@ export default function UserDetailPage() {
       zipCode: p?.zipCode || '',
       citizenship: p?.citizenship || '',
       employer: p?.employer || '',
+      maritalStatus: p?.maritalStatus || '',
+      ownershipType: p?.ownershipType || '',
+      mailingAddress: p?.mailingAddress || '',
+      dayPhone: p?.dayPhone || '',
+      nightPhone: p?.nightPhone || '',
+      spouseFullName: p?.spouseFullName || '',
+      spouseEmail: p?.spouseEmail || '',
+      spouseDateOfBirth: p?.spouseDateOfBirth || '',
+      custodianName: p?.custodianName || '',
+      custodianAcct: p?.custodianAcct || '',
+      custodianPhone: p?.custodianPhone || '',
+      custodianEmail: p?.custodianEmail || '',
       entityName: p?.entityName || '',
       ein: p?.ein || '',
       stateFormation: p?.stateFormation || '',
@@ -266,6 +289,10 @@ export default function UserDetailPage() {
       routingNumber: inv?.routingNumber ? String(inv.routingNumber) : '',
       accNumber: inv?.accNumber || '',
     });
+    setInvSSNMasked(p?.ssNumberMasked || '');
+    setInvSpouseSSNMasked(p?.spouseSSN || '');
+    setInvDLMasked(p?.drivingLicenseNo || '');
+    setInvTaxCertMasked(p?.taxCertificateNo || '');
     setEditingInvId(appId);
     setInvMsg('');
     setInvModal('edit');
@@ -875,14 +902,55 @@ export default function UserDetailPage() {
               <FormField label="First Name *"><input required style={inputStyle} value={invForm.firstName} onChange={e => setInvForm(f => ({ ...f, firstName: e.target.value }))} /></FormField>
               <FormField label="Last Name *"><input required style={inputStyle} value={invForm.lastName} onChange={e => setInvForm(f => ({ ...f, lastName: e.target.value }))} /></FormField>
               <FormField label="Phone"><input style={inputStyle} value={invForm.phone || ''} onChange={e => setInvForm(f => ({ ...f, phone: e.target.value }))} /></FormField>
+              <FormField label="Day Phone"><input style={inputStyle} value={invForm.dayPhone || ''} onChange={e => setInvForm(f => ({ ...f, dayPhone: e.target.value }))} /></FormField>
+              <FormField label="Night Phone"><input style={inputStyle} value={invForm.nightPhone || ''} onChange={e => setInvForm(f => ({ ...f, nightPhone: e.target.value }))} /></FormField>
               <FormField label="Date of Birth"><input type="date" style={inputStyle} value={invForm.dateOfBirth || ''} onChange={e => setInvForm(f => ({ ...f, dateOfBirth: e.target.value }))} /></FormField>
               <FormField label="Street Address"><input style={inputStyle} value={invForm.streetAddress || ''} onChange={e => setInvForm(f => ({ ...f, streetAddress: e.target.value }))} /></FormField>
               <FormField label="City"><input style={inputStyle} value={invForm.city || ''} onChange={e => setInvForm(f => ({ ...f, city: e.target.value }))} /></FormField>
               <FormField label="State"><input style={inputStyle} value={invForm.state || ''} onChange={e => setInvForm(f => ({ ...f, state: e.target.value }))} /></FormField>
               <FormField label="Zip Code"><input style={inputStyle} value={invForm.zipCode || ''} onChange={e => setInvForm(f => ({ ...f, zipCode: e.target.value }))} /></FormField>
+              <FormField label="Mailing Address"><input style={inputStyle} value={invForm.mailingAddress || ''} onChange={e => setInvForm(f => ({ ...f, mailingAddress: e.target.value }))} /></FormField>
               <FormField label="Citizenship"><input style={inputStyle} value={invForm.citizenship || ''} onChange={e => setInvForm(f => ({ ...f, citizenship: e.target.value }))} /></FormField>
               <FormField label="Employer"><input style={inputStyle} value={invForm.employer || ''} onChange={e => setInvForm(f => ({ ...f, employer: e.target.value }))} /></FormField>
+              <FormField label="Marital Status">
+                <select style={selectStyle} value={invForm.maritalStatus || ''} onChange={e => setInvForm(f => ({ ...f, maritalStatus: e.target.value }))}>
+                  <option value="">— Select —</option>
+                  {MARITAL_STATUSES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+                </select>
+              </FormField>
+              <FormField label="Ownership Type"><input style={inputStyle} value={invForm.ownershipType || ''} onChange={e => setInvForm(f => ({ ...f, ownershipType: e.target.value }))} /></FormField>
+              {invForm.investorType === 'Individual' && (
+                <FormField label="SSN (leave blank to keep)">
+                  <input style={inputStyle} value={invForm.ssNumber || ''} placeholder={invSSNMasked || 'Enter SSN'} onChange={e => setInvForm(f => ({ ...f, ssNumber: e.target.value }))} autoComplete="off" />
+                </FormField>
+              )}
             </div>
+
+            {invForm.investorType === 'Individual' && invForm.maritalStatus?.toLowerCase() === 'married' && (
+              <>
+                <SectionTitle>Spouse / Joint Tenant</SectionTitle>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <FormField label="Spouse Full Name"><input style={inputStyle} value={invForm.spouseFullName || ''} onChange={e => setInvForm(f => ({ ...f, spouseFullName: e.target.value }))} /></FormField>
+                  <FormField label="Spouse Email"><input type="email" style={inputStyle} value={invForm.spouseEmail || ''} onChange={e => setInvForm(f => ({ ...f, spouseEmail: e.target.value }))} /></FormField>
+                  <FormField label="Spouse Date of Birth"><input type="date" style={inputStyle} value={invForm.spouseDateOfBirth || ''} onChange={e => setInvForm(f => ({ ...f, spouseDateOfBirth: e.target.value }))} /></FormField>
+                  <FormField label="Spouse SSN (leave blank to keep)">
+                    <input style={inputStyle} value={invForm.spouseSSN || ''} placeholder={invSpouseSSNMasked || 'Enter Spouse SSN'} onChange={e => setInvForm(f => ({ ...f, spouseSSN: e.target.value }))} autoComplete="off" />
+                  </FormField>
+                </div>
+              </>
+            )}
+
+            {(invForm.investorType === 'IRA' || !!invForm.custodianName) && (
+              <>
+                <SectionTitle>Custodian</SectionTitle>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <FormField label="Custodian Name"><input style={inputStyle} value={invForm.custodianName || ''} onChange={e => setInvForm(f => ({ ...f, custodianName: e.target.value }))} /></FormField>
+                  <FormField label="Custodian Account"><input style={inputStyle} value={invForm.custodianAcct || ''} onChange={e => setInvForm(f => ({ ...f, custodianAcct: e.target.value }))} /></FormField>
+                  <FormField label="Custodian Phone"><input style={inputStyle} value={invForm.custodianPhone || ''} onChange={e => setInvForm(f => ({ ...f, custodianPhone: e.target.value }))} /></FormField>
+                  <FormField label="Custodian Email"><input type="email" style={inputStyle} value={invForm.custodianEmail || ''} onChange={e => setInvForm(f => ({ ...f, custodianEmail: e.target.value }))} /></FormField>
+                </div>
+              </>
+            )}
 
             {invForm.investorType !== 'Individual' && (
               <>
@@ -896,6 +964,19 @@ export default function UserDetailPage() {
                 </div>
               </>
             )}
+
+            <SectionTitle>Identity Documents</SectionTitle>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <FormField label="Driving License No (leave blank to keep)">
+                <input style={inputStyle} value={invForm.drivingLicenseNo || ''} placeholder={invDLMasked || 'Enter DL number to update'} onChange={e => setInvForm(f => ({ ...f, drivingLicenseNo: e.target.value }))} autoComplete="off" />
+              </FormField>
+              <FormField label="Driving License State">
+                <input style={inputStyle} value={invForm.drivingLicenseState || ''} onChange={e => setInvForm(f => ({ ...f, drivingLicenseState: e.target.value }))} />
+              </FormField>
+              <FormField label="Tax Certificate No (leave blank to keep)">
+                <input style={inputStyle} value={invForm.taxCertificateNo || ''} placeholder={invTaxCertMasked || 'Enter Tax Cert number to update'} onChange={e => setInvForm(f => ({ ...f, taxCertificateNo: e.target.value }))} autoComplete="off" />
+              </FormField>
+            </div>
 
             <SectionTitle>Investment Details</SectionTitle>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
