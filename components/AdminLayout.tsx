@@ -143,6 +143,18 @@ export default function AdminLayout({
               {label}
             </Link>
           ))}
+          {adminRole === 'SuperAdmin' && (
+            <a
+              href={`${process.env.NEXT_PUBLIC_API_URL?.replace('/api/admin', '') ?? ''}/hangfire`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="sidebar-link"
+              onClick={() => setMobileOpen(false)}
+            >
+              <span style={{ fontSize: 15, width: 20, flexShrink: 0 }}>⚙</span>
+              Job Monitor
+            </a>
+          )}
         </nav>
 
         {/* User footer */}
