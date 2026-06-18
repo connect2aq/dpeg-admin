@@ -143,9 +143,9 @@ export default function AdminLayout({
               {label}
             </Link>
           ))}
-          {adminRole === 'SuperAdmin' && (
+          {adminRole === 'SuperAdmin' && process.env.NEXT_PUBLIC_HANGFIRE_URL && (
             <a
-              href={`${process.env.NEXT_PUBLIC_API_URL?.replace('/api/admin', '') ?? ''}/hangfire`}
+              href={process.env.NEXT_PUBLIC_HANGFIRE_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="sidebar-link"
