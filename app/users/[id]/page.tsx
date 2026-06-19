@@ -145,7 +145,6 @@ export default function UserDetailPage() {
   const [invSSNMasked, setInvSSNMasked] = useState('');
   const [invSpouseSSNMasked, setInvSpouseSSNMasked] = useState('');
   const [invDLMasked, setInvDLMasked] = useState('');
-  const [invTaxCertMasked, setInvTaxCertMasked] = useState('');
   const [invEINMasked, setInvEINMasked] = useState('');
   const [confirmDeleteInvId, setConfirmDeleteInvId] = useState<number | null>(null);
   const [deletingInv, setDeletingInv] = useState(false);
@@ -237,7 +236,7 @@ export default function UserDetailPage() {
     setInvForm(emptyInvForm());
     setEditingInvId(null);
     setInvMsg('');
-    setInvSSNMasked(''); setInvSpouseSSNMasked(''); setInvDLMasked(''); setInvTaxCertMasked(''); setInvEINMasked('');
+    setInvSSNMasked(''); setInvSpouseSSNMasked(''); setInvDLMasked(''); setInvEINMasked('');
     setInvModal('create');
   };
 
@@ -293,7 +292,6 @@ export default function UserDetailPage() {
     setInvSSNMasked(p?.ssNumberMasked || '');
     setInvSpouseSSNMasked(p?.spouseSSN || '');
     setInvDLMasked(p?.drivingLicenseNo || '');
-    setInvTaxCertMasked(p?.taxCertificateNo || '');
     setInvEINMasked(p?.ein || '');
     setEditingInvId(appId);
     setInvMsg('');
@@ -974,9 +972,6 @@ export default function UserDetailPage() {
               </FormField>
               <FormField label="Driving License State">
                 <input style={inputStyle} value={invForm.drivingLicenseState || ''} onChange={e => setInvForm(f => ({ ...f, drivingLicenseState: e.target.value }))} />
-              </FormField>
-              <FormField label="Tax Certificate No (leave blank to keep)">
-                <input style={inputStyle} value={invForm.taxCertificateNo || ''} placeholder={invTaxCertMasked || 'Enter Tax Cert number to update'} onChange={e => setInvForm(f => ({ ...f, taxCertificateNo: e.target.value }))} autoComplete="off" />
               </FormField>
             </div>
 

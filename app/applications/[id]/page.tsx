@@ -366,7 +366,6 @@ export default function ApplicationDetailPage() {
               <InfoRow label="Ownership Type" value={app.investorProfile.ownershipType} />
               <InfoRow label="SSN" value={app.investorProfile.ssNumberMasked} />
               <InfoRow label="Driving License" value={[app.investorProfile.drivingLicenseNo, app.investorProfile.drivingLicenseState].filter(Boolean).join(' · ')} />
-              <InfoRow label="Tax Certificate No" value={app.investorProfile.taxCertificateNo} />
             </div>
 
             <SectionLabel>Contact</SectionLabel>
@@ -434,7 +433,6 @@ export default function ApplicationDetailPage() {
                 {app.investorProfile.taxCertificatePath && (
                   <DocumentPreview
                     label="Tax Certificate"
-                    number={app.investorProfile.taxCertificateNo}
                     path={app.investorProfile.taxCertificatePath}
                   />
                 )}

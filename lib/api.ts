@@ -183,7 +183,6 @@ export interface ApplicationDetail extends ApplicationListItem {
     drivingLicenseNo?: string;
     drivingLicenseState?: string;
     drivingLicensePath?: string;
-    taxCertificateNo?: string;
     taxCertificatePath?: string;
   };
   investment?: {
@@ -859,7 +858,6 @@ export interface CreateApplicationRequest {
   spouseSSN?: string;
   drivingLicenseNo?: string;
   drivingLicenseState?: string;
-  taxCertificateNo?: string;
   numUnits: number;
   totalAmount: number;
   ppmRefNO?: number;

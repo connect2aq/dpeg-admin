@@ -40,7 +40,6 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
   const [ssNumberMasked, setSsNumberMasked] = useState('');
   const [spouseSSNMasked, setSpouseSSNMasked] = useState('');
   const [dlNoMasked, setDlNoMasked] = useState('');
-  const [taxCertNoMasked, setTaxCertNoMasked] = useState('');
   const [einMasked, setEinMasked] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -55,7 +54,6 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
       setSsNumberMasked(p?.ssNumberMasked || '');
       setSpouseSSNMasked(p?.spouseSSN || '');
       setDlNoMasked(p?.drivingLicenseNo || '');
-      setTaxCertNoMasked(p?.taxCertificateNo || '');
       setEinMasked(p?.ein || '');
       setForm({
         investorType: d.investorType || 'Individual',
@@ -266,15 +264,6 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
                 </FormField>
                 <FormField label="Driving License State">
                   <input style={inputStyle} value={form.drivingLicenseState || ''} onChange={e => setForm(f => f && ({ ...f, drivingLicenseState: e.target.value }))} />
-                </FormField>
-                <FormField label="Tax Certificate No (leave blank to keep)">
-                  <input
-                    style={inputStyle}
-                    value={form.taxCertificateNo || ''}
-                    placeholder={taxCertNoMasked || 'Enter new Tax Cert number to update'}
-                    onChange={e => setForm(f => f && ({ ...f, taxCertificateNo: e.target.value }))}
-                    autoComplete="off"
-                  />
                 </FormField>
               </div>
 
