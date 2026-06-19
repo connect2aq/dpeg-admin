@@ -620,17 +620,20 @@ export default function ApplicationDetailPage() {
               </p>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={e => setSignedDocFile(e.target.files?.[0] ?? null)}
-                style={{ fontSize: 13, color: '#475569' }}
-              />
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 16px', background: '#f1f5f9', border: '1.5px dashed #cbd5e1', borderRadius: 8, fontSize: 13, fontWeight: 500, color: '#475569', cursor: 'pointer', transition: 'all 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = '#b8923a', e.currentTarget.style.color = '#b8923a')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = '#cbd5e1', e.currentTarget.style.color = '#475569')}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                {signedDocFile ? signedDocFile.name : 'Choose file (PDF, JPG, PNG)'}
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setSignedDocFile(e.target.files?.[0] ?? null)} style={{ display: 'none' }} />
+              </label>
               <button
                 onClick={uploadSignedDoc}
                 disabled={!signedDocFile || signedDocUploading}
-                style={{ padding: '6px 16px', background: '#b8923a', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', cursor: (!signedDocFile || signedDocUploading) ? 'default' : 'pointer', opacity: (!signedDocFile || signedDocUploading) ? 0.6 : 1 }}>
-                {signedDocUploading ? 'Uploading…' : app.signedDocumentPath ? 'Replace' : 'Upload'}
+                style={{ padding: '7px 18px', background: '#b8923a', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#fff', cursor: (!signedDocFile || signedDocUploading) ? 'default' : 'pointer', opacity: (!signedDocFile || signedDocUploading) ? 0.5 : 1 }}>
+                {signedDocUploading ? 'Uploading…' : app.signedDocumentPath ? 'Replace Document' : 'Upload Document'}
               </button>
               {signedDocMsg && (
                 <span style={{ fontSize: 12, color: signedDocMsg.includes('successfully') ? '#10b981' : '#ef4444' }}>{signedDocMsg}</span>
