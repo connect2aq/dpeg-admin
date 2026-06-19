@@ -143,6 +143,7 @@ export interface ApplicationDetail extends ApplicationListItem {
   docuSignSentAt?: string;
   docuSignCompletedAt?: string;
   docuSignSignersJson?: string;
+  signedDocumentPath?: string;
   investorProfile?: {
     firstName?: string;
     lastName?: string;
@@ -498,6 +499,18 @@ export const adminApi = {
     api.get<ApiResponse<DocuSignEnvelopeStatus>>(
       `/docusign-envelopes/${envelopeId}/status`,
     ),
+  uploadSignedDocument: async (appId: number, file: File): Promise<ApiResponse<string>> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${BASE}/applications/${appId}/upload-signed-document`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    const text = await res.text();
+    return text ? JSON.parse(text) : { success: false, data: '', message: 'Empty response' };
+  },
   downloadDocuSignDocument: async (envelopeId: string): Promise<void> => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
     const res = await fetch(`${BASE}/docusign-envelopes/${envelopeId}/document`, {

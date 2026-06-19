@@ -87,7 +87,11 @@ export default function ApplicationDetailPage() {
   const [dsSendMsg, setDsSendMsg] = useState('');
   const [dsDownloading, setDsDownloading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const { isSuperAdmin } = useAdminAuth();
+  const [signedDocFile, setSignedDocFile] = useState<File | null>(null);
+  const [signedDocUploading, setSignedDocUploading] = useState(false);
+  const [signedDocMsg, setSignedDocMsg] = useState('');
+  const { user } = useAdminAuth();
+  const isSuperAdmin = user?.adminRole === 'SuperAdmin';
 
   useEffect(() => {
     adminApi.application(Number(id))
@@ -186,6 +190,27 @@ export default function ApplicationDetailPage() {
       alert('Failed to download document. Please try again.');
     } finally {
       setDsDownloading(false);
+    }
+  };
+
+  const uploadSignedDoc = async () => {
+    if (!app || !signedDocFile) return;
+    setSignedDocUploading(true);
+    setSignedDocMsg('');
+    try {
+      const r = await adminApi.uploadSignedDocument(app.id, signedDocFile);
+      if (r.success) {
+        setApp(a => a ? { ...a, signedDocumentPath: r.data } : a);
+        setSignedDocMsg('Document uploaded successfully.');
+        setSignedDocFile(null);
+      } else {
+        setSignedDocMsg(r.message || 'Upload failed.');
+      }
+    } catch {
+      setSignedDocMsg('Network error. Please try again.');
+    } finally {
+      setSignedDocUploading(false);
+      setTimeout(() => setSignedDocMsg(''), 5000);
     }
   };
 
@@ -565,6 +590,54 @@ export default function ApplicationDetailPage() {
             </div>
           );
         })()}
+
+        {/* Signed Document (historical accounts without DocuSign) */}
+        {!app.docuSignEnvelopeId && (
+          <div className="card" style={{ marginTop: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342' }}>Signed Agreement Document</h2>
+              {app.signedDocumentPath && (
+                <a
+                  href={`${STATIC_BASE}${app.signedDocumentPath.startsWith('/') ? app.signedDocumentPath : '/' + app.signedDocumentPath}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ padding: '6px 14px', background: '#0f2342', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  ↗ View Document
+                </a>
+              )}
+            </div>
+            {app.signedDocumentPath ? (
+              <div style={{ marginBottom: 16 }}>
+                <iframe
+                  src={`${STATIC_BASE}${app.signedDocumentPath.startsWith('/') ? app.signedDocumentPath : '/' + app.signedDocumentPath}`}
+                  title="Signed Agreement"
+                  style={{ width: '100%', height: 400, border: '1px solid #e2e8f0', borderRadius: 8 }}
+                />
+              </div>
+            ) : (
+              <p style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>
+                No signed agreement on file. Upload a scanned PDF for this historical account.
+              </p>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={e => setSignedDocFile(e.target.files?.[0] ?? null)}
+                style={{ fontSize: 13, color: '#475569' }}
+              />
+              <button
+                onClick={uploadSignedDoc}
+                disabled={!signedDocFile || signedDocUploading}
+                style={{ padding: '6px 16px', background: '#b8923a', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', cursor: (!signedDocFile || signedDocUploading) ? 'default' : 'pointer', opacity: (!signedDocFile || signedDocUploading) ? 0.6 : 1 }}>
+                {signedDocUploading ? 'Uploading…' : app.signedDocumentPath ? 'Replace' : 'Upload'}
+              </button>
+              {signedDocMsg && (
+                <span style={{ fontSize: 12, color: signedDocMsg.includes('successfully') ? '#10b981' : '#ef4444' }}>{signedDocMsg}</span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* User link */}
         {app.userId && (
