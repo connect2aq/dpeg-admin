@@ -198,29 +198,22 @@ export default function DashboardPage() {
           <div style={{ color: "#64748b" }}>Loading stats...</div>
         ) : stats ? (
           <>
-            {/* Registrants & Depositors */}
-            <SectionLabel>Registrants &amp; Depositors</SectionLabel>
+            {/* Depositors */}
+            <SectionLabel>Depositors</SectionLabel>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20, marginBottom: 4 }}>
               <KpiCard label="Total Depositors to Date" value={stats.totalDepositors} sub="Unique investors with active capital" color="#10b981" href="/applications?status=Active" />
               <KpiCard label="Active Depositors" value={stats.activeInvestors} sub="Investors with current balance (not fully redeemed)" color="#6366f1" href="/users?status=Active" />
               <KpiCard label="Total Number of Deposits" value={stats.totalDepositCount} sub="All investment tranches ever deposited" color="#699172" href="/applications" />
               <KpiCard label="Active Agreements" value={stats.totalInvestmentFiles} sub="Open active investment tranches" color="#b8923a" href="/applications?status=Active" />
+              <KpiCard label="Pending Reviews" value={stats.pendingReviews} sub="Applications awaiting admin approval" color="#f59e0b" href="/applications?status=UnderReview" />
             </div>
 
             {/* Conversion Funnel */}
-            <SectionLabel>Conversion Funnel — Unconverted Registrants</SectionLabel>
+            <SectionLabel>Conversion Funnel — Unconverted Prospects</SectionLabel>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20, marginBottom: 4 }}>
               <KpiCard label="Never Applied" value={stats.neverApplied} sub="Registered, no application submitted" color="#94a3b8" href="/users" />
               <KpiCard label="Awaiting Approval" value={stats.awaitingApproval} sub="Submitted, pending admin review" color="#f59e0b" href="/applications?status=UnderReview" />
-              <KpiCard label="Latest App Rejected" value={stats.latestRejected} sub="Most recent application rejected" color="#ef4444" href="/applications?status=Rejected" />
-            </div>
-
-            {/* Pipeline */}
-            <SectionLabel>Application Pipeline</SectionLabel>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20, marginBottom: 4 }}>
-              <KpiCard label="Total Applications" value={stats.totalApplications} color="#64748b" href="/applications" />
-              <KpiCard label="Pending Reviews" value={stats.pendingReviews} sub="Awaiting admin approval" color="#f59e0b" href="/applications?status=UnderReview" />
-              <KpiCard label="Pending Redemptions" value={stats.pendingRedemptions} sub="Awaiting admin approval" color="#ef4444" href="/redemptions?status=UnderReview" />
+              <KpiCard label="Latest App Rejected" value={stats.latestRejected} sub="No successful investment — most recent app rejected" color="#ef4444" href="/applications?status=Rejected" />
             </div>
 
             {/* Capital Flows */}
