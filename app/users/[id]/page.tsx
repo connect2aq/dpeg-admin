@@ -146,6 +146,7 @@ export default function UserDetailPage() {
   const [invSpouseSSNMasked, setInvSpouseSSNMasked] = useState('');
   const [invDLMasked, setInvDLMasked] = useState('');
   const [invTaxCertMasked, setInvTaxCertMasked] = useState('');
+  const [invEINMasked, setInvEINMasked] = useState('');
   const [confirmDeleteInvId, setConfirmDeleteInvId] = useState<number | null>(null);
   const [deletingInv, setDeletingInv] = useState(false);
 
@@ -236,7 +237,7 @@ export default function UserDetailPage() {
     setInvForm(emptyInvForm());
     setEditingInvId(null);
     setInvMsg('');
-    setInvSSNMasked(''); setInvSpouseSSNMasked(''); setInvDLMasked(''); setInvTaxCertMasked('');
+    setInvSSNMasked(''); setInvSpouseSSNMasked(''); setInvDLMasked(''); setInvTaxCertMasked(''); setInvEINMasked('');
     setInvModal('create');
   };
 
@@ -293,6 +294,7 @@ export default function UserDetailPage() {
     setInvSpouseSSNMasked(p?.spouseSSN || '');
     setInvDLMasked(p?.drivingLicenseNo || '');
     setInvTaxCertMasked(p?.taxCertificateNo || '');
+    setInvEINMasked(p?.ein || '');
     setEditingInvId(appId);
     setInvMsg('');
     setInvModal('edit');
@@ -957,7 +959,7 @@ export default function UserDetailPage() {
                 <SectionTitle>Entity Information</SectionTitle>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                   <FormField label="Entity Name"><input style={inputStyle} value={invForm.entityName || ''} onChange={e => setInvForm(f => ({ ...f, entityName: e.target.value }))} /></FormField>
-                  <FormField label="EIN"><input style={inputStyle} value={invForm.ein || ''} onChange={e => setInvForm(f => ({ ...f, ein: e.target.value }))} /></FormField>
+                  <FormField label="EIN (leave blank to keep)"><input style={inputStyle} value={invForm.ein || ''} placeholder={invEINMasked || 'Enter EIN to update'} onChange={e => setInvForm(f => ({ ...f, ein: e.target.value }))} autoComplete="off" /></FormField>
                   <FormField label="State of Formation"><input style={inputStyle} value={invForm.stateFormation || ''} onChange={e => setInvForm(f => ({ ...f, stateFormation: e.target.value }))} /></FormField>
                   <FormField label="Signatory Name"><input style={inputStyle} value={invForm.signatoryName || ''} onChange={e => setInvForm(f => ({ ...f, signatoryName: e.target.value }))} /></FormField>
                   <FormField label="Signatory Title"><input style={inputStyle} value={invForm.signatoryTitle || ''} onChange={e => setInvForm(f => ({ ...f, signatoryTitle: e.target.value }))} /></FormField>

@@ -41,6 +41,7 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
   const [spouseSSNMasked, setSpouseSSNMasked] = useState('');
   const [dlNoMasked, setDlNoMasked] = useState('');
   const [taxCertNoMasked, setTaxCertNoMasked] = useState('');
+  const [einMasked, setEinMasked] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState('');
@@ -55,6 +56,7 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
       setSpouseSSNMasked(p?.spouseSSN || '');
       setDlNoMasked(p?.drivingLicenseNo || '');
       setTaxCertNoMasked(p?.taxCertificateNo || '');
+      setEinMasked(p?.ein || '');
       setForm({
         investorType: d.investorType || 'Individual',
         investmentType: d.investmentType || '',
@@ -229,7 +231,7 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
                   <SectionTitle>Entity Information</SectionTitle>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                     <FormField label="Entity Name"><input style={inputStyle} value={form.entityName || ''} onChange={e => setForm(f => f && ({ ...f, entityName: e.target.value }))} /></FormField>
-                    <FormField label="EIN"><input style={inputStyle} value={form.ein || ''} onChange={e => setForm(f => f && ({ ...f, ein: e.target.value }))} /></FormField>
+                    <FormField label="EIN (leave blank to keep)"><input style={inputStyle} value={form.ein || ''} placeholder={einMasked || 'Enter EIN to update'} onChange={e => setForm(f => f && ({ ...f, ein: e.target.value }))} autoComplete="off" /></FormField>
                     <FormField label="State of Formation"><input style={inputStyle} value={form.stateFormation || ''} onChange={e => setForm(f => f && ({ ...f, stateFormation: e.target.value }))} /></FormField>
                     <FormField label="Signatory Name"><input style={inputStyle} value={form.signatoryName || ''} onChange={e => setForm(f => f && ({ ...f, signatoryName: e.target.value }))} /></FormField>
                     <FormField label="Signatory Title"><input style={inputStyle} value={form.signatoryTitle || ''} onChange={e => setForm(f => f && ({ ...f, signatoryTitle: e.target.value }))} /></FormField>
