@@ -4,6 +4,8 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
+import { InvestmentEditModal } from '@/components/InvestmentEditModal';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { adminApi, STATIC_BASE, type ApplicationDetail, type DocuSignEnvelopeStatus } from '@/lib/api';
 
 const STATUSES = ['UnderReview', 'Active', 'Rejected'];
@@ -84,6 +86,8 @@ export default function ApplicationDetailPage() {
   const [dsSending, setDsSending] = useState(false);
   const [dsSendMsg, setDsSendMsg] = useState('');
   const [dsDownloading, setDsDownloading] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const { isSuperAdmin } = useAdminAuth();
 
   useEffect(() => {
     adminApi.application(Number(id))
@@ -221,7 +225,14 @@ export default function ApplicationDetailPage() {
               {app.userFirstName} {app.userLastName} · {app.userEmail}
             </p>
           </div>
-          <StatusBadge status={app.status} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              onClick={() => setShowEditModal(true)}
+              style={{ padding: '8px 18px', background: '#0f2342', color: 'white', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+              Edit
+            </button>
+            <StatusBadge status={app.status} />
+          </div>
         </div>
 
         {/* Status Update */}
@@ -563,6 +574,18 @@ export default function ApplicationDetailPage() {
           </div>
         )}
       </div>
+
+      {showEditModal && (
+        <InvestmentEditModal
+          applicationId={app.id}
+          isSuperAdmin={isSuperAdmin}
+          onClose={() => setShowEditModal(false)}
+          onSaved={(_pending, _msg) => {
+            setShowEditModal(false);
+            adminApi.application(app.id).then(r => { if (r.success && r.data) setApp(r.data); });
+          }}
+        />
+      )}
     </AdminLayout>
   );
 }
