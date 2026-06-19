@@ -110,7 +110,7 @@ export default function AdminLayout({
         </div>
 
         {/* Navigation */}
-        <nav style={{ flex: 1, padding: "14px 12px" }}>
+        <nav style={{ flex: 1, padding: "14px 12px", overflowY: "auto", minHeight: 0 }}>
           {/* Pending Approvals — visible to Checker, Approver, SuperAdmin */}
           {adminRole !== 'Maker' && (
             <Link

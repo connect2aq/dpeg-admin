@@ -88,6 +88,21 @@ body {
   padding-left: 13px;
 }
 
+/* Sidebar nav scrollbar — subtle on dark background */
+.sidebar-nav nav::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-nav nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-nav nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+}
+.sidebar-nav nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
 /* ── Cards ──────────────────────────────────────────────── */
 .card {
   background: var(--bg-card);
