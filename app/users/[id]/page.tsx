@@ -275,7 +275,6 @@ export default function UserDetailPage() {
       custodianPhone: p?.custodianPhone || '',
       custodianEmail: p?.custodianEmail || '',
       entityName: p?.entityName || '',
-      ein: p?.ein || '',
       stateFormation: p?.stateFormation || '',
       signatoryName: p?.signatoryName || '',
       signatoryTitle: p?.signatoryTitle || '',
