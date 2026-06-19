@@ -506,8 +506,13 @@ export const adminApi = {
     if (!res.ok) throw new Error('Download failed');
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `docusign-${envelopeId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
   },
   redemptions: (params: Record<string, string | number>) => {
     const q = new URLSearchParams(params as Record<string, string>).toString();
