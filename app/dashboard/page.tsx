@@ -201,11 +201,18 @@ export default function DashboardPage() {
             {/* Registrants & Depositors */}
             <SectionLabel>Registrants &amp; Depositors</SectionLabel>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20, marginBottom: 4 }}>
-              <KpiCard label="Total Registrants" value={stats.totalUsers} sub="All individuals in database" color="#0e3416" href="/users" />
               <KpiCard label="Total Depositors to Date" value={stats.totalDepositors} sub="Unique investors with active capital" color="#10b981" href="/applications?status=Active" />
               <KpiCard label="Active Depositors" value={stats.activeInvestors} sub="Investors with current balance (not fully redeemed)" color="#6366f1" href="/users?status=Active" />
               <KpiCard label="Total Number of Deposits" value={stats.totalDepositCount} sub="All investment tranches ever deposited" color="#699172" href="/applications" />
               <KpiCard label="Active Agreements" value={stats.totalInvestmentFiles} sub="Open active investment tranches" color="#b8923a" href="/applications?status=Active" />
+            </div>
+
+            {/* Conversion Funnel */}
+            <SectionLabel>Conversion Funnel — Unconverted Registrants</SectionLabel>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20, marginBottom: 4 }}>
+              <KpiCard label="Never Applied" value={stats.neverApplied} sub="Registered, no application submitted" color="#94a3b8" href="/users" />
+              <KpiCard label="Awaiting Approval" value={stats.awaitingApproval} sub="Submitted, pending admin review" color="#f59e0b" href="/applications?status=UnderReview" />
+              <KpiCard label="Latest App Rejected" value={stats.latestRejected} sub="Most recent application rejected" color="#ef4444" href="/applications?status=Rejected" />
             </div>
 
             {/* Pipeline */}

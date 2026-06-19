@@ -65,6 +65,10 @@ export interface DashboardStats {
   totalDepositors: number;
   totalInvestmentFiles: number;
   totalDepositCount: number;
+  // Unconverted registrant funnel
+  neverApplied: number;
+  awaitingApproval: number;
+  latestRejected: number;
   // Application pipeline
   pendingReviews: number;
   totalApplications: number;
@@ -233,6 +237,7 @@ export interface RedemptionDetail extends RedemptionListItem {
   docuSignSentAt?: string;
   docuSignCompletedAt?: string;
   docuSignSignersJson?: string;
+  signedDocumentPath?: string;
   bankName?: string;
   bankAccountHolderName?: string;
   bankAccountNumber?: string;
@@ -501,6 +506,18 @@ export const adminApi = {
     api.get<ApiResponse<DocuSignEnvelopeStatus>>(
       `/docusign-envelopes/${envelopeId}/status`,
     ),
+  uploadRedemptionSignedDocument: async (redemptionId: number, file: File): Promise<ApiResponse<string>> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${BASE}/redemptions/${redemptionId}/upload-signed-document`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    const text = await res.text();
+    return text ? JSON.parse(text) : { success: false, data: '', message: 'Empty response' };
+  },
   uploadSignedDocument: async (appId: number, file: File): Promise<ApiResponse<string>> => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
     const form = new FormData();
