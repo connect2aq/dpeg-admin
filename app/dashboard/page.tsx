@@ -211,7 +211,7 @@ export default function DashboardPage() {
             {/* Conversion Funnel */}
             <SectionLabel>Conversion Funnel — Unconverted Prospects</SectionLabel>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20, marginBottom: 4 }}>
-              <KpiCard label="Never Applied" value={stats.neverApplied} sub="Registered, no application submitted" color="#94a3b8" href="/users" />
+              <KpiCard label="Never Applied" value={stats.neverApplied} sub="Registered, no application submitted" color="#94a3b8" href="/users?filter=neverApplied" />
               <KpiCard label="Awaiting Approval" value={stats.awaitingApproval} sub="Submitted, pending admin review" color="#f59e0b" href="/applications?status=UnderReview" />
               <KpiCard label="Latest App Rejected" value={stats.latestRejected} sub="No successful investment — most recent app rejected" color="#ef4444" href="/applications?status=Rejected" />
             </div>

@@ -28,6 +28,7 @@ function UsersContent() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState(() => searchParams.get('status') ?? '');
+  const [neverApplied] = useState(() => searchParams.get('filter') === 'neverApplied');
   const [page, setPage] = useState(1);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'investors' | 'admins'>('investors');
@@ -50,6 +51,7 @@ function UsersContent() {
     if (search) params.search = search;
     if (status && status !== 'Test') params.status = status;
     if (viewMode === 'admins') params.isAdmin = 'true';
+    if (neverApplied) params.neverApplied = 'true';
     adminApi.users(params)
       .then(r => {
         if (r.success) {
@@ -138,7 +140,15 @@ function UsersContent() {
   return (
     <AdminLayout>
       <div style={{ padding: '32px 36px' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0e3416', marginBottom: 16 }}>Users</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0e3416', marginBottom: neverApplied ? 8 : 16 }}>Users</h1>
+        {neverApplied && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <span style={{ background: '#f1f5f9', border: '1.5px solid #cbd5e1', borderRadius: 8, padding: '5px 12px', fontSize: 13, color: '#475569', fontWeight: 600 }}>
+              Filter: Never Applied — registered users with no application submitted
+            </span>
+            <a href="/users" style={{ fontSize: 12, color: '#94a3b8', textDecoration: 'underline' }}>Clear filter</a>
+          </div>
+        )}
 
         {/* View toggle */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
