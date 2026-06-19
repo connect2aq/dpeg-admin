@@ -7,7 +7,8 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { adminApi, type UserListItem, type PagedResult, type CreateUserAdminRequest } from '@/lib/api';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
-const STATUSES = ['', 'InProgress', 'UnderReview', 'Active', 'Inactive', 'Test'];
+const STATUSES = ['', 'InProgress', 'UnderReview', 'Active', 'Inactive', 'Test', 'NeverApplied'];
+const STATUS_LABELS: Record<string, string> = { '': 'All Statuses', NeverApplied: 'Never Applied' };
 const PAGE_SIZE = 20;
 
 const emptyCreateForm: CreateUserAdminRequest = { firstName: '', lastName: '', email: '', password: '' };
@@ -27,8 +28,9 @@ function UsersContent() {
   const [result, setResult] = useState<PagedResult<UserListItem> | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState(() => searchParams.get('status') ?? '');
-  const [neverApplied] = useState(() => searchParams.get('filter') === 'neverApplied');
+  const [status, setStatus] = useState(() =>
+    searchParams.get('filter') === 'neverApplied' ? 'NeverApplied' : (searchParams.get('status') ?? '')
+  );
   const [page, setPage] = useState(1);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'investors' | 'admins'>('investors');
@@ -49,9 +51,9 @@ function UsersContent() {
     setLoading(true);
     const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE };
     if (search) params.search = search;
-    if (status && status !== 'Test') params.status = status;
+    if (status && status !== 'Test' && status !== 'NeverApplied') params.status = status;
     if (viewMode === 'admins') params.isAdmin = 'true';
-    if (neverApplied) params.neverApplied = 'true';
+    if (status === 'NeverApplied') params.neverApplied = 'true';
     adminApi.users(params)
       .then(r => {
         if (r.success) {
@@ -140,15 +142,7 @@ function UsersContent() {
   return (
     <AdminLayout>
       <div style={{ padding: '32px 36px' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0e3416', marginBottom: neverApplied ? 8 : 16 }}>Users</h1>
-        {neverApplied && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-            <span style={{ background: '#f1f5f9', border: '1.5px solid #cbd5e1', borderRadius: 8, padding: '5px 12px', fontSize: 13, color: '#475569', fontWeight: 600 }}>
-              Filter: Never Applied — registered users with no application submitted
-            </span>
-            <a href="/users" style={{ fontSize: 12, color: '#94a3b8', textDecoration: 'underline' }}>Clear filter</a>
-          </div>
-        )}
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0e3416', marginBottom: 16 }}>Users</h1>
 
         {/* View toggle */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
@@ -182,7 +176,7 @@ function UsersContent() {
             onChange={e => { setStatus(e.target.value); setPage(1); }}
             style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}
           >
-            {STATUSES.map(s => <option key={s} value={s}>{s || 'All Statuses'}</option>)}
+            {STATUSES.map(s => <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>)}
           </select>
           <button type="submit" className="btn-primary">Search</button>
         </form>
