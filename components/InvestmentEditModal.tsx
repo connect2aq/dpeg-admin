@@ -83,6 +83,7 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
         custodianAcct: p?.custodianAcct || '',
         custodianPhone: p?.custodianPhone || '',
         custodianEmail: p?.custodianEmail || '',
+        drivingLicenseState: p?.drivingLicenseState || '',
         entityName: p?.entityName || '',
         stateFormation: p?.stateFormation || '',
         signatoryName: p?.signatoryName || '',

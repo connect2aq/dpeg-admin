@@ -376,7 +376,8 @@ export default function ApplicationDetailPage() {
               <InfoRow label="Marital Status" value={app.investorProfile.maritalStatus} />
               <InfoRow label="Ownership Type" value={app.investorProfile.ownershipType} />
               <InfoRow label="SSN" value={app.investorProfile.ssNumberMasked} />
-              <InfoRow label="Driving License" value={[app.investorProfile.drivingLicenseNo, app.investorProfile.drivingLicenseState].filter(Boolean).join(' · ')} />
+              <InfoRow label="Driving License No" value={app.investorProfile.drivingLicenseNo} />
+              <InfoRow label="Driving License State" value={app.investorProfile.drivingLicenseState} />
             </div>
 
             <SectionLabel>Contact</SectionLabel>
