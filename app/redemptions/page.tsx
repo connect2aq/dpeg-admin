@@ -209,6 +209,7 @@ function RedemptionsContent() {
                     <th>Units to Redeem</th>
                     <th>Total Units Owned</th>
                     <th>Purchase Price</th>
+                    <th>Redemption Amount</th>
                     <th>Email</th>
                     <th>Status</th>
                     <th>Date</th>
@@ -217,7 +218,7 @@ function RedemptionsContent() {
                 </thead>
                 <tbody>
                   {result.items.length === 0 ? (
-                    <tr><td colSpan={11} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No redemption requests found</td></tr>
+                    <tr><td colSpan={12} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No redemption requests found</td></tr>
                   ) : result.items.map(r => (
                     <tr key={r.id} style={{ background: selected.has(r.id) ? '#fff7ed' : undefined }}>
                       <td style={{ padding: '12px 8px 12px 16px' }}>
@@ -234,6 +235,7 @@ function RedemptionsContent() {
                       <td style={{ fontWeight: 700, color: '#0e3416' }}>{r.unitsToRedeem ?? '—'}</td>
                       <td style={{ color: '#64748b' }}>{r.totalUnitsOwned ?? '—'}</td>
                       <td>{r.aggregatePurchasePrice ?? '—'}</td>
+                      <td style={{ fontWeight: 600, color: '#0e3416' }}>{r.netAggregatePrice ? `$${parseFloat(r.netAggregatePrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : (r.aggregatePurchasePrice ?? '—')}</td>
                       <td style={{ fontSize: 13, color: '#64748b' }}>{r.email ?? '—'}</td>
                       <td>
                         <StatusBadge status={r.status} />

@@ -85,6 +85,7 @@ export interface DashboardStats {
   // Manually entered management figures
   deployedAmount?: number;
   bankAccountBalance?: number;
+  interestReceived?: number;
   balanceAsAtDate?: string;
   // Date range reflected back
   dateRangeFrom?: string;
@@ -207,6 +208,7 @@ export interface RedemptionListItem {
   unitsToRedeem?: string;
   totalUnitsOwned?: string;
   aggregatePurchasePrice?: string;
+  netAggregatePrice?: string;
   email?: string;
   status: string;
   createdOn: string;
@@ -706,6 +708,7 @@ export interface DailyBalanceLog {
   date: string;
   bankAccountBalance: number;
   deployedAmount: number;
+  interestReceived: number;
   notes?: string;
 }
 

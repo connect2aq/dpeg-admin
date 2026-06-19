@@ -62,6 +62,7 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
   const available     = hasDeployed ? afterInterest - (stats.deployedAmount ?? 0) : null;
   const hasBank       = stats.bankAccountBalance != null;
   const variance      = hasDeployed && hasBank ? (stats.bankAccountBalance ?? 0) - (available ?? 0) : null;
+  const hasInterestReceived = stats.interestReceived != null;
 
   const box = (label: string, value: string, accent: string, muted?: boolean, href?: string) => {
     const inner = (
@@ -71,8 +72,9 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
         borderTop: `3px solid ${accent}`,
         borderRadius: 8,
         padding: "14px 18px",
-        minWidth: 130,
-        flex: "1 1 130px",
+        minWidth: 148,
+        minHeight: 72,
+        flex: "0 0 148px",
         opacity: muted ? 0.65 : 1,
         cursor: href ? "pointer" : "default",
         transition: "box-shadow 0.15s",
@@ -126,13 +128,14 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
       <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
         {box("Total Deposits", fmt(stats.totalDeployedCommencement), "#0e3416", false, "/applications?status=Active")}
         {arrow("Redeemed", `−${fmt(stats.totalWithdrawnCommencement)}`, "#ef4444", false, "/redemptions?status=Active")}
-        {box("Remaining", fmt(remaining), "#6366f1")}
-        {arrow("Interest Paid", `−${fmt(stats.interestPaidCommencement)}`, "#f59e0b", false, "/distributions")}
-        {box("After Interest", fmt(afterInterest), "#10b981")}
+        {box("Balance Remaining", fmt(remaining), "#6366f1")}
+        {arrow("Dividend Paid", `−${fmt(stats.interestPaidCommencement)}`, "#f59e0b", false, "/distributions")}
+        {box("After Dividend", fmt(afterInterest), "#10b981")}
         {arrow("Deployed", hasDeployed ? `−${fmt(stats.deployedAmount ?? 0)}` : "Pending", "#8b5cf6", !hasDeployed, "/settings")}
         {hasDeployed
-          ? box("Available", fmt(available ?? 0), "#699172")
-          : box("Available", "Not entered", "#b8923a", true)}
+          ? box("Balance Available", fmt(available ?? 0), "#699172")
+          : box("Balance Available", "Not entered", "#b8923a", true)}
+        {box("Interest Received", hasInterestReceived ? fmt(stats.interestReceived ?? 0) : "Not entered", "#0f2342", !hasInterestReceived, hasInterestReceived ? undefined : "/settings")}
         {hasBank && (
           <>
             {variance != null
@@ -199,10 +202,10 @@ export default function DashboardPage() {
             <SectionLabel>Registrants &amp; Depositors</SectionLabel>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20, marginBottom: 4 }}>
               <KpiCard label="Total Registrants" value={stats.totalUsers} sub="All individuals in database" color="#0e3416" href="/users" />
-              <KpiCard label="Active Depositors" value={stats.activeInvestors} sub="Accounts approved by admin" color="#6366f1" href="/users?status=Active" />
               <KpiCard label="Total Depositors to Date" value={stats.totalDepositors} sub="Unique investors with active capital" color="#10b981" href="/applications?status=Active" />
+              <KpiCard label="Active Depositors" value={stats.activeInvestors} sub="Investors with current balance (not fully redeemed)" color="#6366f1" href="/users?status=Active" />
               <KpiCard label="Total Number of Deposits" value={stats.totalDepositCount} sub="All investment tranches ever deposited" color="#699172" href="/applications" />
-              <KpiCard label="Investment Files" value={stats.totalInvestmentFiles} sub="Open active investment tranches" color="#b8923a" href="/applications?status=Active" />
+              <KpiCard label="Active Agreements" value={stats.totalInvestmentFiles} sub="Open active investment tranches" color="#b8923a" href="/applications?status=Active" />
             </div>
 
             {/* Pipeline */}
@@ -250,21 +253,21 @@ export default function DashboardPage() {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 20, marginBottom: 4 }}>
               <KpiCard
-                label="Total Deposits (Range)"
+                label="Total Deposits"
                 value={fmt(stats.totalDepositedDateRange)}
                 sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "YTD (default)"}
                 color="#0e3416"
                 href="/applications?status=Active"
               />
               <KpiCard
-                label="Total Redeemed (Range)"
+                label="Total Redeemed"
                 value={fmt(stats.totalWithdrawnDateRange)}
                 sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "YTD (default)"}
                 color="#6366f1"
                 href="/redemptions?status=Active"
               />
               <KpiCard
-                label="Interest Paid (Range)"
+                label="Dividend Paid"
                 value={fmt(stats.interestPaidDateRange)}
                 sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "YTD (default)"}
                 color="#10b981"
