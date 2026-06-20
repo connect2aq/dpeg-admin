@@ -41,6 +41,7 @@ function CapitalLedgerContent() {
   const [to, setTo] = useState(() => searchParams.get('to') ?? '');
   const [typeFilter, setTypeFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [appIdFilter, setAppIdFilter] = useState('');
   const [exporting, setExporting] = useState(false);
 
   const load = useCallback(() => {
@@ -58,6 +59,10 @@ function CapitalLedgerContent() {
       const q = search.toLowerCase();
       if (!e.investorName.toLowerCase().includes(q) && !e.email.toLowerCase().includes(q)) return false;
     }
+    if (appIdFilter) {
+      const id = appIdFilter.replace('#', '').trim();
+      if (String(e.applicationId ?? '') !== id) return false;
+    }
     return true;
   });
 
@@ -69,7 +74,7 @@ function CapitalLedgerContent() {
         .filter(e => !typeFilter || e.entryType === typeFilter)
         .map(e => [
           entryLabel(e),
-          e.entryType !== 'Contribution' && e.applicationId ? `App #${e.applicationId}` : '',
+          e.applicationId ? `#${e.applicationId}` : '',
           new Date(e.date).toLocaleDateString(),
           e.entryType,
           e.investorName,
@@ -80,7 +85,7 @@ function CapitalLedgerContent() {
           e.runningBalance,
         ]);
       downloadCsv(
-        [['ID', 'Ref App', 'Date', 'Type', 'Investor', 'Email', 'PPM Ref', 'Units', 'Amount', 'Running Balance'], ...rows],
+        [['ID', 'App ID', 'Date', 'Type', 'Investor', 'Email', 'PPM Ref', 'Units', 'Amount', 'Running Balance'], ...rows],
         'capital-ledger.csv',
       );
     }
@@ -128,6 +133,8 @@ function CapitalLedgerContent() {
           </select>
           <input type="text" placeholder="Search investor…" value={search} onChange={e => setSearch(e.target.value)}
             style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, flex: '1 1 180px' }} />
+          <input type="text" placeholder="App ID e.g. 29" value={appIdFilter} onChange={e => setAppIdFilter(e.target.value)}
+            style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, width: 140 }} />
           <button onClick={exportToExcel} disabled={exporting}
             style={{ padding: '9px 18px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: exporting ? 'not-allowed' : 'pointer', opacity: exporting ? 0.7 : 1 }}>
             {exporting ? 'Exporting…' : '↓ Export'}
@@ -155,7 +162,7 @@ function CapitalLedgerContent() {
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0' }}>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>ID</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Ref App</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>App ID</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Date</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Type</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Investor</th>
@@ -179,8 +186,8 @@ function CapitalLedgerContent() {
                           : '—'}
                       </td>
                       <td style={{ padding: '11px 16px', whiteSpace: 'nowrap' }}>
-                        {e.entryType !== 'Contribution' && e.applicationId
-                          ? <Link href={`/applications/${e.applicationId}`} style={{ color: '#475569', textDecoration: 'none', fontSize: 12 }}>App #{e.applicationId}</Link>
+                        {e.applicationId
+                          ? <Link href={`/applications/${e.applicationId}`} style={{ color: '#374151', textDecoration: 'none', fontWeight: 600, fontSize: 12 }}>#{e.applicationId}</Link>
                           : <span style={{ color: '#cbd5e1', fontSize: 12 }}>—</span>}
                       </td>
                       <td style={{ padding: '11px 16px', color: '#374151', whiteSpace: 'nowrap' }}>
