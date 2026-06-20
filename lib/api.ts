@@ -274,6 +274,7 @@ export interface DashboardTrends {
 export interface InvestorCapitalAccountEntry {
   date: string;
   entryType: 'Contribution' | 'Redemption' | 'Dividend' | 'Clawback';
+  investmentType?: string; // 'ShortTerm' | 'LongTerm'
   applicationId?: number;
   ppmRefNo?: string;
   units?: number;
@@ -296,6 +297,7 @@ export interface InvestorCapitalAccount {
 export interface CapitalLedgerEntry {
   date: string;
   entryType: 'Contribution' | 'Redemption' | 'Dividend';
+  investmentType?: string; // 'ShortTerm' | 'LongTerm'
   investorName: string;
   email: string;
   entryId?: number;

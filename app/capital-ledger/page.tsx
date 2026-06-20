@@ -77,6 +77,7 @@ function CapitalLedgerContent() {
           e.applicationId ? `#${e.applicationId}` : '',
           new Date(e.date).toLocaleDateString(),
           e.entryType,
+          e.investmentType === 'ShortTerm' ? 'Short Term' : e.investmentType === 'LongTerm' ? 'Long Term' : '',
           e.investorName,
           e.email,
           e.ppmRefNo ?? '',
@@ -85,7 +86,7 @@ function CapitalLedgerContent() {
           e.runningBalance,
         ]);
       downloadCsv(
-        [['ID', 'App ID', 'Date', 'Type', 'Investor', 'Email', 'PPM Ref', 'Units', 'Amount', 'Running Balance'], ...rows],
+        [['ID', 'App ID', 'Date', 'Type', 'Inv. Type', 'Investor', 'Email', 'PPM Ref', 'Units', 'Amount', 'Running Balance'], ...rows],
         'capital-ledger.csv',
       );
     }
@@ -165,6 +166,7 @@ function CapitalLedgerContent() {
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>App ID</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Date</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Type</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Inv. Type</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Investor</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>Units</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>Amount</th>
@@ -173,7 +175,7 @@ function CapitalLedgerContent() {
               </thead>
               <tbody>
                 {visibleEntries.length === 0 && (
-                  <tr><td colSpan={8} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>No entries found.</td></tr>
+                  <tr><td colSpan={9} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>No entries found.</td></tr>
                 )}
                 {visibleEntries.map((e, i) => {
                   const colors = TYPE_COLORS[e.entryType] ?? TYPE_COLORS.Contribution;
@@ -198,6 +200,13 @@ function CapitalLedgerContent() {
                           {e.entryType}
                         </span>
                       </td>
+                      <td style={{ padding: '11px 16px', whiteSpace: 'nowrap' }}>
+                        {e.investmentType ? (
+                          <span style={{ background: e.investmentType === 'ShortTerm' ? '#eff6ff' : '#f5f3ff', color: e.investmentType === 'ShortTerm' ? '#1d4ed8' : '#6d28d9', fontWeight: 600, fontSize: 11, borderRadius: 5, padding: '3px 8px' }}>
+                            {e.investmentType === 'ShortTerm' ? 'Short Term' : 'Long Term'}
+                          </span>
+                        ) : <span style={{ color: '#cbd5e1', fontSize: 12 }}>—</span>}
+                      </td>
                       <td style={{ padding: '11px 16px' }}>
                         <div style={{ fontWeight: 600, color: '#1e293b' }}>{e.investorName || '—'}</div>
                         <div style={{ fontSize: 11, color: '#94a3b8' }}>{e.email}</div>
@@ -218,7 +227,7 @@ function CapitalLedgerContent() {
               {visibleEntries.length > 0 && (
                 <tfoot>
                   <tr style={{ background: '#f8fafc', borderTop: '2px solid #e2e8f0' }}>
-                    <td colSpan={6} style={{ padding: '12px 16px', fontWeight: 700, color: '#374151', fontSize: 13 }}>
+                    <td colSpan={7} style={{ padding: '12px 16px', fontWeight: 700, color: '#374151', fontSize: 13 }}>
                       {visibleEntries.length} entries
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0f2342', fontSize: 13 }}>

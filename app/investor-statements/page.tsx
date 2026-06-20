@@ -19,11 +19,16 @@ const fmt = (n: number) =>
 const fmtSigned = (n: number) =>
   `${n < 0 ? "−" : "+"}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+function fmtInvType(t?: string) {
+  return t === "ShortTerm" ? "Short Term" : t === "LongTerm" ? "Long Term" : "";
+}
+
 function exportCSV(data: InvestorCapitalAccount, investorName: string) {
-  const headers = ["Date", "Type", "App ID", "PPM Ref", "Units", "Capital", "Income", "Capital Balance"];
+  const headers = ["Date", "Type", "Inv. Type", "App ID", "PPM Ref", "Units", "Capital", "Income", "Capital Balance"];
   const rows = data.entries.map(e => [
     new Date(e.date).toLocaleDateString("en-US"),
     e.entryType,
+    fmtInvType(e.investmentType),
     e.applicationId ? `#${e.applicationId}` : "",
     e.ppmRefNo ? `#${e.ppmRefNo}` : "",
     e.units ?? "",
@@ -46,6 +51,7 @@ function exportPDF(data: InvestorCapitalAccount, investorName: string, ytdIncome
     <tr>
       <td>${new Date(e.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</td>
       <td>${e.entryType}</td>
+      <td>${fmtInvType(e.investmentType) || "—"}</td>
       <td>${e.applicationId ? "#" + e.applicationId : "—"}</td>
       <td>${e.ppmRefNo ? "#" + e.ppmRefNo : "—"}</td>
       <td class="r">${e.units ?? "—"}</td>
@@ -96,10 +102,10 @@ function exportPDF(data: InvestorCapitalAccount, investorName: string, ytdIncome
     <div class="card"><label>Accrued (Unpaid)</label><div class="val amber">${fmt(accrued)}</div></div>
   </div>
   <table>
-    <thead><tr><th>Date</th><th>Type</th><th>App ID</th><th>PPM Ref</th><th class="r">Units</th><th class="r">Capital</th><th class="r">Income</th><th class="r">Capital Balance</th></tr></thead>
+    <thead><tr><th>Date</th><th>Type</th><th>Inv. Type</th><th>App ID</th><th>PPM Ref</th><th class="r">Units</th><th class="r">Capital</th><th class="r">Income</th><th class="r">Capital Balance</th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr>
-      <td colspan="5">${data.entries.length} entries</td>
+      <td colspan="6">${data.entries.length} entries</td>
       <td class="r">${fmtSigned(data.entries.reduce((s, e) => s + e.amount, 0))}</td>
       <td class="r amber">+${fmt(data.totalIncome)}</td>
       <td class="r">${fmt(data.netPosition)}</td>
@@ -321,8 +327,8 @@ export default function InvestorStatementsPage() {
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: "var(--bg-section)", borderBottom: "1px solid var(--border)" }}>
-                      {["Date", "Type", "App ID", "PPM Ref", "Units", "Capital", "Income", "Capital Balance"].map((h, i) => (
-                        <th key={h} style={{ padding: "10px 14px", textAlign: i >= 4 ? "right" : "left", fontWeight: 600, fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap" }}>{h}</th>
+                      {["Date", "Type", "Inv. Type", "App ID", "PPM Ref", "Units", "Capital", "Income", "Capital Balance"].map((h, i) => (
+                        <th key={h} style={{ padding: "10px 14px", textAlign: i >= 5 ? "right" : "left", fontWeight: 600, fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -338,6 +344,13 @@ export default function InvestorStatementsPage() {
                             <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wide ${colors.badge}`}>
                               {e.entryType}
                             </span>
+                          </td>
+                          <td style={{ padding: "9px 14px", whiteSpace: "nowrap" }}>
+                            {e.investmentType ? (
+                              <span style={{ background: e.investmentType === "ShortTerm" ? "#eff6ff" : "#f5f3ff", color: e.investmentType === "ShortTerm" ? "#1d4ed8" : "#6d28d9", fontWeight: 600, fontSize: 11, borderRadius: 5, padding: "3px 8px" }}>
+                                {e.investmentType === "ShortTerm" ? "Short Term" : "Long Term"}
+                              </span>
+                            ) : <span style={{ color: "var(--muted)", fontSize: 12 }}>—</span>}
                           </td>
                           <td style={{ padding: "9px 14px", color: "var(--muted)", fontSize: 12 }}>
                             {e.applicationId ? `#${e.applicationId}` : "—"}
@@ -363,7 +376,7 @@ export default function InvestorStatementsPage() {
                   </tbody>
                   <tfoot>
                     <tr style={{ borderTop: "2px solid var(--border)", background: "var(--bg-section)" }}>
-                      <td colSpan={5} style={{ padding: "9px 14px", fontWeight: 600, color: "var(--muted)", fontSize: 12 }}>
+                      <td colSpan={6} style={{ padding: "9px 14px", fontWeight: 600, color: "var(--muted)", fontSize: 12 }}>
                         {visible.length} entries
                       </td>
                       <td style={{ padding: "9px 14px", textAlign: "right", fontWeight: 700, color: "var(--text-primary)", fontSize: 13 }}>
