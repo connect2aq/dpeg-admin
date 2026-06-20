@@ -191,7 +191,7 @@ function RedemptionsContent() {
           ) : result ? (
             <>
               <div className="table-scroll">
-              <table style={{ minWidth: 1120 }}>
+              <table style={{ minWidth: 1020 }}>
                 <thead>
                   <tr>
                     <th style={{ width: 40, padding: '12px 8px 12px 16px' }}>
@@ -208,17 +208,16 @@ function RedemptionsContent() {
                     <th>Type</th>
                     <th>Units to Redeem</th>
                     <th>Total Units Owned</th>
-                    <th>Purchase Price</th>
                     <th>Redemption Amount</th>
                     <th>Email</th>
                     <th>Status</th>
-                    <th>Date</th>
+                    <th>Effective Date</th>
                     <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {result.items.length === 0 ? (
-                    <tr><td colSpan={12} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No redemption requests found</td></tr>
+                    <tr><td colSpan={11} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No redemption requests found</td></tr>
                   ) : result.items.map(r => (
                     <tr key={r.id} style={{ background: selected.has(r.id) ? '#fff7ed' : undefined }}>
                       <td style={{ padding: '12px 8px 12px 16px' }}>
@@ -234,14 +233,13 @@ function RedemptionsContent() {
                       <td>{r.investorType}</td>
                       <td style={{ fontWeight: 700, color: '#0e3416' }}>{r.unitsToRedeem ?? '—'}</td>
                       <td style={{ color: '#64748b' }}>{r.totalUnitsOwned ?? '—'}</td>
-                      <td>{r.aggregatePurchasePrice ?? '—'}</td>
                       <td style={{ fontWeight: 600, color: '#0e3416' }}>{r.netAggregatePrice ? `$${parseFloat(r.netAggregatePrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : (r.aggregatePurchasePrice ?? '—')}</td>
                       <td style={{ fontSize: 13, color: '#64748b' }}>{r.email ?? '—'}</td>
                       <td>
                         <StatusBadge status={r.status} />
                         {pendingMap[r.id] && <PendingBadge item={pendingMap[r.id]} />}
                       </td>
-                      <td style={{ fontSize: 13, color: '#64748b' }}>{new Date(r.createdOn).toLocaleDateString()}</td>
+                      <td style={{ fontSize: 13, color: '#64748b' }}>{r.effectiveDate || '—'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                           <Link href={`/redemptions/${r.id}`} style={{ color: '#699172', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>View</Link>

@@ -780,7 +780,7 @@ export default function UserDetailPage() {
             <div style={{ overflowX: 'auto' }}>
               <table>
                 <thead>
-                  <tr><th>Investor</th><th>Units to Redeem</th><th>Effective Date</th><th>Status</th><th></th></tr>
+                  <tr><th>Investor</th><th>Units to Redeem</th><th>Effective Date</th><th>Redemption Amount</th><th>Status</th><th></th></tr>
                 </thead>
                 <tbody>
                   {userRedemptions.map(r => (
@@ -788,6 +788,7 @@ export default function UserDetailPage() {
                       <td style={{ fontWeight: 600 }}>{r.sellingPartnerName || r.email || '—'}</td>
                       <td>{r.unitsToRedeem ?? '—'}</td>
                       <td style={{ fontSize: 13, color: '#64748b' }}>{r.effectiveDate || '—'}</td>
+                      <td style={{ fontWeight: 600, color: '#0e3416' }}>{r.netAggregatePrice ? `$${parseFloat(r.netAggregatePrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : (r.aggregatePurchasePrice ?? '—')}</td>
                       <td>
                         <StatusBadge status={r.status} />
                         {redeemPendingMap[r.id] && <PendingBadge item={redeemPendingMap[r.id]} />}
