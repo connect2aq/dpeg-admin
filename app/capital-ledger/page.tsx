@@ -69,6 +69,7 @@ function CapitalLedgerContent() {
         .filter(e => !typeFilter || e.entryType === typeFilter)
         .map(e => [
           entryLabel(e),
+          e.entryType !== 'Contribution' && e.applicationId ? `App #${e.applicationId}` : '',
           new Date(e.date).toLocaleDateString(),
           e.entryType,
           e.investorName,
@@ -79,7 +80,7 @@ function CapitalLedgerContent() {
           e.runningBalance,
         ]);
       downloadCsv(
-        [['ID', 'Date', 'Type', 'Investor', 'Email', 'PPM Ref', 'Units', 'Amount', 'Running Balance'], ...rows],
+        [['ID', 'Ref App', 'Date', 'Type', 'Investor', 'Email', 'PPM Ref', 'Units', 'Amount', 'Running Balance'], ...rows],
         'capital-ledger.csv',
       );
     }
@@ -154,6 +155,7 @@ function CapitalLedgerContent() {
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0' }}>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>ID</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Ref App</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Date</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Type</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Investor</th>
@@ -164,7 +166,7 @@ function CapitalLedgerContent() {
               </thead>
               <tbody>
                 {visibleEntries.length === 0 && (
-                  <tr><td colSpan={7} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>No entries found.</td></tr>
+                  <tr><td colSpan={8} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>No entries found.</td></tr>
                 )}
                 {visibleEntries.map((e, i) => {
                   const colors = TYPE_COLORS[e.entryType] ?? TYPE_COLORS.Contribution;
@@ -175,6 +177,11 @@ function CapitalLedgerContent() {
                         {e.entryId
                           ? <Link href={entryHref(e)} style={{ color: '#0f2342', textDecoration: 'none', fontWeight: 700, fontSize: 12 }}>{entryLabel(e)}</Link>
                           : '—'}
+                      </td>
+                      <td style={{ padding: '11px 16px', whiteSpace: 'nowrap' }}>
+                        {e.entryType !== 'Contribution' && e.applicationId
+                          ? <Link href={`/applications/${e.applicationId}`} style={{ color: '#475569', textDecoration: 'none', fontSize: 12 }}>App #{e.applicationId}</Link>
+                          : <span style={{ color: '#cbd5e1', fontSize: 12 }}>—</span>}
                       </td>
                       <td style={{ padding: '11px 16px', color: '#374151', whiteSpace: 'nowrap' }}>
                         {new Date(e.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
@@ -204,7 +211,7 @@ function CapitalLedgerContent() {
               {visibleEntries.length > 0 && (
                 <tfoot>
                   <tr style={{ background: '#f8fafc', borderTop: '2px solid #e2e8f0' }}>
-                    <td colSpan={5} style={{ padding: '12px 16px', fontWeight: 700, color: '#374151', fontSize: 13 }}>
+                    <td colSpan={6} style={{ padding: '12px 16px', fontWeight: 700, color: '#374151', fontSize: 13 }}>
                       {visibleEntries.length} entries
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0f2342', fontSize: 13 }}>
