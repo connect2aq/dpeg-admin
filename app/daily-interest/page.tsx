@@ -7,6 +7,7 @@ import {
   type PagedResult,
   type DeleteDailyInterestPreviewResult,
 } from '@/lib/api';
+import { downloadCsv } from '@/lib/exportCsv';
 
 const PAGE_SIZE = 25;
 
@@ -41,6 +42,30 @@ export default function DailyInterestPage() {
   const [diBulkPushing, setDiBulkPushing] = useState(false);
   const [diBulkResult, setDiBulkResult] = useState<string | null>(null);
   const [deleteModal, setDeleteModal] = useState<DeleteModalState>({ phase: 'idle' });
+  const [exporting, setExporting] = useState(false);
+
+  const exportToExcel = async () => {
+    setExporting(true);
+    const params: Record<string, string | number> = { page: 1, pageSize: 100000 };
+    if (appId) params.appId = appId;
+    if (from) params.from = from;
+    if (to) params.to = to;
+    if (included !== '') params.included = included;
+    const r = await adminApi.dailyInterestLogs(params);
+    if (r.success) {
+      const headers = ['ID', 'App ID', 'Investor Name', 'Email', 'Date', 'Units', 'Capital', 'Annual Rate %', 'Net Interest', 'Included in Monthly', 'Odoo Status', 'Created'];
+      const rows = r.data.items.map(d => [
+        d.id, d.applicationId, d.investorName, d.investorEmail ?? '',
+        new Date(d.date).toLocaleDateString(),
+        d.units, d.capital, d.annualRate, d.netInterest,
+        d.includedInMonthlyDistribution ? 'Yes' : 'No',
+        d.odooStatus ?? '',
+        new Date(d.createdOn).toLocaleDateString(),
+      ]);
+      downloadCsv([headers, ...rows], 'daily-interest.csv');
+    }
+    setExporting(false);
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -144,6 +169,10 @@ export default function DailyInterestPage() {
             <option value="true">Included in Distribution</option>
             <option value="false">Pending Distribution</option>
           </select>
+          <button onClick={exportToExcel} disabled={exporting}
+            style={{ padding: '9px 18px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: exporting ? 'not-allowed' : 'pointer', opacity: exporting ? 0.7 : 1 }}>
+            {exporting ? 'Exporting…' : '↓ Export'}
+          </button>
         </div>
 
         {/* Summary bar */}

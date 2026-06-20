@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { adminApi, type DistributionListItem, type DistributionRunResult, type PagedResult } from '@/lib/api';
+import { downloadCsv } from '@/lib/exportCsv';
 
 const STATUSES = ['', 'Pending', 'Sent', 'Failed', 'Paid'];
 const MONTHS = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
@@ -79,6 +80,31 @@ function DistributionsContent() {
   const [batchPushing, setBatchPushing] = useState(false);
   const [batchResult, setBatchResult] = useState<{ pushed: number; failed: number } | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const exportToExcel = async () => {
+    setExporting(true);
+    const params: Record<string, string | number> = { page: 1, pageSize: 100000 };
+    if (status) params.status = status;
+    if (month) params.month = month;
+    if (year) params.year = year;
+    const parsedAppId = parseInt(appIdFilter, 10);
+    if (!isNaN(parsedAppId) && parsedAppId > 0) params.applicationId = parsedAppId;
+    const r = await adminApi.distributions(params);
+    if (r.success) {
+      const headers = ['ID', 'App ID', 'Investor Name', 'Email', 'Distribution Month', 'Total Net Amount', 'Payment Status', 'Paid At', 'Bank Name', 'Account Number', 'Created'];
+      const rows = r.data.items.map(d => [
+        d.id, d.applicationId, d.investorName, d.investorEmail ?? '',
+        d.distributionMonth ? new Date(d.distributionMonth).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : '',
+        d.totalNetAmount, d.paymentStatus,
+        d.paidAt ? new Date(d.paidAt).toLocaleDateString() : '',
+        d.bankName ?? '', d.bankAccountNumber ?? '',
+        new Date(d.createdOn).toLocaleDateString(),
+      ]);
+      downloadCsv([headers, ...rows], 'distributions.csv');
+    }
+    setExporting(false);
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -470,6 +496,10 @@ function DistributionsContent() {
           <input type="number" placeholder="App ID" value={appIdFilter}
             onChange={e => { setAppIdFilter(e.target.value); setPage(1); setSelectedHistoryIds(new Set()); }}
             style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, width: 120 }} />
+          <button onClick={exportToExcel} disabled={exporting}
+            style={{ padding: '10px 18px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: exporting ? 'not-allowed' : 'pointer', opacity: exporting ? 0.7 : 1 }}>
+            {exporting ? 'Exporting…' : '↓ Export'}
+          </button>
         </div>
 
         {/* Bulk action bar */}

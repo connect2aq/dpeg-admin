@@ -71,10 +71,9 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
         border: `1px solid ${muted ? "#e2e8f0" : "#cbd5e1"}`,
         borderTop: `3px solid ${accent}`,
         borderRadius: 8,
-        padding: "14px 18px",
-        minWidth: 148,
-        minHeight: 72,
-        flex: "0 0 148px",
+        padding: "10px 12px",
+        minWidth: 0,
+        flex: "1 1 120px",
         opacity: muted ? 0.65 : 1,
         cursor: href ? "pointer" : "default",
         transition: "box-shadow 0.15s",
@@ -82,42 +81,37 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
         onMouseEnter={e => { if (href) (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)"; }}
         onMouseLeave={e => { if (href) (e.currentTarget as HTMLDivElement).style.boxShadow = ""; }}
       >
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", marginBottom: 6 }}>{label}</div>
-        <div style={{ fontSize: 22, fontWeight: 700, color: muted ? "#94a3b8" : "#0e3416" }}>{value}</div>
-        {href && <div style={{ fontSize: 10.5, color: "#699172", marginTop: 6, fontWeight: 600 }}>View details →</div>}
+        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", marginBottom: 4 }}>{label}</div>
+        <div style={{ fontSize: 17, fontWeight: 700, color: muted ? "#94a3b8" : "#0e3416" }}>{value}</div>
+        {href && <div style={{ fontSize: 10, color: "#699172", marginTop: 4, fontWeight: 600 }}>View details →</div>}
       </div>
     );
     return href ? <Link href={href} style={{ textDecoration: "none" }}>{inner}</Link> : inner;
   };
 
   const arrow = (label: string, amount: string, color: string, muted?: boolean, href?: string) => {
-    const chip = (
+    const inner = (
       <div style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 1,
-        background: muted ? "#f1f5f9" : `${color}1a`,
+        background: muted ? "#f8fafc" : `${color}0d`,
         border: `1px solid ${muted ? "#e2e8f0" : `${color}40`}`,
-        borderRadius: 999,
-        padding: "4px 12px",
-        whiteSpace: "nowrap",
+        borderTop: `3px solid ${muted ? "#e2e8f0" : color}`,
+        borderRadius: 8,
+        padding: "10px 12px",
+        minWidth: 0,
+        flex: "1 1 120px",
+        opacity: muted ? 0.65 : 1,
         cursor: href ? "pointer" : "default",
-      }}>
-        <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: muted ? "#94a3b8" : color }}>
-          {label}
-        </span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: muted ? "#94a3b8" : color }}>
-          {amount}
-        </span>
+        transition: "box-shadow 0.15s",
+      }}
+        onMouseEnter={e => { if (href) (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)"; }}
+        onMouseLeave={e => { if (href) (e.currentTarget as HTMLDivElement).style.boxShadow = ""; }}
+      >
+        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: muted ? "#94a3b8" : color, marginBottom: 4 }}>→ {label}</div>
+        <div style={{ fontSize: 17, fontWeight: 700, color: muted ? "#94a3b8" : color }}>{amount}</div>
+        {href && <div style={{ fontSize: 10, color: "#699172", marginTop: 4, fontWeight: 600 }}>View details →</div>}
       </div>
     );
-    return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 4px", flexShrink: 0, gap: 6 }}>
-        <span style={{ fontSize: 16, color: "#cbd5e1" }}>→</span>
-        {href ? <Link href={href} style={{ textDecoration: "none" }}>{chip}</Link> : chip}
-      </div>
-    );
+    return href ? <Link href={href} style={{ textDecoration: "none" }}>{inner}</Link> : inner;
   };
 
   return (
@@ -125,7 +119,7 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
       <div style={{ fontSize: 13, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>
         Balance Flow (Since Inception){stats.balanceAsAtDate && ` — Balance as at ${new Date(stats.balanceAsAtDate).toLocaleDateString()}`}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "stretch", gap: 3, flexWrap: "nowrap" }}>
         {box("Total Deposits", fmt(stats.totalDeployedCommencement), "#0e3416", false, "/applications?status=Active")}
         {arrow("Redeemed", `−${fmt(stats.totalWithdrawnCommencement)}`, "#ef4444", false, "/redemptions?status=Active")}
         {box("Balance Remaining", fmt(remaining), "#6366f1")}
@@ -201,9 +195,9 @@ export default function DashboardPage() {
             {/* Depositors */}
             <SectionLabel>Depositors</SectionLabel>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20, marginBottom: 4 }}>
-              <KpiCard label="Total Depositors to Date" value={stats.totalDepositors} sub="Unique investors with active capital" color="#10b981" href="/applications?status=Active" />
-              <KpiCard label="Active Depositors" value={stats.activeInvestors} sub="Investors with current balance (not fully redeemed)" color="#6366f1" href="/users?status=Active" />
-              <KpiCard label="Total Number of Deposits" value={stats.totalDepositCount} sub="All investment tranches ever deposited" color="#699172" href="/applications" />
+              <KpiCard label="Total Depositors to Date" value={stats.totalDepositors} sub="Unique investors with active capital" color="#10b981" href="/users?filter=hasDeposit" />
+              <KpiCard label="Active Depositors" value={stats.activeInvestors} sub="Investors with current balance (not fully redeemed)" color="#6366f1" href="/users?filter=hasActiveInvestment" />
+              <KpiCard label="Total Number of Deposits" value={stats.totalDepositCount} sub="All investment tranches ever deposited" color="#699172" href="/applications?filter=deposited" />
               <KpiCard label="Active Agreements" value={stats.totalInvestmentFiles} sub="Open active investment tranches" color="#b8923a" href="/applications?status=Active" />
               <KpiCard label="Pending Reviews" value={stats.pendingReviews} sub="Applications awaiting admin approval" color="#f59e0b" href="/applications?status=UnderReview" />
             </div>
@@ -212,18 +206,9 @@ export default function DashboardPage() {
             <SectionLabel>Conversion Funnel — Unconverted Prospects</SectionLabel>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20, marginBottom: 4 }}>
               <KpiCard label="Never Applied" value={stats.neverApplied} sub="Registered, no application submitted" color="#94a3b8" href="/users?filter=neverApplied" />
-              <KpiCard label="Awaiting Approval" value={stats.awaitingApproval} sub="Submitted, pending admin review" color="#f59e0b" href="/applications?status=UnderReview" />
-              <KpiCard label="Latest App Rejected" value={stats.latestRejected} sub="No successful investment — most recent app rejected" color="#ef4444" href="/applications?status=Rejected" />
+              <KpiCard label="Awaiting Approval" value={stats.awaitingApproval} sub="Submitted, pending admin review" color="#f59e0b" href="/users?filter=awaitingApproval" />
+              <KpiCard label="Latest App Rejected" value={stats.latestRejected} sub="No successful investment — most recent app rejected" color="#ef4444" href="/users?filter=latestRejected" />
             </div>
-
-            {/* Capital Flows */}
-            <SectionLabel>Capital Flows — All Time (Since Inception)</SectionLabel>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 20, marginBottom: 4 }}>
-              <KpiCard label="Current AUM" value={fmt(stats.totalAUM)} sub={`${stats.totalUnits} active units`} color="#699172" href="/applications?status=Active" />
-            </div>
-            <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 8, marginBottom: 4 }}>
-              Deposit, redemption, interest, and balance figures are shown below in Balance Flow.
-            </p>
 
             {/* Date Range Filter */}
             <SectionLabel>Capital Flows — Date Range</SectionLabel>
@@ -253,11 +238,11 @@ export default function DashboardPage() {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 20, marginBottom: 4 }}>
               <KpiCard
-                label="Total Deposits"
+                label="Capital Raised"
                 value={fmt(stats.totalDepositedDateRange)}
                 sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "YTD (default)"}
                 color="#0e3416"
-                href="/applications?status=Active"
+                href="/capital-ledger"
               />
               <KpiCard
                 label="Total Redeemed"

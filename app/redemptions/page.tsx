@@ -7,6 +7,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { PendingBadge } from '@/components/PendingBadge';
 import { RedemptionEditModal } from '@/components/RedemptionEditModal';
 import { adminApi, type RedemptionListItem, type PagedResult, type PendingChangeItem } from '@/lib/api';
+import { downloadCsv } from '@/lib/exportCsv';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 const STATUSES = ['', 'UnderReview', 'Active', 'Rejected', 'Redeemed'];
@@ -41,8 +42,32 @@ function RedemptionsContent() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deletingOne, setDeletingOne] = useState(false);
   const [toast, setToast] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const selectAllRef = useRef<HTMLInputElement>(null);
+
+  const exportToExcel = async () => {
+    setExporting(true);
+    const params: Record<string, string | number> = { page: 1, pageSize: 100000 };
+    if (status) params.status = status;
+    if (search) params.search = search;
+    if (from) params.from = from;
+    if (to) params.to = to;
+    const r = await adminApi.redemptions(params);
+    if (r.success) {
+      const headers = ['ID', 'Investor Name', 'Email', 'Type', 'Units to Redeem', 'Total Units', 'Aggregate Price', 'Net Price', 'Status', 'Effective Date', 'Created'];
+      const rows = r.data.items.map(a => [
+        a.id, a.sellingPartnerName ?? '', a.email ?? '', a.investorType,
+        a.unitsToRedeem ?? '', a.totalUnitsOwned ?? '',
+        a.aggregatePurchasePrice ?? '', a.netAggregatePrice ?? '',
+        a.status,
+        a.effectiveDate ? new Date(a.effectiveDate).toLocaleDateString() : '',
+        new Date(a.createdOn).toLocaleDateString(),
+      ]);
+      downloadCsv([headers, ...rows], 'redemptions.csv');
+    }
+    setExporting(false);
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -177,6 +202,10 @@ function RedemptionsContent() {
             style={{ flex: '1 1 140px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}
             title="To date"
           />
+          <button onClick={exportToExcel} disabled={exporting}
+            style={{ padding: '10px 18px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: exporting ? 'not-allowed' : 'pointer', opacity: exporting ? 0.7 : 1 }}>
+            {exporting ? 'Exporting…' : '↓ Export'}
+          </button>
           {(search || from || to) && (
             <button
               onClick={() => { setSearch(''); setFrom(''); setTo(''); setPage(1); }}

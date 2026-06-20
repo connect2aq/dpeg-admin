@@ -7,9 +7,11 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { PendingBadge } from '@/components/PendingBadge';
 import { InvestmentEditModal } from '@/components/InvestmentEditModal';
 import { adminApi, type ApplicationListItem, type PagedResult, type PendingChangeItem } from '@/lib/api';
+import { downloadCsv } from '@/lib/exportCsv';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
-const STATUSES = ['', 'UnderReview', 'Active', 'Rejected'];
+const STATUSES = ['', 'Deposited', 'UnderReview', 'Active', 'Redeemed', 'Rejected'];
+const STATUS_LABELS: Record<string, string> = { '': 'All Statuses', Deposited: 'All Deposits (Active/Redeemed)' };
 const TYPES = ['', 'Individual', 'Entity', 'IRA', 'Trust'];
 const PAGE_SIZE = 20;
 
@@ -28,7 +30,10 @@ function ApplicationsContent() {
   const [result, setResult] = useState<PagedResult<ApplicationListItem> | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState(() => searchParams.get('status') ?? '');
+  const [appIdInput, setAppIdInput] = useState('');
+  const [status, setStatus] = useState(() =>
+    searchParams.get('filter') === 'deposited' ? 'Deposited' : (searchParams.get('status') ?? '')
+  );
   const [investorType, setInvestorType] = useState('');
   const [page, setPage] = useState(1);
 
@@ -41,15 +46,47 @@ function ApplicationsContent() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deletingOne, setDeletingOne] = useState(false);
   const [toast, setToast] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const selectAllRef = useRef<HTMLInputElement>(null);
+
+  const exportToExcel = async () => {
+    setExporting(true);
+    const params: Record<string, string | number> = { page: 1, pageSize: 100000 };
+    const parsedAppId = appIdInput ? parseInt(appIdInput, 10) : NaN;
+    if (!isNaN(parsedAppId)) { params.id = parsedAppId; }
+    else {
+      if (search) params.search = search;
+      if (status === 'Deposited') params.deposited = 'true';
+      else if (status) params.status = status;
+      if (investorType) params.investorType = investorType;
+    }
+    const r = await adminApi.applications(params);
+    if (r.success) {
+      const headers = ['ID', 'PPM Ref', 'Account Name', 'Account Email', 'Investor', 'Type', 'Units', 'Amount', 'Status', 'Effective Date', 'Submitted'];
+      const rows = r.data.items.map(a => [
+        a.id, a.ppmRefNO ?? '', `${a.userFirstName} ${a.userLastName}`.trim(), a.userEmail,
+        a.investorName ?? '', a.investorType, a.numUnits ?? '', a.totalAmount ?? '',
+        a.status,
+        a.effectiveDate ? new Date(a.effectiveDate).toLocaleDateString() : '',
+        a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : '',
+      ]);
+      downloadCsv([headers, ...rows], 'applications.csv');
+    }
+    setExporting(false);
+  };
 
   const load = useCallback(() => {
     setLoading(true);
     const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE };
-    if (search) params.search = search;
-    if (status) params.status = status;
-    if (investorType) params.investorType = investorType;
+    const parsedAppId = appIdInput ? parseInt(appIdInput, 10) : NaN;
+    if (!isNaN(parsedAppId)) { params.id = parsedAppId; }
+    else {
+      if (search) params.search = search;
+      if (status === 'Deposited') params.deposited = 'true';
+      else if (status) params.status = status;
+      if (investorType) params.investorType = investorType;
+    }
     adminApi.applications(params)
       .then(r => {
         if (r.success) {
@@ -67,7 +104,7 @@ function ApplicationsContent() {
         }
       })
       .finally(() => setLoading(false));
-  }, [page, search, status, investorType]);
+  }, [page, search, appIdInput, status, investorType]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -153,6 +190,13 @@ function ApplicationsContent() {
         {/* Filters */}
         <form onSubmit={e => { e.preventDefault(); setPage(1); load(); }} style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
           <input
+            type="number"
+            value={appIdInput}
+            onChange={e => { setAppIdInput(e.target.value); setPage(1); }}
+            placeholder="App ID"
+            style={{ flex: '0 0 110px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}
+          />
+          <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -161,13 +205,17 @@ function ApplicationsContent() {
           />
           <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}
             style={{ flex: '1 1 130px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
-            {STATUSES.map(s => <option key={s} value={s}>{s || 'All Statuses'}</option>)}
+            {STATUSES.map(s => <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>)}
           </select>
           <select value={investorType} onChange={e => { setInvestorType(e.target.value); setPage(1); }}
             style={{ flex: '1 1 130px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
             {TYPES.map(t => <option key={t} value={t}>{t || 'All Types'}</option>)}
           </select>
           <button type="submit" className="btn-primary">Search</button>
+          <button type="button" onClick={exportToExcel} disabled={exporting}
+            style={{ padding: '10px 18px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: exporting ? 'not-allowed' : 'pointer', opacity: exporting ? 0.7 : 1 }}>
+            {exporting ? 'Exporting…' : '↓ Export'}
+          </button>
         </form>
 
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -195,13 +243,14 @@ function ApplicationsContent() {
                     <th>Units</th>
                     <th>Amount</th>
                     <th>Status</th>
+                    <th>Effective Date</th>
                     <th>Submitted</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {result.items.length === 0 ? (
-                    <tr><td colSpan={10} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No applications found</td></tr>
+                    <tr><td colSpan={11} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No applications found</td></tr>
                   ) : result.items.map(a => (
                     <tr key={a.id} style={{ background: selected.has(a.id) ? '#fff7ed' : undefined }}>
                       <td style={{ padding: '12px 8px 12px 16px' }}>
@@ -230,6 +279,7 @@ function ApplicationsContent() {
                         <StatusBadge status={a.status} />
                         {pendingMap[a.id] && <PendingBadge item={pendingMap[a.id]} />}
                       </td>
+                      <td style={{ color: '#64748b', fontSize: 13 }}>{a.effectiveDate ? new Date(a.effectiveDate).toLocaleDateString() : '—'}</td>
                       <td style={{ color: '#64748b', fontSize: 13 }}>{a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : '—'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>

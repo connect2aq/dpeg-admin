@@ -736,13 +736,14 @@ export default function UserDetailPage() {
               <table>
                 <thead>
                   <tr>
-                    <th>PPM#</th><th>Type</th><th>Units</th><th>Amount</th><th>Status</th><th>Effective</th><th></th>
+                    <th>App ID</th><th>PPM#</th><th>Type</th><th>Units</th><th>Amount</th><th>Status</th><th>Effective</th><th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {user.applications.map(a => (
                     <tr key={a.id}>
-                      <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{a.ppmRefNO ?? `#${a.id}`}</td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 600, color: '#64748b' }}>#{a.id}</td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{a.ppmRefNO ?? '—'}</td>
                       <td>{a.investorType}</td>
                       <td>{a.numUnits ?? '—'}</td>
                       <td>{a.totalAmount ? `$${a.totalAmount.toLocaleString()}` : '—'}</td>

@@ -7,8 +7,8 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { adminApi, type UserListItem, type PagedResult, type CreateUserAdminRequest } from '@/lib/api';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
-const STATUSES = ['', 'InProgress', 'UnderReview', 'Active', 'Inactive', 'Test', 'NeverApplied'];
-const STATUS_LABELS: Record<string, string> = { '': 'All Statuses', NeverApplied: 'Never Applied' };
+const STATUSES = ['', 'InProgress', 'UnderReview', 'Active', 'Inactive', 'Test', 'NeverApplied', 'HasDeposit', 'HasActiveInvestment', 'AwaitingApproval', 'LatestRejected'];
+const STATUS_LABELS: Record<string, string> = { '': 'All Statuses', NeverApplied: 'Never Applied', HasDeposit: 'Total Depositors (Active/Redeemed)', HasActiveInvestment: 'Active Depositors', AwaitingApproval: 'Awaiting Approval (Unconverted)', LatestRejected: 'Latest App Rejected (Unconverted)' };
 const PAGE_SIZE = 20;
 
 const emptyCreateForm: CreateUserAdminRequest = { firstName: '', lastName: '', email: '', password: '' };
@@ -28,9 +28,15 @@ function UsersContent() {
   const [result, setResult] = useState<PagedResult<UserListItem> | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState(() =>
-    searchParams.get('filter') === 'neverApplied' ? 'NeverApplied' : (searchParams.get('status') ?? '')
-  );
+  const [status, setStatus] = useState(() => {
+    const filter = searchParams.get('filter');
+    if (filter === 'neverApplied') return 'NeverApplied';
+    if (filter === 'hasDeposit') return 'HasDeposit';
+    if (filter === 'hasActiveInvestment') return 'HasActiveInvestment';
+    if (filter === 'awaitingApproval') return 'AwaitingApproval';
+    if (filter === 'latestRejected') return 'LatestRejected';
+    return searchParams.get('status') ?? '';
+  });
   const [page, setPage] = useState(1);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'investors' | 'admins'>('investors');
@@ -51,9 +57,14 @@ function UsersContent() {
     setLoading(true);
     const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE };
     if (search) params.search = search;
-    if (status && status !== 'Test' && status !== 'NeverApplied') params.status = status;
+    const specialFilters = ['Test', 'NeverApplied', 'HasDeposit', 'HasActiveInvestment', 'AwaitingApproval', 'LatestRejected'];
+    if (status && !specialFilters.includes(status)) params.status = status;
     if (viewMode === 'admins') params.isAdmin = 'true';
     if (status === 'NeverApplied') params.neverApplied = 'true';
+    if (status === 'HasDeposit') params.hasDeposit = 'true';
+    if (status === 'HasActiveInvestment') params.hasActiveInvestment = 'true';
+    if (status === 'AwaitingApproval') params.awaitingApproval = 'true';
+    if (status === 'LatestRejected') params.latestRejected = 'true';
     adminApi.users(params)
       .then(r => {
         if (r.success) {
