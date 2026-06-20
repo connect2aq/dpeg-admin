@@ -122,16 +122,17 @@ function exportPDF(data: InvestorCapitalAccount, investorName: string, ytdIncome
 export default function InvestorStatementsPage() {
   const [investors, setInvestors] = useState<UserListItem[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
-  const [search, setSearch] = useState("");
+  const [inputValue, setInputValue] = useState("");
+  const [open, setOpen] = useState(false);
   const [data, setData] = useState<InvestorCapitalAccount | null>(null);
-  const [accrued] = useState(0); // per-investor accrual not available via admin API — shows 0
+  const [accrued] = useState(0);
   const [typeFilter, setTypeFilter] = useState("");
   const [loading, setLoading] = useState(false);
   const [investorsLoading, setInvestorsLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    adminApi.users({ page: 1, pageSize: 500, status: "Active" })
+    adminApi.users({ page: 1, pageSize: 500 })
       .then(r => { if (r.success) setInvestors(r.data.items); })
       .catch(() => {})
       .finally(() => setInvestorsLoading(false));
@@ -148,12 +149,27 @@ export default function InvestorStatementsPage() {
       .finally(() => setLoading(false));
   }, [selectedUserId]);
 
-  const filtered = investors.filter(u =>
-    !search || `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(search.toLowerCase())
-  );
+  const suggestions = investors.filter(u => {
+    if (!inputValue || selectedUserId) return false;
+    const q = inputValue.toLowerCase();
+    return `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(q);
+  }).slice(0, 8);
 
   const selectedInvestor = investors.find(u => u.id === selectedUserId);
   const investorName = selectedInvestor ? `${selectedInvestor.firstName} ${selectedInvestor.lastName}` : "";
+
+  function selectInvestor(u: UserListItem) {
+    setSelectedUserId(u.id);
+    setInputValue(`${u.firstName} ${u.lastName}`);
+    setOpen(false);
+  }
+
+  function clearSelection() {
+    setSelectedUserId(null);
+    setInputValue("");
+    setData(null);
+    setOpen(false);
+  }
 
   const visible: InvestorCapitalAccountEntry[] = (data?.entries ?? []).filter(
     e => !typeFilter || e.entryType === typeFilter,
@@ -177,40 +193,52 @@ export default function InvestorStatementsPage() {
           </p>
         </div>
 
-        {/* Investor selector */}
-        <div style={{ display: "flex", gap: 12, marginBottom: 28, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div style={{ flex: "1 1 300px", maxWidth: 420 }}>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
-              Search Investor
-            </label>
+        {/* Investor combobox */}
+        <div style={{ marginBottom: 28, maxWidth: 480, position: "relative" }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+            Search Investor
+          </label>
+          <div style={{ position: "relative" }}>
             <input
               type="text"
-              placeholder="Name or email…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ width: "100%", padding: "8px 12px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", color: "var(--text-primary)", boxSizing: "border-box" }}
+              placeholder={investorsLoading ? "Loading investors…" : "Type name or email to search…"}
+              value={inputValue}
+              disabled={investorsLoading}
+              onChange={e => { setInputValue(e.target.value); setOpen(true); if (selectedUserId) clearSelection(); }}
+              onFocus={() => { if (!selectedUserId && inputValue) setOpen(true); }}
+              onBlur={() => setTimeout(() => setOpen(false), 150)}
+              style={{ width: "100%", padding: "10px 36px 10px 14px", fontSize: 13, border: `1.5px solid ${open ? "var(--forest)" : "var(--border)"}`, borderRadius: 8, background: "var(--bg-card)", color: "var(--text-primary)", boxSizing: "border-box", outline: "none" }}
             />
+            {selectedUserId ? (
+              <button onClick={clearSelection} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 16, lineHeight: 1, padding: 2 }} title="Clear">×</button>
+            ) : (
+              <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted)", fontSize: 12, pointerEvents: "none" }}>▾</span>
+            )}
           </div>
-          <div style={{ flex: "1 1 260px", maxWidth: 360 }}>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
-              Select Investor
-            </label>
-            <select
-              value={selectedUserId ?? ""}
-              onChange={e => setSelectedUserId(e.target.value ? Number(e.target.value) : null)}
-              style={{ width: "100%", padding: "8px 12px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", color: "var(--text-primary)", boxSizing: "border-box" }}
-            >
-              <option value="">— Select an investor —</option>
-              {investorsLoading
-                ? <option disabled>Loading…</option>
-                : filtered.map(u => (
-                    <option key={u.id} value={u.id}>
-                      {u.firstName} {u.lastName} · {u.email}
-                    </option>
-                  ))
-              }
-            </select>
-          </div>
+          {open && suggestions.length > 0 && (
+            <div style={{ position: "absolute", zIndex: 50, top: "calc(100% + 4px)", left: 0, right: 0, background: "var(--bg-card)", border: "1.5px solid var(--border)", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.10)", overflow: "hidden" }}>
+              {suggestions.map(u => (
+                <button
+                  key={u.id}
+                  onMouseDown={() => selectInvestor(u)}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "10px 14px", background: "none", border: "none", cursor: "pointer", textAlign: "left", borderBottom: "1px solid var(--border)" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-section)")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "none")}
+                >
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{u.firstName} {u.lastName}</div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 1 }}>{u.email}</div>
+                  </div>
+                  <span style={{ fontSize: 10, color: "var(--muted)", background: "var(--bg-section)", borderRadius: 4, padding: "2px 6px" }}>{u.status}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {open && !investorsLoading && inputValue.length > 0 && suggestions.length === 0 && (
+            <div style={{ position: "absolute", zIndex: 50, top: "calc(100% + 4px)", left: 0, right: 0, background: "var(--bg-card)", border: "1.5px solid var(--border)", borderRadius: 8, padding: "12px 14px", fontSize: 13, color: "var(--muted)" }}>
+              No investors found for &ldquo;{inputValue}&rdquo;
+            </div>
+          )}
         </div>
 
         {/* Empty state */}
