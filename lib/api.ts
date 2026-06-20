@@ -136,6 +136,7 @@ export interface ApplicationListItem extends ApplicationSummary {
   userLastName: string;
   userEmail: string;
   investorName?: string;
+  effectiveDate?: string;
 }
 
 export interface ApplicationDetail extends ApplicationListItem {
@@ -268,6 +269,51 @@ export interface DashboardTrends {
   monthlyApplications: { month: string; total: number; approved: number }[];
   investorTypeBreakdown: { type: string; count: number }[];
   monthlyCapital: { month: string; deployed: number }[];
+}
+
+export interface InvestorCapitalAccountEntry {
+  date: string;
+  entryType: 'Contribution' | 'Redemption' | 'Dividend' | 'Clawback';
+  applicationId?: number;
+  ppmRefNo?: string;
+  units?: number;
+  amount: number;
+  income: number;   // positive = received; negative = clawback
+  runningBalance: number;
+}
+
+export interface InvestorCapitalAccount {
+  entries: InvestorCapitalAccountEntry[];
+  totalContributions: number;
+  totalCapitalRedeemed: number;
+  totalDividends: number;
+  totalRedemptionIncome: number;
+  totalClawbacks: number;
+  totalIncome: number;
+  netPosition: number;
+}
+
+export interface CapitalLedgerEntry {
+  date: string;
+  entryType: 'Contribution' | 'Redemption' | 'Dividend';
+  investorName: string;
+  email: string;
+  entryId?: number;
+  applicationId?: number;
+  ppmRefNo?: string;
+  units?: number;
+  amount: number;
+  runningBalance: number;
+}
+
+export interface CapitalLedger {
+  entries: CapitalLedgerEntry[];
+  openingBalance: number;
+  totalContributions: number;
+  totalRedemptions: number;
+  totalDistributions: number;
+  totalPendingAccruals: number;
+  closingBalance: number;
 }
 
 // ── Historical Import ────────────────────────────────────────────────────────
@@ -703,6 +749,12 @@ export const adminApi = {
     api.put<ApiResponse<string>>(`/users/${userId}/change-password`, { currentPassword, newPassword }),
   resetPassword: (userId: number, newPassword: string) =>
     api.put<ApiResponse<string>>(`/users/${userId}/reset-password`, { newPassword }),
+  capitalLedger: (params: { from?: string; to?: string } = {}) => {
+    const q = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString();
+    return api.get<ApiResponse<CapitalLedger>>(`/capital-ledger${q ? '?' + q : ''}`);
+  },
+  investorStatement: (userId: number) =>
+    api.get<ApiResponse<InvestorCapitalAccount>>(`/investor-statement/${userId}`),
 };
 
 export interface NotificationEmail {
