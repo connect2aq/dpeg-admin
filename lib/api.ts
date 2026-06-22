@@ -659,6 +659,8 @@ export const adminApi = {
     api.post<ApiResponse<DeleteDailyInterestPreviewResult>>('/daily-interest/delete-preview', { ids }),
   batchDeleteDailyInterest: (ids: number[], cascadeMonthly: boolean) =>
     api.deleteWithBody<ApiResponse<DeleteDailyInterestResult>>('/daily-interest/batch', { ids, cascadeMonthly }),
+  resetMonthDistribution: (applicationId: number, year: number, month: number) =>
+    api.post<ApiResponse<ResetMonthResult>>('/daily-interest/reset-month', { applicationId, year, month }),
 
   // ── Admin CRUD: Bulk Delete ────────────────────────────────────────────
   bulkDeleteUsers: (userIds: number[]) =>
@@ -902,6 +904,13 @@ export interface DeleteDailyInterestResult {
   cascadedDistributions: number;
   siblingLogsReset: number;
   skipped: number;
+}
+
+export interface ResetMonthResult {
+  logsReset: number;
+  distributionDeleted: boolean;
+  previousAmount: number;
+  odooStatus?: string | null;
 }
 
 // ── Admin CRUD request/response types ─────────────────────────────────────

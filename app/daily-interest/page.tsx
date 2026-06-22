@@ -6,6 +6,7 @@ import {
   type DailyInterestItem,
   type PagedResult,
   type DeleteDailyInterestPreviewResult,
+  type ResetMonthResult,
 } from '@/lib/api';
 import { downloadCsv } from '@/lib/exportCsv';
 
@@ -29,6 +30,12 @@ type DeleteModalState =
   | { phase: 'deleting' }
   | { phase: 'done'; deleted: number; cascaded: number; skipped: number };
 
+type ResetMonthModalState =
+  | { phase: 'idle' }
+  | { phase: 'confirm'; applicationId: number; year: number; month: number; investorName: string }
+  | { phase: 'resetting' }
+  | { phase: 'done'; result: ResetMonthResult };
+
 export default function DailyInterestPage() {
   const [result, setResult] = useState<PagedResult<DailyInterestItem> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,6 +49,7 @@ export default function DailyInterestPage() {
   const [diBulkPushing, setDiBulkPushing] = useState(false);
   const [diBulkResult, setDiBulkResult] = useState<string | null>(null);
   const [deleteModal, setDeleteModal] = useState<DeleteModalState>({ phase: 'idle' });
+  const [resetModal, setResetModal] = useState<ResetMonthModalState>({ phase: 'idle' });
   const [exporting, setExporting] = useState(false);
 
   const exportToExcel = async () => {
@@ -129,6 +137,30 @@ export default function DailyInterestPage() {
       load();
     } else {
       setDeleteModal({ phase: 'idle' });
+    }
+  };
+
+  const handleResetMonth = (row: DailyInterestItem) => {
+    const d = new Date(row.date);
+    setResetModal({
+      phase: 'confirm',
+      applicationId: row.applicationId,
+      year: d.getFullYear(),
+      month: d.getMonth() + 1,
+      investorName: row.investorName,
+    });
+  };
+
+  const handleResetConfirm = async () => {
+    if (resetModal.phase !== 'confirm') return;
+    const { applicationId, year, month } = resetModal;
+    setResetModal({ phase: 'resetting' });
+    const r = await adminApi.resetMonthDistribution(applicationId, year, month);
+    if (r.success) {
+      setResetModal({ phase: 'done', result: r.data });
+      load();
+    } else {
+      setResetModal({ phase: 'idle' });
     }
   };
 
@@ -234,6 +266,19 @@ export default function DailyInterestPage() {
           </div>
         )}
 
+        {/* Reset month result banner */}
+        {resetModal.phase === 'done' && (
+          <div style={{ marginBottom: 10, padding: '10px 16px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, fontSize: 13, color: '#9a3412', fontWeight: 500, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>
+              ✓ Reset complete — {resetModal.result.logsReset} daily log{resetModal.result.logsReset !== 1 ? 's' : ''} unmarked.
+              {resetModal.result.distributionDeleted && ` Monthly distribution record deleted (was $${resetModal.result.previousAmount.toFixed(2)}${resetModal.result.odooStatus ? `, Odoo: ${resetModal.result.odooStatus}` : ''}).`}
+              {' '}Re-run Distribution Execute to include these logs in the corrected payout.
+            </span>
+            <button onClick={() => setResetModal({ phase: 'idle' })}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#9a3412', marginLeft: 12 }}>×</button>
+          </div>
+        )}
+
         {loading ? (
           <p style={{ color: '#64748b', fontSize: 14 }}>Loading…</p>
         ) : (
@@ -293,15 +338,25 @@ export default function DailyInterestPage() {
                             {row.includedInMonthlyDistribution ? 'Yes' : 'Pending'}
                           </span>
                         </td>
-                        <td style={td}>
-                          {canPush && (
-                            <button
-                              onClick={() => handlePushDailyInterest(row.id)}
-                              disabled={pushingDIId === row.id}
-                              style={{ padding: '4px 11px', background: '#b8923a', color: '#fff', border: 'none', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: pushingDIId === row.id ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-                              {pushingDIId === row.id ? '…' : 'Push to Odoo'}
-                            </button>
-                          )}
+                        <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'nowrap' }}>
+                            {canPush && (
+                              <button
+                                onClick={() => handlePushDailyInterest(row.id)}
+                                disabled={pushingDIId === row.id}
+                                style={{ padding: '4px 11px', background: '#b8923a', color: '#fff', border: 'none', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: pushingDIId === row.id ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                                {pushingDIId === row.id ? '…' : 'Push to Odoo'}
+                              </button>
+                            )}
+                            {row.includedInMonthlyDistribution && (
+                              <button
+                                onClick={() => handleResetMonth(row)}
+                                title="Unmark this month's distribution so it can be re-run with corrected daily logs"
+                                style={{ padding: '4px 11px', background: '#f97316', color: '#fff', border: 'none', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                Reset Month
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -323,6 +378,61 @@ export default function DailyInterestPage() {
           </>
         )}
       </div>
+
+      {/* Reset Month confirmation modal */}
+      {(resetModal.phase === 'confirm' || resetModal.phase === 'resetting') && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: 32, width: 500, maxWidth: '95vw', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#0f2342', marginBottom: 6 }}>Reset Monthly Distribution</h2>
+
+            {resetModal.phase === 'confirm' && (() => {
+              const monthLabel = new Date(resetModal.year, resetModal.month - 1, 1)
+                .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+              return (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                    <div style={{ padding: '12px 14px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, fontSize: 13, color: '#9a3412' }}>
+                      <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                        {resetModal.investorName} — App #{resetModal.applicationId} — {monthLabel}
+                      </div>
+                      <div>This will:</div>
+                      <ul style={{ margin: '6px 0 0 18px', lineHeight: 1.7 }}>
+                        <li>Delete the <strong>{monthLabel}</strong> monthly distribution record for this investor</li>
+                        <li>Reset all daily interest logs for this month to <strong>Pending</strong></li>
+                      </ul>
+                    </div>
+                    <div style={{ padding: '10px 14px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, fontSize: 12, color: '#075985' }}>
+                      After resetting, go to the <strong>Distributions</strong> page and re-run <strong>Execute</strong> for this month to create a corrected distribution that includes all daily logs (including any newly catch-upped ones).
+                    </div>
+                    <div style={{ padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 12, color: '#991b1b' }}>
+                      If this distribution was already pushed to Odoo, you will need to correct that entry in Odoo separately.
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => setResetModal({ phase: 'idle' })}
+                      style={{ padding: '9px 18px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: '#fff', color: '#374151' }}>
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleResetConfirm}
+                      style={{ padding: '9px 18px', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: '#f97316', color: '#fff' }}>
+                      Reset & Unmark
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+
+            {resetModal.phase === 'resetting' && (
+              <p style={{ color: '#64748b', fontSize: 14 }}>Resetting distribution…</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation modal */}
       {(deleteModal.phase === 'confirm' || deleteModal.phase === 'deleting') && (
