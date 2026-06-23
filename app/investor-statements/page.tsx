@@ -131,7 +131,7 @@ export default function InvestorStatementsPage() {
   const [inputValue, setInputValue] = useState("");
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<InvestorCapitalAccount | null>(null);
-  const [accrued] = useState(0);
+  const [accrued, setAccrued] = useState(0);
   const [typeFilter, setTypeFilter] = useState("");
   const [loading, setLoading] = useState(false);
   const [investorsLoading, setInvestorsLoading] = useState(true);
@@ -145,12 +145,19 @@ export default function InvestorStatementsPage() {
   }, []);
 
   useEffect(() => {
-    if (!selectedUserId) { setData(null); return; }
+    if (!selectedUserId) { setData(null); setAccrued(0); return; }
     setLoading(true);
     setError("");
     setData(null);
     adminApi.investorStatement(selectedUserId)
-      .then(r => { if (r.success && r.data) setData(r.data); else setError("No data found for this investor."); })
+      .then(r => {
+        if (r.success && r.data) {
+          setData(r.data);
+          setAccrued(r.data.accrued ?? 0);
+        } else {
+          setError("No data found for this investor.");
+        }
+      })
       .catch(() => setError("Failed to load statement."))
       .finally(() => setLoading(false));
   }, [selectedUserId]);

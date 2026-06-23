@@ -294,6 +294,7 @@ export interface InvestorCapitalAccount {
   totalClawbacks: number;
   totalIncome: number;
   netPosition: number;
+  accrued: number;
 }
 
 export interface CapitalLedgerEntry {
