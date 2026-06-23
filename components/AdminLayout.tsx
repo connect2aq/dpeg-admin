@@ -75,7 +75,7 @@ export default function AdminLayout({
 
       {/* ── Sidebar ───────────────────────────────────────── */}
       <aside
-        className={`sidebar-nav flex-shrink-0 flex flex-col${mobileOpen ? ' open' : ''}`}
+        className={`sidebar-nav flex-shrink-0 flex flex-col min-h-0${mobileOpen ? ' open' : ''}`}
         style={{
           width: "var(--sidebar-width)",
           background: "var(--forest)",

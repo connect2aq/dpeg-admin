@@ -6,7 +6,7 @@ import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PendingBadge } from '@/components/PendingBadge';
 import { RedemptionEditModal } from '@/components/RedemptionEditModal';
-import { adminApi, type RedemptionListItem, type PagedResult, type PendingChangeItem } from '@/lib/api';
+import { adminApi, type RedemptionListItem, type PagedResult, type PendingChangeItem, type PendingChangeDetail, type CreateRedemptionAdminRequest, type RedemptionCalculationPreview } from '@/lib/api';
 import { downloadCsv } from '@/lib/exportCsv';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
@@ -43,6 +43,18 @@ function RedemptionsContent() {
   const [deletingOne, setDeletingOne] = useState(false);
   const [toast, setToast] = useState('');
   const [exporting, setExporting] = useState(false);
+
+  // Pending CREATE redemptions (maker-checker: not yet committed to DB)
+  const [pendingCreates, setPendingCreates] = useState<PendingChangeItem[]>([]);
+  const [viewingCreate, setViewingCreate] = useState<{ item: PendingChangeItem; detail: PendingChangeDetail } | null>(null);
+  const [viewingCreateLoading, setViewingCreateLoading] = useState(false);
+  const [cancellingCreateId, setCancellingCreateId] = useState<number | null>(null);
+  const [createEditMode, setCreateEditMode] = useState(false);
+  const [createEditUnits, setCreateEditUnits] = useState('');
+  const [createEditDate, setCreateEditDate] = useState('');
+  const [createEditPreview, setCreateEditPreview] = useState<RedemptionCalculationPreview | null>(null);
+  const [createEditPreviewLoading, setCreateEditPreviewLoading] = useState(false);
+  const [createEditSaving, setCreateEditSaving] = useState(false);
 
   const selectAllRef = useRef<HTMLInputElement>(null);
 
@@ -95,7 +107,85 @@ function RedemptionsContent() {
       .finally(() => setLoading(false));
   }, [page, status, search, from, to]);
 
+  const loadPendingCreates = useCallback(async () => {
+    const r = await adminApi.getPendingChanges({ entityType: 'Redemption', pageSize: 100 });
+    if (r.success) {
+      setPendingCreates(r.data.items.filter(
+        p => p.operationType === 'Create' && (p.status === 'Pending' || p.status === 'Checked')
+      ));
+    }
+  }, []);
+
+  const openViewCreate = async (item: PendingChangeItem) => {
+    setViewingCreateLoading(true);
+    setCreateEditMode(false);
+    setCreateEditPreview(null);
+    const r = await adminApi.getPendingChange(item.id);
+    if (r.success) {
+      setViewingCreate({ item, detail: r.data });
+      const payload: CreateRedemptionAdminRequest = JSON.parse(r.data.payloadJson);
+      setCreateEditUnits(payload.unitsToRedeem ?? '');
+      setCreateEditDate(payload.effectiveDate ?? '');
+    }
+    setViewingCreateLoading(false);
+  };
+
+  const cancelPendingCreate = async (id: number) => {
+    setCancellingCreateId(id);
+    const r = await adminApi.cancelChange(id);
+    if (r.success) {
+      setPendingCreates(prev => prev.filter(p => p.id !== id));
+      if (viewingCreate?.item.id === id) setViewingCreate(null);
+      setToast('Redemption request cancelled successfully.');
+    } else {
+      alert(r.message || 'Failed to cancel request.');
+    }
+    setCancellingCreateId(null);
+  };
+
+  const saveCreateEdit = async () => {
+    if (!viewingCreate || !createEditPreview) return;
+    setCreateEditSaving(true);
+    const payload: CreateRedemptionAdminRequest = JSON.parse(viewingCreate.detail.payloadJson);
+    const updatedDto: CreateRedemptionAdminRequest = {
+      ...payload,
+      unitsToRedeem: createEditUnits,
+      effectiveDate: createEditDate,
+      aggregatePurchasePrice: String(createEditPreview.aggregatePurchasePrice),
+      proratedPreferredReturn: String(createEditPreview.proratedPreferredReturn),
+      distributionClawback: String(createEditPreview.distributionClawback),
+      netAggregatePrice: String(createEditPreview.netAggregatePrice),
+      totalUnitsOwned: String(createEditPreview.totalUnits),
+    };
+    const r = await adminApi.createRedemption(updatedDto);
+    if (r.success) {
+      setViewingCreate(null);
+      loadPendingCreates();
+      setToast('Submission updated — previous request replaced with updated values.');
+    } else {
+      alert(r.message || 'Failed to update submission.');
+    }
+    setCreateEditSaving(false);
+  };
+
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadPendingCreates(); }, [loadPendingCreates]);
+
+  // Recalculate preview when editing a pending create
+  useEffect(() => {
+    if (!createEditMode || !viewingCreate) return;
+    const payload: CreateRedemptionAdminRequest = JSON.parse(viewingCreate.detail.payloadJson);
+    const trancheId = payload.trancheApplicationId;
+    const units = parseInt(createEditUnits);
+    if (!trancheId || !units || units <= 0 || !createEditDate) { setCreateEditPreview(null); return; }
+    setCreateEditPreviewLoading(true);
+    const timer = setTimeout(async () => {
+      const r = await adminApi.getRedemptionPreview(trancheId, units, createEditDate);
+      if (r.success) setCreateEditPreview(r.data);
+      setCreateEditPreviewLoading(false);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [createEditMode, createEditUnits, createEditDate, viewingCreate]);
 
   useEffect(() => {
     if (!selectAllRef.current || !result) return;
@@ -172,6 +262,49 @@ function RedemptionsContent() {
           <div style={{ background: '#fffbeb', border: '1.5px solid #fbbf24', borderRadius: 8, padding: '12px 16px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, color: '#92400e', fontWeight: 600 }}>⏳ {toast}</span>
             <button onClick={() => setToast('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 16 }}>×</button>
+          </div>
+        )}
+
+        {/* Pending CREATE redemptions — maker-submitted, not yet approved */}
+        {pendingCreates.length > 0 && (
+          <div style={{ marginBottom: 20, padding: '14px 18px', background: '#fffbeb', border: '1.5px solid #f59e0b', borderRadius: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <span style={{ padding: '3px 10px', background: '#f59e0b', color: '#fff', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                {pendingCreates.length} Pending
+              </span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#0f2342' }}>
+                Redemption submissions awaiting checker/approver approval
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {pendingCreates.map(p => (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'white', borderRadius: 8, border: '1px solid #fde68a', flexWrap: 'wrap' }}>
+                  <span style={{ padding: '2px 8px', background: p.status === 'Checked' ? '#d1fae5' : '#fef3c7', color: p.status === 'Checked' ? '#065f46' : '#92400e', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                    {p.status}
+                  </span>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#0f2342', minWidth: 160 }}>{p.description}</span>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>by <strong>{p.makerName}</strong></span>
+                  <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                    {new Date(p.createdOn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                  <button
+                    onClick={() => openViewCreate(p)}
+                    style={{ fontSize: 12, fontWeight: 600, color: '#b8923a', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}
+                  >
+                    View / Edit
+                  </button>
+                  {p.status === 'Pending' && (
+                    <button
+                      onClick={() => cancelPendingCreate(p.id)}
+                      disabled={cancellingCreateId === p.id}
+                      style={{ fontSize: 12, fontWeight: 600, color: '#b91c1c', background: 'none', border: 'none', cursor: cancellingCreateId === p.id ? 'not-allowed' : 'pointer', padding: '4px 8px', opacity: cancellingCreateId === p.id ? 0.6 : 1 }}
+                    >
+                      {cancellingCreateId === p.id ? 'Cancelling…' : 'Cancel'}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -357,6 +490,166 @@ function RedemptionsContent() {
           }}
         />
       )}
+
+      {/* Pending CREATE view/edit modal */}
+      {viewingCreateLoading && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: 'white', borderRadius: 12, padding: 32, color: '#64748b', fontSize: 15 }}>Loading submission details…</div>
+        </div>
+      )}
+      {viewingCreate && (() => {
+        const payload: CreateRedemptionAdminRequest = JSON.parse(viewingCreate.detail.payloadJson);
+        const isEditable = viewingCreate.item.status === 'Pending';
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+            <div style={{ background: 'white', borderRadius: 12, width: '100%', maxWidth: 680, maxHeight: '90vh', overflowY: 'auto', padding: '28px 32px', boxShadow: '0 24px 64px rgba(0,0,0,0.25)' }}>
+
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+                <div>
+                  <h2 style={{ fontSize: 18, fontWeight: 700, color: '#0f2342', margin: 0 }}>Pending Submission #{viewingCreate.item.id}</h2>
+                  <p style={{ fontSize: 13, color: '#64748b', marginTop: 4, marginBottom: 0 }}>{viewingCreate.item.description}</p>
+                </div>
+                <button onClick={() => { setViewingCreate(null); setCreateEditMode(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 22, lineHeight: 1, padding: 0, marginLeft: 12 }}>×</button>
+              </div>
+
+              {/* Status + timeline */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+                <span style={{ padding: '3px 10px', background: viewingCreate.item.status === 'Checked' ? '#d1fae5' : '#fef3c7', color: viewingCreate.item.status === 'Checked' ? '#065f46' : '#92400e', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                  {viewingCreate.item.status}
+                </span>
+                <span style={{ fontSize: 12, color: '#64748b' }}>
+                  Submitted by <strong>{viewingCreate.item.makerName}</strong> on {new Date(viewingCreate.item.createdOn).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </span>
+                {viewingCreate.item.checkerName && (
+                  <span style={{ fontSize: 12, color: '#64748b' }}>· Reviewed by <strong>{viewingCreate.item.checkerName}</strong></span>
+                )}
+              </div>
+
+              {/* Read-only investor details */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 24px', marginBottom: 18 }}>
+                {([
+                  ['Partner Name', payload.sellingPartnerName],
+                  ['Investor Type', payload.investorType],
+                  ['Email', payload.email],
+                  ['Tranche App ID', payload.trancheApplicationId ? `#${payload.trancheApplicationId}` : undefined],
+                  ['Original Purchase Date', payload.originalPurchaseDate],
+                  ['Status on Submit', payload.status],
+                ] as [string, string | undefined][]).filter(([, v]) => v).map(([label, value]) => (
+                  <div key={label}>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 2 }}>{label}</div>
+                    <div style={{ fontSize: 13, color: '#1a1a2e', fontWeight: 500 }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Redemption figures */}
+              {!createEditMode && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px 16px', padding: '14px', background: '#f0fdf4', border: '1px solid #a7f3d0', borderRadius: 8, marginBottom: 20 }}>
+                  {([
+                    ['Units to Redeem', payload.unitsToRedeem],
+                    ['Total Units Owned', payload.totalUnitsOwned],
+                    ['Effective Date', payload.effectiveDate],
+                    ['Aggregate Price', payload.aggregatePurchasePrice ? `$${parseFloat(payload.aggregatePurchasePrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : undefined],
+                    ['Preferred Return', payload.proratedPreferredReturn ? `$${parseFloat(payload.proratedPreferredReturn).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : undefined],
+                    ['Clawback', payload.distributionClawback ? `$${parseFloat(payload.distributionClawback).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : undefined],
+                    ['Net Price', payload.netAggregatePrice ? `$${parseFloat(payload.netAggregatePrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : undefined],
+                  ] as [string, string | undefined][]).filter(([, v]) => v).map(([label, value]) => (
+                    <div key={label}>
+                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#059669', letterSpacing: '0.05em', marginBottom: 2 }}>{label}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#065f46' }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Edit section */}
+              {createEditMode && isEditable && (
+                <div style={{ padding: '16px', background: '#f8fafc', borderRadius: 8, border: '1.5px solid #e2e8f0', marginBottom: 20 }}>
+                  <h3 style={{ fontSize: 13, fontWeight: 700, color: '#0f2342', marginBottom: 14, marginTop: 0 }}>Edit Submission Values</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Units to Redeem</label>
+                      <input
+                        type="number" min={1}
+                        value={createEditUnits}
+                        onChange={e => { setCreateEditUnits(e.target.value); setCreateEditPreview(null); }}
+                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Effective Date</label>
+                      <input
+                        type="date"
+                        value={createEditDate}
+                        onChange={e => { setCreateEditDate(e.target.value); setCreateEditPreview(null); }}
+                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }}
+                      />
+                    </div>
+                  </div>
+                  {createEditPreviewLoading && <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>Calculating…</div>}
+                  {createEditPreview && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px 14px', padding: '12px', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 8, marginBottom: 14 }}>
+                      {([
+                        ['Aggregate Price', `$${createEditPreview.aggregatePurchasePrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+                        ['Preferred Return', `$${createEditPreview.proratedPreferredReturn.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+                        ['Clawback', `$${createEditPreview.distributionClawback.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+                        ['Net Price', `$${createEditPreview.netAggregatePrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+                        ['Days Invested', String(createEditPreview.daysInvested)],
+                        ['Short Term', createEditPreview.isShortTerm ? 'Yes' : 'No'],
+                      ] as [string, string][]).map(([label, value]) => (
+                        <div key={label}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>{label}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#065f46' }}>{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      onClick={saveCreateEdit}
+                      disabled={createEditSaving || !createEditPreview}
+                      style={{ padding: '9px 20px', background: '#b8923a', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: createEditSaving || !createEditPreview ? 'not-allowed' : 'pointer', opacity: createEditSaving || !createEditPreview ? 0.6 : 1 }}
+                    >
+                      {createEditSaving ? 'Saving…' : 'Save & Replace Submission'}
+                    </button>
+                    <button onClick={() => { setCreateEditMode(false); setCreateEditPreview(null); }} style={{ padding: '9px 16px', background: '#f1f5f9', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
+                      Discard Changes
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: 18, marginTop: 4, flexWrap: 'wrap' }}>
+                {isEditable && !createEditMode && (
+                  <button
+                    onClick={() => setCreateEditMode(true)}
+                    style={{ padding: '9px 18px', background: '#0f2342', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Edit Submission
+                  </button>
+                )}
+                {isEditable && !createEditMode && (
+                  <button
+                    onClick={() => cancelPendingCreate(viewingCreate.item.id)}
+                    disabled={cancellingCreateId === viewingCreate.item.id}
+                    style={{ padding: '9px 16px', background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#b91c1c', cursor: cancellingCreateId ? 'not-allowed' : 'pointer', opacity: cancellingCreateId ? 0.7 : 1 }}
+                  >
+                    {cancellingCreateId === viewingCreate.item.id ? 'Cancelling…' : 'Cancel Request'}
+                  </button>
+                )}
+                <button
+                  onClick={() => { setViewingCreate(null); setCreateEditMode(false); }}
+                  style={{ padding: '9px 16px', background: '#f1f5f9', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#475569', cursor: 'pointer' }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </AdminLayout>
   );
 }

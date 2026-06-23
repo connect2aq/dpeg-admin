@@ -243,6 +243,8 @@ export interface RedemptionDetail extends RedemptionListItem {
   bankAccountHolderName?: string;
   bankAccountNumber?: string;
   bankRoutingNumber?: string;
+  investorNotifiedAt?: string;
+  isAdminCreated?: boolean;
 }
 
 export interface AuditLogItem {
@@ -602,8 +604,8 @@ export const adminApi = {
   },
   redemption: (id: number) =>
     api.get<ApiResponse<RedemptionDetail>>(`/redemptions/${id}`),
-  updateRedemptionStatus: (id: number, status: string, reviewNote?: string) =>
-    api.put<ApiResponse<string>>(`/redemptions/${id}/status`, { status, reviewNote }),
+  updateRedemptionStatus: (id: number, status: string, reviewNote?: string, sendNotification = false) =>
+    api.put<ApiResponse<string>>(`/redemptions/${id}/status`, { status, reviewNote, sendNotification }),
   sendRedemptionDocuSignEnvelope: (id: number) =>
     api.post<ApiResponse<string>>(`/redemptions/${id}/send-docusign`, {}),
   auditLogs: (params: Record<string, string | number | boolean>) => {

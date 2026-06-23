@@ -6,7 +6,7 @@ import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { adminApi, STATIC_BASE, type RedemptionDetail, type DocuSignEnvelopeStatus } from '@/lib/api';
 
-const STATUSES = ['UnderReview', 'Rejected', 'Redeemed'];
+const STATUSES = ['UnderReview', 'Active', 'Rejected'];
 
 // DB DateTime columns come back without timezone info; append Z so JS treats them as UTC
 const asUtc = (iso?: string | null) =>
@@ -38,6 +38,9 @@ export default function RedemptionDetailPage() {
   const [note, setNote] = useState('');
   const [updating, setUpdating] = useState(false);
   const [msg, setMsg] = useState('');
+  const [approveConfirm, setApproveConfirm] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [approveMsg, setApproveMsg] = useState('');
 
   const [dsStatus, setDsStatus] = useState<DocuSignEnvelopeStatus | null>(null);
   const [dsLoading, setDsLoading] = useState(false);
@@ -63,11 +66,27 @@ export default function RedemptionDetailPage() {
   const updateStatus = async () => {
     if (!redemption || newStatus === redemption.status) return;
     setUpdating(true);
-    const r = await adminApi.updateRedemptionStatus(redemption.id, newStatus, note || undefined);
+    const r = await adminApi.updateRedemptionStatus(redemption.id, newStatus, note || undefined, false);
     setMsg(r.success ? 'Status updated.' : r.message);
     if (r.success) setRedemption(a => a ? { ...a, status: newStatus } : a);
     setUpdating(false);
     setTimeout(() => setMsg(''), 3000);
+  };
+
+  const approveAndNotify = async () => {
+    if (!redemption) return;
+    setApproving(true);
+    const r = await adminApi.updateRedemptionStatus(redemption.id, 'Active', undefined, true);
+    if (r.success) {
+      setRedemption(a => a ? { ...a, status: 'Active' } : a);
+      setNewStatus('Active');
+      setApproveMsg('Approved. Investor has been notified.');
+    } else {
+      setApproveMsg(r.message || 'Failed to approve.');
+    }
+    setApproving(false);
+    setApproveConfirm(false);
+    setTimeout(() => setApproveMsg(''), 5000);
   };
 
   const loadDsStatus = async () => {
@@ -150,6 +169,14 @@ export default function RedemptionDetailPage() {
             <p style={{ color: '#64748b', marginTop: 4 }}>
               {redemption.investorType} · {redemption.email ?? 'No email'}
             </p>
+            <span style={{
+              display: 'inline-block', marginTop: 6, padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+              background: redemption.isAdminCreated ? '#eff6ff' : '#fdf4ff',
+              color: redemption.isAdminCreated ? '#1d4ed8' : '#7e22ce',
+              border: `1px solid ${redemption.isAdminCreated ? '#bfdbfe' : '#e9d5ff'}`,
+            }}>
+              {redemption.isAdminCreated ? 'Admin Created' : 'Investor Submitted'}
+            </span>
           </div>
           <StatusBadge status={redemption.status} />
         </div>
@@ -160,7 +187,7 @@ export default function RedemptionDetailPage() {
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
             <select value={newStatus} onChange={e => setNewStatus(e.target.value)}
               style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
-              {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              {(STATUSES.includes(redemption.status) ? STATUSES : [redemption.status, ...STATUSES]).map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             <input
               type="text"
@@ -181,6 +208,57 @@ export default function RedemptionDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Approve & Notify — shown while under review AND not yet notified */}
+        {redemption.status === 'UnderReview' && !redemption.investorNotifiedAt && (
+          <div className="card" style={{ marginBottom: 24, border: '1.5px solid #e2e8f0' }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 8 }}>Approve &amp; Notify Investor</h2>
+            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>
+              This will set the status to <strong>Active</strong> and send notification emails to the investor.
+              To change status without sending notifications, use the status dropdown above.
+            </p>
+            {!approveConfirm ? (
+              <button
+                onClick={() => setApproveConfirm(true)}
+                style={{ padding: '9px 20px', background: '#0f2342', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
+                Approve &amp; Notify Investor
+              </button>
+            ) : (
+              <div style={{ padding: '14px 16px', background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: 8 }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#9a3412', marginBottom: 12 }}>
+                  ⚠ This will send notification emails to the investor and the admin team. This cannot be undone. Proceed?
+                </p>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={approveAndNotify}
+                    disabled={approving}
+                    style={{ padding: '8px 18px', background: '#b8923a', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#fff', cursor: approving ? 'default' : 'pointer', opacity: approving ? 0.7 : 1 }}>
+                    {approving ? 'Sending…' : 'Confirm & Send Notifications'}
+                  </button>
+                  <button
+                    onClick={() => setApproveConfirm(false)}
+                    disabled={approving}
+                    style={{ padding: '8px 16px', background: '#f1f5f9', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            {approveMsg && (
+              <p style={{ marginTop: 10, fontSize: 13, color: approveMsg.includes('Approved') ? '#10b981' : '#ef4444' }}>{approveMsg}</p>
+            )}
+          </div>
+        )}
+
+        {/* Notification already sent — shown instead of the approve button */}
+        {redemption.investorNotifiedAt && (
+          <div style={{ marginBottom: 24, padding: '12px 16px', background: '#f0fdf4', border: '1.5px solid #a7f3d0', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 16 }}>✓</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#065f46' }}>
+              Investor notified on {new Date(asUtc(redemption.investorNotifiedAt)!).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        )}
 
         {/* Partner / investor info */}
         <div className="card" style={{ marginBottom: 20 }}>
