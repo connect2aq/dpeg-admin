@@ -699,6 +699,9 @@ export const adminApi = {
   runBulkCatchUp: (from: string, to: string) =>
     api.post<ApiResponse<{ appsProcessed: number; logsCreated: number; errors: string[] }>>('/distributions/catch-up', { from, to }),
 
+  fixHistoricalCatchUp: () =>
+    api.post<ApiResponse<unknown[]>>('/distributions/fix-historical-catchup', {}),
+
   // ── Manual distribution run ───────────────────────────────────────────
   simulateDistribution: (asOfDate: string) =>
     api.post<ApiResponse<DistributionRunResult[]>>('/distributions/simulate', { asOfDate }),

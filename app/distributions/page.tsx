@@ -66,6 +66,12 @@ function DistributionsContent() {
   const [catchUpResult, setCatchUpResult] = useState<{ appsProcessed: number; logsCreated: number; errors: string[] } | null>(null);
   const [catchUpError, setCatchUpError] = useState<string | null>(null);
 
+  // Historical catch-up fix state
+  type HistoricalFixResult = { applicationId: number; redemptionEffectiveDate: string; unitsRedeemed: number; remainingUnits: number; logsCorrected: number; distributionMonthReset: string; distributionDeleted: boolean };
+  const [histFixLoading, setHistFixLoading] = useState(false);
+  const [histFixResults, setHistFixResults] = useState<HistoricalFixResult[] | null>(null);
+  const [histFixError, setHistFixError] = useState<string | null>(null);
+
   // Run distribution state
   const [runDate, setRunDate] = useState(todayStr());
   const [runMode, setRunMode] = useState<'preview' | 'execute' | null>(null);
@@ -187,6 +193,17 @@ function DistributionsContent() {
     setCatchUpLoading(false);
     if (r.success) setCatchUpResult(r.data);
     else setCatchUpError('Catch-up failed. Check the date range and try again.');
+  };
+
+  const handleHistoricalFix = async () => {
+    if (!confirm('This will scan all historical redemptions and correct any daily interest logs where redeemed units were double-counted with the prorated preferred return. Affected monthly distributions will be deleted and need to be re-run.\n\nContinue?')) return;
+    setHistFixLoading(true);
+    setHistFixResults(null);
+    setHistFixError(null);
+    const r = await adminApi.fixHistoricalCatchUp();
+    setHistFixLoading(false);
+    if (r.success) setHistFixResults(r.data);
+    else setHistFixError('Fix failed. Check server logs.');
   };
 
   const handlePreview = async () => {
@@ -329,6 +346,60 @@ function DistributionsContent() {
                     ))}
                   </ul>
                 </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Historical Catch-Up Fix Panel */}
+        <div style={{ background: '#fdf4ff', border: '1.5px solid #e9d5ff', borderRadius: 12, padding: '20px 24px', marginBottom: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#6b21a8', marginBottom: 6 }}>Fix Historical Double-Count (one-time)</div>
+          <div style={{ fontSize: 13, color: '#7e22ce', marginBottom: 12 }}>
+            Corrects daily interest logs where admin same-day redemptions caused the redeemed units to be counted twice
+            — once in the nightly log and once in the prorated preferred return. Affected monthly distributions are
+            deleted and must be re-run via Step 2 below.
+          </div>
+          <button
+            onClick={handleHistoricalFix}
+            disabled={histFixLoading}
+            style={{ padding: '9px 20px', background: '#7e22ce', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: histFixLoading ? 'not-allowed' : 'pointer', opacity: histFixLoading ? 0.6 : 1 }}>
+            {histFixLoading ? 'Scanning & fixing…' : 'Run Historical Fix'}
+          </button>
+          {histFixError && <div style={{ marginTop: 10, fontSize: 13, color: '#dc2626' }}>{histFixError}</div>}
+          {histFixResults !== null && (
+            <div style={{ marginTop: 12 }}>
+              {histFixResults.length === 0 ? (
+                <div style={{ padding: '8px 14px', background: '#f0fdf4', borderRadius: 8, fontSize: 13, color: '#15803d', fontWeight: 500, display: 'inline-block' }}>
+                  No double-counting found — all historical logs are clean.
+                </div>
+              ) : (
+                <>
+                  <div style={{ padding: '8px 14px', background: '#fef3c7', borderRadius: 8, fontSize: 13, color: '#92400e', fontWeight: 600, marginBottom: 10 }}>
+                    Fixed {histFixResults.length} redemption month{histFixResults.length !== 1 ? 's' : ''}. Re-run distributions below for the affected months.
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: '#ede9fe' }}>
+                        {['App ID', 'Redemption Date', 'Units Redeemed', 'Remaining', 'Logs Fixed', 'Month Reset', 'Dist. Deleted'].map(h => (
+                          <th key={h} style={{ padding: '6px 10px', textAlign: 'left', color: '#6b21a8', fontWeight: 600 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {histFixResults.map((r, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #e9d5ff' }}>
+                          <td style={{ padding: '5px 10px' }}>#{r.applicationId}</td>
+                          <td style={{ padding: '5px 10px' }}>{r.redemptionEffectiveDate?.slice(0, 10)}</td>
+                          <td style={{ padding: '5px 10px' }}>{r.unitsRedeemed}</td>
+                          <td style={{ padding: '5px 10px' }}>{r.remainingUnits}</td>
+                          <td style={{ padding: '5px 10px' }}>{r.logsCorrected}</td>
+                          <td style={{ padding: '5px 10px' }}>{r.distributionMonthReset?.slice(0, 7)}</td>
+                          <td style={{ padding: '5px 10px' }}>{r.distributionDeleted ? 'Yes' : 'No'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
               )}
             </div>
           )}
