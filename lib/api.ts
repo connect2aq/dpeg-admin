@@ -79,6 +79,8 @@ export interface DashboardStats {
   totalDeployedCommencement: number;
   totalWithdrawnCommencement: number;
   interestPaidCommencement: number;
+  monthlyDistributionsCommencement: number;
+  redemptionInterestCommencement: number;
   // AUM & capital flows — date range
   totalDepositedDateRange: number;
   totalWithdrawnDateRange: number;

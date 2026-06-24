@@ -55,63 +55,76 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 function BalanceFlow({ stats }: { stats: DashboardStats }) {
-  const fmt = (n: number) => n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M` : `$${n.toLocaleString()}`;
-  const remaining     = stats.totalDeployedCommencement - stats.totalWithdrawnCommencement;
-  const afterInterest = remaining - stats.interestPaidCommencement;
-  const hasDeployed   = stats.deployedAmount != null;
-  const available     = hasDeployed ? afterInterest - (stats.deployedAmount ?? 0) : null;
-  const hasBank       = stats.bankAccountBalance != null;
-  const variance      = hasDeployed && hasBank ? (stats.bankAccountBalance ?? 0) - (available ?? 0) : null;
-  const hasInterestReceived = stats.interestReceived != null;
+  const fmt = (n: number) => `$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  const box = (label: string, value: string, accent: string, muted?: boolean, href?: string) => {
+  const remaining           = stats.totalDeployedCommencement - stats.totalWithdrawnCommencement;
+  const afterDividend       = remaining - stats.interestPaidCommencement;
+  const hasDeployed         = stats.deployedAmount != null;
+  const hasInterestReceived = stats.interestReceived != null;
+  // Balance Available = after dividends − deployed + interest received back from investments
+  const available = hasDeployed
+    ? afterDividend - (stats.deployedAmount ?? 0) + (hasInterestReceived ? (stats.interestReceived ?? 0) : 0)
+    : null;
+  const hasBank  = stats.bankAccountBalance != null;
+  const variance = hasDeployed && hasBank ? (stats.bankAccountBalance ?? 0) - (available ?? 0) : null;
+
+  const boxStyle = (accent: string, muted?: boolean, clickable?: boolean): React.CSSProperties => ({
+    background: muted ? "#f8fafc" : "#fff",
+    border: `1px solid ${muted ? "#e2e8f0" : "#cbd5e1"}`,
+    borderTop: `3px solid ${accent}`,
+    borderRadius: 8,
+    padding: "12px 14px",
+    opacity: muted ? 0.65 : 1,
+    cursor: clickable ? "pointer" : "default",
+    transition: "box-shadow 0.15s",
+    height: "100%",
+    boxSizing: "border-box" as const,
+    display: "flex",
+    flexDirection: "column" as const,
+  });
+
+  const arrowStyle = (color: string, muted?: boolean, clickable?: boolean): React.CSSProperties => ({
+    background: muted ? "#f8fafc" : `${color}0d`,
+    border: `1px solid ${muted ? "#e2e8f0" : `${color}40`}`,
+    borderTop: `3px solid ${muted ? "#e2e8f0" : color}`,
+    borderRadius: 8,
+    padding: "12px 14px",
+    opacity: muted ? 0.65 : 1,
+    cursor: clickable ? "pointer" : "default",
+    transition: "box-shadow 0.15s",
+    height: "100%",
+    boxSizing: "border-box" as const,
+    display: "flex",
+    flexDirection: "column" as const,
+  });
+
+  const hover = (href?: string) => ({
+    onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => { if (href) e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)"; },
+    onMouseLeave: (e: React.MouseEvent<HTMLDivElement>) => { if (href) e.currentTarget.style.boxShadow = ""; },
+  });
+
+  const box = (label: string, value: string, accent: string, muted?: boolean, href?: string, sub?: string) => {
     const inner = (
-      <div style={{
-        background: muted ? "#f8fafc" : "#fff",
-        border: `1px solid ${muted ? "#e2e8f0" : "#cbd5e1"}`,
-        borderTop: `3px solid ${accent}`,
-        borderRadius: 8,
-        padding: "10px 12px",
-        minWidth: 0,
-        flex: "1 1 120px",
-        opacity: muted ? 0.65 : 1,
-        cursor: href ? "pointer" : "default",
-        transition: "box-shadow 0.15s",
-      }}
-        onMouseEnter={e => { if (href) (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)"; }}
-        onMouseLeave={e => { if (href) (e.currentTarget as HTMLDivElement).style.boxShadow = ""; }}
-      >
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", marginBottom: 4 }}>{label}</div>
-        <div style={{ fontSize: 17, fontWeight: 700, color: muted ? "#94a3b8" : "#0e3416" }}>{value}</div>
-        {href && <div style={{ fontSize: 10, color: "#699172", marginTop: 4, fontWeight: 600 }}>View details →</div>}
+      <div style={boxStyle(accent, muted, !!href)} {...hover(href)}>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", marginBottom: 6 }}>{label}</div>
+        <div style={{ fontSize: 17, fontWeight: 700, color: muted ? "#94a3b8" : "#0e3416", flex: 1 }}>{value}</div>
+        {sub && <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>{sub}</div>}
+        {href && <div style={{ fontSize: 10, color: "#699172", marginTop: 6, fontWeight: 600 }}>View details →</div>}
       </div>
     );
-    return href ? <Link href={href} style={{ textDecoration: "none" }}>{inner}</Link> : inner;
+    return href ? <Link href={href} style={{ textDecoration: "none", display: "block", height: "100%" }}>{inner}</Link> : inner;
   };
 
-  const arrow = (label: string, amount: string, color: string, muted?: boolean, href?: string) => {
+  const arrow = (label: string, amount: string, color: string, muted?: boolean, href?: string, sub?: string) => {
     const inner = (
-      <div style={{
-        background: muted ? "#f8fafc" : `${color}0d`,
-        border: `1px solid ${muted ? "#e2e8f0" : `${color}40`}`,
-        borderTop: `3px solid ${muted ? "#e2e8f0" : color}`,
-        borderRadius: 8,
-        padding: "10px 12px",
-        minWidth: 0,
-        flex: "1 1 120px",
-        opacity: muted ? 0.65 : 1,
-        cursor: href ? "pointer" : "default",
-        transition: "box-shadow 0.15s",
-      }}
-        onMouseEnter={e => { if (href) (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)"; }}
-        onMouseLeave={e => { if (href) (e.currentTarget as HTMLDivElement).style.boxShadow = ""; }}
-      >
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: muted ? "#94a3b8" : color, marginBottom: 4 }}>→ {label}</div>
-        <div style={{ fontSize: 17, fontWeight: 700, color: muted ? "#94a3b8" : color }}>{amount}</div>
-        {href && <div style={{ fontSize: 10, color: "#699172", marginTop: 4, fontWeight: 600 }}>View details →</div>}
+      <div style={arrowStyle(color, muted, !!href)} {...hover(href)}>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: muted ? "#94a3b8" : color, marginBottom: 6 }}>→ {label}</div>
+        <div style={{ fontSize: 17, fontWeight: 700, color: muted ? "#94a3b8" : color, flex: 1 }}>{amount}</div>
+        {sub && <div style={{ fontSize: 10, color: muted ? "#94a3b8" : `${color}cc`, marginTop: 4 }}>{sub}</div>}
+        {href && <div style={{ fontSize: 10, color: "#699172", marginTop: 6, fontWeight: 600 }}>View details →</div>}
       </div>
     );
-    return href ? <Link href={href} style={{ textDecoration: "none" }}>{inner}</Link> : inner;
+    return href ? <Link href={href} style={{ textDecoration: "none", display: "block", height: "100%" }}>{inner}</Link> : inner;
   };
 
   return (
@@ -119,31 +132,36 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
       <div style={{ fontSize: 13, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>
         Balance Flow (Since Inception){stats.balanceAsAtDate && ` — Balance as at ${new Date(stats.balanceAsAtDate).toLocaleDateString()}`}
       </div>
-      <div style={{ display: "flex", alignItems: "stretch", gap: 3, flexWrap: "nowrap" }}>
-        {box("Total Deposits", fmt(stats.totalDeployedCommencement), "#0e3416", false, "/applications?status=Active")}
-        {arrow("Redeemed", `−${fmt(stats.totalWithdrawnCommencement)}`, "#ef4444", false, "/redemptions?status=Active")}
-        {box("Balance Remaining", fmt(remaining), "#6366f1")}
-        {arrow("Dividend Paid", `−${fmt(stats.interestPaidCommencement)}`, "#f59e0b", false, "/distributions")}
-        {box("After Dividend", fmt(afterInterest), "#10b981")}
-        {arrow("Deployed", hasDeployed ? `−${fmt(stats.deployedAmount ?? 0)}` : "Pending", "#8b5cf6", !hasDeployed, "/settings")}
+      {/* 5-column grid — boxes wrap into two equal rows */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6, alignItems: "stretch" }}>
+        {/* Row 1 */}
+        {box("Total Deposits to Date",  fmt(stats.totalDeployedCommencement),    "#0e3416", false, "/applications?status=Active")}
+        {arrow("Redeemed",              `−${fmt(stats.totalWithdrawnCommencement)}`, "#ef4444", false, "/redemptions?status=Active")}
+        {box("Balance Remaining",       fmt(remaining),                           "#6366f1")}
+        {arrow("Dividend Paid",         `−${fmt(stats.interestPaidCommencement)}`,  "#f59e0b", false, "/distributions",
+          `${fmt(stats.monthlyDistributionsCommencement)} monthly divs + ${fmt(stats.redemptionInterestCommencement)} on exit`)}
+        {box("After Dividends",         fmt(afterDividend),                       "#10b981")}
+
+        {/* Row 2 */}
         {hasDeployed
-          ? box("Balance Available", fmt(available ?? 0), "#699172")
-          : box("Balance Available", "Not entered", "#b8923a", true)}
-        {box("Interest Received", hasInterestReceived ? fmt(stats.interestReceived ?? 0) : "Not entered", "#0f2342", !hasInterestReceived, hasInterestReceived ? undefined : "/settings")}
-        {hasBank && (
-          <>
-            {variance != null
-              ? arrow("Variance", `${variance >= 0 ? "+" : "−"}${fmt(Math.abs(variance))}`, variance >= 0 ? "#10b981" : "#ef4444")
-              : arrow("vs Available", "N/A", "#94a3b8", true)}
-            {box("Bank Account Balance", fmt(stats.bankAccountBalance ?? 0), "#64748b", false, "/settings")}
-          </>
-        )}
-        {!hasDeployed && (
-          <div style={{ fontSize: 11, color: "#b8923a", alignSelf: "flex-end", paddingBottom: 4, flexBasis: "100%", marginTop: 8 }}>
-            ⚠ Enter today&apos;s Deployed Amount in Admin → Settings → Daily Balances to complete this flow.
-          </div>
-        )}
+          ? arrow("Deployed",         `−${fmt(stats.deployedAmount ?? 0)}`,                        "#8b5cf6", false, "/settings")
+          : arrow("Deployed",         "Pending",                                                    "#8b5cf6", true,  "/settings")}
+        {box("Interest Received",     hasInterestReceived ? fmt(stats.interestReceived ?? 0) : "Not entered", "#0f2342", !hasInterestReceived, hasInterestReceived ? undefined : "/settings")}
+        {hasDeployed
+          ? box("Balance Available",  fmt(available ?? 0),                                          "#699172")
+          : box("Balance Available",  "Not entered",                                                "#b8923a", true)}
+        {hasBank && variance != null
+          ? arrow("Variance",         `${variance >= 0 ? "+" : "−"}${fmt(Math.abs(variance))}`,    variance >= 0 ? "#10b981" : "#ef4444")
+          : arrow("Variance",         "N/A",                                                        "#94a3b8", true)}
+        {hasBank
+          ? box("Bank Account Balance", fmt(stats.bankAccountBalance ?? 0),                         "#64748b", false, "/settings")
+          : box("Bank Account Balance", "Not entered",                                              "#64748b", true,  "/settings")}
       </div>
+      {!hasDeployed && (
+        <div style={{ fontSize: 11, color: "#b8923a", marginTop: 10 }}>
+          ⚠ Enter today&apos;s Deployed Amount in Admin → Settings → Daily Balances to complete this flow.
+        </div>
+      )}
     </div>
   );
 }
