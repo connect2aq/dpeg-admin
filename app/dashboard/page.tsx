@@ -13,12 +13,14 @@ function KpiCard({
   label,
   value,
   sub,
+  breakdown,
   color,
   href,
 }: {
   label: string;
   value: string | number;
   sub?: string;
+  breakdown?: string;
   color?: string;
   href?: string;
 }) {
@@ -29,21 +31,26 @@ function KpiCard({
         borderTop: `3px solid ${color ?? "#699172"}`,
         cursor: href ? "pointer" : "default",
         transition: "box-shadow 0.15s",
+        height: "100%",
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
       }}
       onMouseEnter={e => { if (href) (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)"; }}
       onMouseLeave={e => { if (href) (e.currentTarget as HTMLDivElement).style.boxShadow = ""; }}
     >
-      <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", marginBottom: 8 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", marginBottom: 8 }}>
         {label}
       </div>
-      <div style={{ fontSize: 32, fontWeight: 700, color: "#0e3416", lineHeight: 1 }}>
+      <div style={{ fontSize: 26, fontWeight: 700, color: "#0e3416", lineHeight: 1.1, flex: 1 }}>
         {value}
       </div>
-      {sub && <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 6 }}>{sub}</div>}
+      {breakdown && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 5 }}>{breakdown}</div>}
+      {sub && <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>{sub}</div>}
       {href && <div style={{ fontSize: 11, color: "#699172", marginTop: 8, fontWeight: 600 }}>View details →</div>}
     </div>
   );
-  return href ? <Link href={href} style={{ textDecoration: "none" }}>{inner}</Link> : inner;
+  return href ? <Link href={href} style={{ textDecoration: "none", display: "block", height: "100%" }}>{inner}</Link> : inner;
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -198,7 +205,7 @@ export default function DashboardPage() {
   };
 
   const fmt = (n: number) =>
-    n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M` : `$${n.toLocaleString()}`;
+    `$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <AdminLayout>
@@ -212,17 +219,17 @@ export default function DashboardPage() {
           <>
             {/* Depositors */}
             <SectionLabel>Depositors</SectionLabel>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20, marginBottom: 4 }}>
-              <KpiCard label="Total Depositors to Date" value={stats.totalDepositors} sub="Unique investors with active capital" color="#10b981" href="/users?filter=hasDeposit" />
-              <KpiCard label="Active Depositors" value={stats.activeInvestors} sub="Investors with current balance (not fully redeemed)" color="#6366f1" href="/users?filter=hasActiveInvestment" />
-              <KpiCard label="Total Number of Deposits" value={stats.totalDepositCount} sub="All investment tranches ever deposited" color="#699172" href="/applications?filter=deposited" />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 20, marginBottom: 4, alignItems: "stretch" }}>
+              <KpiCard label="Total Depositors" value={stats.totalDepositors} sub="Unique investors with active capital" color="#10b981" href="/users?filter=hasDeposit" />
+              <KpiCard label="Active Depositors" value={stats.activeInvestors} sub="With current balance (not fully redeemed)" color="#6366f1" href="/users?filter=hasActiveInvestment" />
+              <KpiCard label="Total Deposits" value={stats.totalDepositCount} sub="All investment tranches ever deposited" color="#699172" href="/applications?filter=deposited" />
               <KpiCard label="Active Agreements" value={stats.totalInvestmentFiles} sub="Open active investment tranches" color="#b8923a" href="/applications?status=Active" />
               <KpiCard label="Pending Reviews" value={stats.pendingReviews} sub="Applications awaiting admin approval" color="#f59e0b" href="/applications?status=UnderReview" />
             </div>
 
             {/* Conversion Funnel */}
             <SectionLabel>Conversion Funnel — Unconverted Prospects</SectionLabel>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20, marginBottom: 4 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20, marginBottom: 4, alignItems: "stretch" }}>
               <KpiCard label="Never Applied" value={stats.neverApplied} sub="Registered, no application submitted" color="#94a3b8" href="/users?filter=neverApplied" />
               <KpiCard label="Awaiting Approval" value={stats.awaitingApproval} sub="Submitted, pending admin review" color="#f59e0b" href="/users?filter=awaitingApproval" />
               <KpiCard label="Latest App Rejected" value={stats.latestRejected} sub="No successful investment — most recent app rejected" color="#ef4444" href="/users?filter=latestRejected" />
@@ -254,7 +261,7 @@ export default function DashboardPage() {
                 </button>
               )}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 20, marginBottom: 4 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20, marginBottom: 4, alignItems: "stretch" }}>
               <KpiCard
                 label="Capital Raised"
                 value={fmt(stats.totalDepositedDateRange)}
@@ -272,6 +279,7 @@ export default function DashboardPage() {
               <KpiCard
                 label="Dividend Paid"
                 value={fmt(stats.interestPaidDateRange)}
+                breakdown={`${fmt(stats.monthlyDistributionsDateRange)} monthly divs + ${fmt(stats.redemptionInterestDateRange)} on exit`}
                 sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "YTD (default)"}
                 color="#10b981"
                 href="/distributions"

@@ -85,6 +85,8 @@ export interface DashboardStats {
   totalDepositedDateRange: number;
   totalWithdrawnDateRange: number;
   interestPaidDateRange: number;
+  monthlyDistributionsDateRange: number;
+  redemptionInterestDateRange: number;
   // YTD (legacy)
   ytdDeployed: number;
   ytdWithdrawn: number;
