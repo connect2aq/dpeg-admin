@@ -197,11 +197,14 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
 
-  const handleDateChange = (from: string, to: string) => {
-    setDateFrom(from);
-    setDateTo(to);
-    if (from && to) fetchDashboard(from, to);
-    else if (!from && !to) fetchDashboard();
+  const applyDateRange = () => {
+    if (dateFrom && dateTo) fetchDashboard(dateFrom, dateTo);
+  };
+
+  const clearDateRange = () => {
+    setDateFrom("");
+    setDateTo("");
+    fetchDashboard();
   };
 
   const fmt = (n: number) =>
@@ -242,19 +245,26 @@ export default function DashboardPage() {
               <input
                 type="date"
                 value={dateFrom}
-                onChange={e => handleDateChange(e.target.value, dateTo)}
+                onChange={e => setDateFrom(e.target.value)}
                 style={{ fontSize: 13, padding: "6px 10px", border: "1px solid #cbd5e1", borderRadius: 6, color: "#0e3416" }}
               />
               <label style={{ fontSize: 13, color: "#64748b", fontWeight: 600 }}>To</label>
               <input
                 type="date"
                 value={dateTo}
-                onChange={e => handleDateChange(dateFrom, e.target.value)}
+                onChange={e => setDateTo(e.target.value)}
                 style={{ fontSize: 13, padding: "6px 10px", border: "1px solid #cbd5e1", borderRadius: 6, color: "#0e3416" }}
               />
+              <button
+                onClick={applyDateRange}
+                disabled={!dateFrom || !dateTo}
+                style={{ fontSize: 13, padding: "6px 16px", border: "none", borderRadius: 6, background: dateFrom && dateTo ? "#0e3416" : "#e2e8f0", color: dateFrom && dateTo ? "#fff" : "#94a3b8", cursor: dateFrom && dateTo ? "pointer" : "default", fontWeight: 600, transition: "background 0.15s" }}
+              >
+                Apply
+              </button>
               {(dateFrom || dateTo) && (
                 <button
-                  onClick={() => handleDateChange("", "")}
+                  onClick={clearDateRange}
                   style={{ fontSize: 12, padding: "6px 12px", border: "1px solid #cbd5e1", borderRadius: 6, background: "#f8fafc", color: "#64748b", cursor: "pointer" }}
                 >
                   Clear
