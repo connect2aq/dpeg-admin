@@ -337,7 +337,7 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="card">
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>Monthly Capital Deployed</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>Monthly Deposits</div>
                     <ResponsiveContainer width="100%" height={200}>
                       <LineChart data={trends.monthlyCapital} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
