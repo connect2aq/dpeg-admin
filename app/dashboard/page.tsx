@@ -159,11 +159,11 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
         {hasDeployed
           ? arrow("Deployed",            `−${fmt(stats.deployedAmount ?? 0)}`,        "#8b5cf6", false, "/settings")
           : arrow("Deployed",            "Pending",                                   "#8b5cf6", true,  "/settings")}
-        {box("Dividend Received",        hasDividendReceived ? fmt(stats.dividendReceived ?? 0) : "Not entered", "#b8923a", !hasDividendReceived, hasDividendReceived ? undefined : "/settings")}
-        {box("Interest Received from Bank", hasInterestReceived ? fmt(stats.interestReceived ?? 0) : "Not entered", "#0f2342", !hasInterestReceived, hasInterestReceived ? undefined : "/settings")}
+        {box("Dividend Received",           hasDividendReceived ? fmt(stats.dividendReceived ?? 0) : "Not entered",  "#b8923a", !hasDividendReceived, "/settings")}
+        {box("Interest Received from Bank", hasInterestReceived ? fmt(stats.interestReceived ?? 0) : "Not entered",  "#0f2342", !hasInterestReceived, "/settings")}
 
         {/* Row 3 */}
-        {box("Other Charges / Expenses", hasOtherCharges ? fmt(stats.otherCharges ?? 0) : "Not entered",          "#ef4444", !hasOtherCharges, hasOtherCharges ? undefined : "/settings")}
+        {box("Other Charges / Expenses",    hasOtherCharges ? fmt(stats.otherCharges ?? 0) : "Not entered",          "#ef4444", !hasOtherCharges,      "/settings")}
         {hasDeployed
           ? box("Total Balance Available", fmt(available ?? 0),                       "#699172")
           : box("Total Balance Available", "Not entered",                             "#b8923a", true)}
