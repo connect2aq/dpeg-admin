@@ -275,14 +275,14 @@ export default function DashboardPage() {
               <KpiCard
                 label="Capital Raised"
                 value={fmt(stats.totalDepositedDateRange)}
-                sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "YTD (default)"}
+                sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "Since Inception (default)"}
                 color="#0e3416"
                 href="/capital-ledger"
               />
               <KpiCard
                 label="Total Redeemed"
                 value={fmt(stats.totalWithdrawnDateRange)}
-                sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "YTD (default)"}
+                sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "Since Inception (default)"}
                 color="#6366f1"
                 href="/redemptions?status=Active"
               />
@@ -290,7 +290,7 @@ export default function DashboardPage() {
                 label="Dividend Paid"
                 value={fmt(stats.interestPaidDateRange)}
                 breakdown={`${fmt(stats.monthlyDistributionsDateRange)} monthly divs + ${fmt(stats.redemptionInterestDateRange)} on exit`}
-                sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "YTD (default)"}
+                sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "Since Inception (default)"}
                 color="#10b981"
                 href="/distributions"
               />
