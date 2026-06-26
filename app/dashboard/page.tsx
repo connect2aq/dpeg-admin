@@ -66,11 +66,17 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
 
   const remaining           = stats.totalDeployedCommencement - stats.totalWithdrawnCommencement;
   const afterDividend       = remaining - stats.interestPaidCommencement;
-  const hasDeployed         = stats.deployedAmount != null;
-  const hasInterestReceived = stats.interestReceived != null;
-  // Balance Available = after dividends − deployed + interest received back from investments
+  const hasDeployed          = stats.deployedAmount != null;
+  const hasInterestReceived  = stats.interestReceived != null;
+  const hasDividendReceived  = stats.dividendReceived != null;
+  const hasOtherCharges      = stats.otherCharges != null;
+  // Balance Available = after dividends − deployed + interest received + dividend received − other charges
   const available = hasDeployed
-    ? afterDividend - (stats.deployedAmount ?? 0) + (hasInterestReceived ? (stats.interestReceived ?? 0) : 0)
+    ? afterDividend
+        - (stats.deployedAmount ?? 0)
+        + (hasInterestReceived ? (stats.interestReceived ?? 0) : 0)
+        + (hasDividendReceived ? (stats.dividendReceived ?? 0) : 0)
+        - (hasOtherCharges ? (stats.otherCharges ?? 0) : 0)
     : null;
   const hasBank  = stats.bankAccountBalance != null;
   const variance = hasDeployed && hasBank ? (stats.bankAccountBalance ?? 0) - (available ?? 0) : null;
@@ -139,30 +145,33 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
       <div style={{ fontSize: 13, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>
         Balance Flow (Since Inception){stats.balanceAsAtDate && ` — Balance as at ${new Date(stats.balanceAsAtDate).toLocaleDateString()}`}
       </div>
-      {/* 5-column grid — boxes wrap into two equal rows */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6, alignItems: "stretch" }}>
-        {/* Row 1 */}
+      {/* Row 1 — 5 columns */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6, alignItems: "stretch", marginBottom: 6 }}>
         {box("Total Deposits to Date",  fmt(stats.totalDeployedCommencement),    "#0e3416", false, "/applications?status=Active")}
         {arrow("Redeemed",              `−${fmt(stats.totalWithdrawnCommencement)}`, "#ef4444", false, "/redemptions?status=Active")}
         {box("Balance Remaining",       fmt(remaining),                           "#6366f1")}
         {arrow("Dividend Paid",         `−${fmt(stats.interestPaidCommencement)}`,  "#f59e0b", false, "/distributions",
           `${fmt(stats.monthlyDistributionsCommencement)} monthly divs + ${fmt(stats.redemptionInterestCommencement)} on exit`)}
         {box("After Dividends",         fmt(afterDividend),                       "#10b981")}
+      </div>
 
-        {/* Row 2 */}
+      {/* Row 2 — 7 columns */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, alignItems: "stretch" }}>
         {hasDeployed
-          ? arrow("Deployed",         `−${fmt(stats.deployedAmount ?? 0)}`,                        "#8b5cf6", false, "/settings")
-          : arrow("Deployed",         "Pending",                                                    "#8b5cf6", true,  "/settings")}
-        {box("Interest Received",     hasInterestReceived ? fmt(stats.interestReceived ?? 0) : "Not entered", "#0f2342", !hasInterestReceived, hasInterestReceived ? undefined : "/settings")}
+          ? arrow("Deployed",              `−${fmt(stats.deployedAmount ?? 0)}`,                                          "#8b5cf6", false, "/settings")
+          : arrow("Deployed",              "Pending",                                                                     "#8b5cf6", true,  "/settings")}
+        {box("Dividend Received",          hasDividendReceived ? fmt(stats.dividendReceived ?? 0) : "Not entered",        "#b8923a", !hasDividendReceived, hasDividendReceived ? undefined : "/settings")}
         {hasDeployed
-          ? box("Balance Available",  fmt(available ?? 0),                                          "#699172")
-          : box("Balance Available",  "Not entered",                                                "#b8923a", true)}
+          ? box("Balance Available",       fmt(available ?? 0),                                                           "#699172")
+          : box("Balance Available",       "Not entered",                                                                 "#b8923a", true)}
+        {box("Interest Received",          hasInterestReceived ? fmt(stats.interestReceived ?? 0) : "Not entered",        "#0f2342", !hasInterestReceived, hasInterestReceived ? undefined : "/settings")}
+        {box("Other Charges / Expenses",   hasOtherCharges ? fmt(stats.otherCharges ?? 0) : "Not entered",                "#ef4444", !hasOtherCharges, hasOtherCharges ? undefined : "/settings")}
         {hasBank && variance != null
-          ? arrow("Variance",         `${variance >= 0 ? "+" : "−"}${fmt(Math.abs(variance))}`,    variance >= 0 ? "#10b981" : "#ef4444")
-          : arrow("Variance",         "N/A",                                                        "#94a3b8", true)}
+          ? arrow("Variance",              `${variance >= 0 ? "+" : "−"}${fmt(Math.abs(variance))}`,                     variance >= 0 ? "#10b981" : "#ef4444")
+          : arrow("Variance",              "N/A",                                                                         "#94a3b8", true)}
         {hasBank
-          ? box("Bank Account Balance", fmt(stats.bankAccountBalance ?? 0),                         "#64748b", false, "/settings")
-          : box("Bank Account Balance", "Not entered",                                              "#64748b", true,  "/settings")}
+          ? box("Bank Account Balance",    fmt(stats.bankAccountBalance ?? 0),                                            "#64748b", false, "/settings")
+          : box("Bank Account Balance",    "Not entered",                                                                 "#64748b", true,  "/settings")}
       </div>
       {!hasDeployed && (
         <div style={{ fontSize: 11, color: "#b8923a", marginTop: 10 }}>

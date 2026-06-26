@@ -94,6 +94,8 @@ export interface DashboardStats {
   deployedAmount?: number;
   bankAccountBalance?: number;
   interestReceived?: number;
+  dividendReceived?: number;
+  otherCharges?: number;
   balanceAsAtDate?: string;
   // Date range reflected back
   dateRangeFrom?: string;
@@ -792,6 +794,8 @@ export interface DailyBalanceLog {
   bankAccountBalance: number;
   deployedAmount: number;
   interestReceived: number;
+  dividendReceived: number;
+  otherCharges: number;
   notes?: string;
 }
 

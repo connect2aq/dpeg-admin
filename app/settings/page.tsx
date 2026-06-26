@@ -18,6 +18,8 @@ const EMPTY_BALANCE: DailyBalanceLog = {
   bankAccountBalance: 0,
   deployedAmount: 0,
   interestReceived: 0,
+  dividendReceived: 0,
+  otherCharges: 0,
   notes: '',
 };
 
@@ -217,6 +219,16 @@ export default function SettingsPage() {
                   <input type="number" step="0.01" style={inputStyle} value={balanceForm.interestReceived}
                     onChange={e => setBalanceForm(f => ({ ...f, interestReceived: parseFloat(e.target.value) || 0 }))} />
                 </div>
+                <div>
+                  <label style={labelStyle}>Dividend Received</label>
+                  <input type="number" step="0.01" style={inputStyle} value={balanceForm.dividendReceived}
+                    onChange={e => setBalanceForm(f => ({ ...f, dividendReceived: parseFloat(e.target.value) || 0 }))} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Other Charges / Expenses</label>
+                  <input type="number" step="0.01" style={inputStyle} value={balanceForm.otherCharges}
+                    onChange={e => setBalanceForm(f => ({ ...f, otherCharges: parseFloat(e.target.value) || 0 }))} />
+                </div>
                 <div style={{ flex: '1 1 200px' }}>
                   <label style={labelStyle}>Notes (optional)</label>
                   <input style={inputStyle} value={balanceForm.notes ?? ''}
@@ -237,7 +249,7 @@ export default function SettingsPage() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr>
-                        {['Date', 'Bank Account Balance', 'Deployed Amount', 'Interest Received', 'Notes', ''].map(h => (
+                        {['Date', 'Bank Account Balance', 'Deployed Amount', 'Interest Received', 'Dividend Received', 'Other Charges', 'Notes', ''].map(h => (
                           <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: '#6b7280', fontWeight: 600, borderBottom: '1.5px solid #e2e8f0' }}>{h}</th>
                         ))}
                       </tr>
@@ -249,6 +261,8 @@ export default function SettingsPage() {
                           <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>${b.bankAccountBalance.toLocaleString()}</td>
                           <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>${b.deployedAmount.toLocaleString()}</td>
                           <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>{b.interestReceived ? `$${b.interestReceived.toLocaleString()}` : '—'}</td>
+                          <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>{b.dividendReceived ? `$${b.dividendReceived.toLocaleString()}` : '—'}</td>
+                          <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>{b.otherCharges ? `$${b.otherCharges.toLocaleString()}` : '—'}</td>
                           <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9', color: '#64748b' }}>{b.notes || '—'}</td>
                           <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>
                             <button onClick={() => setBalanceForm({ ...b, date: b.date.slice(0, 10) })}
