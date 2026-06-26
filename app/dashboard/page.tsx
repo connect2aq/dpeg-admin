@@ -64,18 +64,20 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function BalanceFlow({ stats }: { stats: DashboardStats }) {
   const fmt = (n: number) => `$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  const remaining           = stats.totalDeployedCommencement - stats.totalWithdrawnCommencement;
-  const afterDividend       = remaining - stats.interestPaidCommencement;
+  const remaining            = stats.totalDeployedCommencement - stats.totalWithdrawnCommencement;
+  const afterDividend        = remaining - stats.interestPaidCommencement;
   const hasDeployed          = stats.deployedAmount != null;
   const hasInterestReceived  = stats.interestReceived != null;
   const hasDividendReceived  = stats.dividendReceived != null;
+  const hasSponsoredEquity   = stats.sponsoredEquity != null;
   const hasOtherCharges      = stats.otherCharges != null;
-  // Balance Available = after dividends − deployed + interest received + dividend received − other charges
+  // Balance Available = after dividends − deployed + interest received + dividend received + sponsored equity − other charges
   const available = hasDeployed
     ? afterDividend
         - (stats.deployedAmount ?? 0)
         + (hasInterestReceived ? (stats.interestReceived ?? 0) : 0)
         + (hasDividendReceived ? (stats.dividendReceived ?? 0) : 0)
+        + (hasSponsoredEquity ? (stats.sponsoredEquity ?? 0) : 0)
         - (hasOtherCharges ? (stats.otherCharges ?? 0) : 0)
     : null;
   const hasBank  = stats.bankAccountBalance != null;
@@ -145,7 +147,7 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
       <div style={{ fontSize: 13, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>
         Balance Flow (Since Inception){stats.balanceAsAtDate && ` — Balance as at ${new Date(stats.balanceAsAtDate).toLocaleDateString()}`}
       </div>
-      {/* 3 rows × 4 columns — all cards same width and height */}
+      {/* Row 1–3: 4 columns; Row 4: Bank Account Balance full width */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, alignItems: "stretch" }}>
         {/* Row 1 */}
         {box("Total Deposits to Date",   fmt(stats.totalDeployedCommencement),       "#0e3416", false, "/capital-ledger?type=Contribution")}
@@ -160,9 +162,10 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
           ? arrow("Deployed",            `−${fmt(stats.deployedAmount ?? 0)}`,        "#8b5cf6", false, "/settings")
           : arrow("Deployed",            "Pending",                                   "#8b5cf6", true,  "/settings")}
         {box("Dividend Received",           hasDividendReceived ? fmt(stats.dividendReceived ?? 0) : "Not entered",  "#b8923a", !hasDividendReceived, "/settings")}
-        {box("Interest Received from Bank", hasInterestReceived ? fmt(stats.interestReceived ?? 0) : "Not entered",  "#0f2342", !hasInterestReceived, "/settings")}
+        {box("Sponsored Equity",            hasSponsoredEquity  ? fmt(stats.sponsoredEquity  ?? 0) : "Not entered",  "#699172", !hasSponsoredEquity,  "/settings")}
 
         {/* Row 3 */}
+        {box("Interest Received from Bank", hasInterestReceived ? fmt(stats.interestReceived ?? 0) : "Not entered",  "#0f2342", !hasInterestReceived, "/settings")}
         {arrow("Other Charges / Expenses",   hasOtherCharges ? `−${fmt(stats.otherCharges ?? 0)}` : "Not entered",    "#ef4444", !hasOtherCharges,      "/settings")}
         {hasDeployed
           ? box("Total Balance Available", fmt(available ?? 0),                       "#699172")
@@ -170,9 +173,13 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
         {hasBank && variance != null
           ? arrow("Variance",            `${variance >= 0 ? "+" : "−"}${fmt(Math.abs(variance))}`, variance >= 0 ? "#10b981" : "#ef4444")
           : arrow("Variance",            "N/A",                                                     "#94a3b8", true)}
-        {hasBank
-          ? box("Bank Account Balance",  fmt(stats.bankAccountBalance ?? 0),          "#64748b", false, "/settings")
-          : box("Bank Account Balance",  "Not entered",                               "#64748b", true,  "/settings")}
+
+        {/* Row 4: Bank Account Balance — full width */}
+        <div style={{ gridColumn: "1 / -1" }}>
+          {hasBank
+            ? box("Bank Account Balance",  fmt(stats.bankAccountBalance ?? 0),        "#64748b", false, "/settings")
+            : box("Bank Account Balance",  "Not entered",                             "#64748b", true,  "/settings")}
+        </div>
       </div>
       {!hasDeployed && (
         <div style={{ fontSize: 11, color: "#b8923a", marginTop: 10 }}>
@@ -273,7 +280,7 @@ export default function DashboardPage() {
                 </button>
               )}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20, marginBottom: 4, alignItems: "stretch" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, marginBottom: 4, alignItems: "stretch" }}>
               <KpiCard
                 label="Capital Raised"
                 value={fmt(dateFrom && dateTo ? stats.totalDepositedDateRange : stats.totalDeployedCommencement)}
@@ -295,6 +302,13 @@ export default function DashboardPage() {
                 sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "Since Inception (default)"}
                 color="#10b981"
                 href="/capital-ledger?type=Redemption,Dividend"
+              />
+              <KpiCard
+                label="Sponsored Equity"
+                value={stats.sponsoredEquity != null ? fmt(stats.sponsoredEquity) : "Not entered"}
+                sub="Manually entered — update in Settings"
+                color="#699172"
+                href="/settings"
               />
             </div>
 
