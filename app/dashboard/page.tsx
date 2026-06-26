@@ -174,13 +174,13 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
           ? arrow("Variance",            `${variance >= 0 ? "+" : "−"}${fmt(Math.abs(variance))}`, variance >= 0 ? "#10b981" : "#ef4444")
           : arrow("Variance",            "N/A",                                                     "#94a3b8", true)}
 
-        {/* Row 4: Bank Account Balance — full width, centered */}
+        {/* Row 4: Bank Account Balance — full width, centered, same height as peer cards */}
         <Link href="/settings" style={{ gridColumn: "1 / -1", textDecoration: "none", display: "block" }}>
           <div
             style={{
-              background: hasBank ? "#fff" : "#f8fafc",
-              border: `1px solid ${hasBank ? "#94a3b8" : "#e2e8f0"}`,
-              borderTop: "3px solid #64748b",
+              background: hasBank ? "linear-gradient(135deg, #f0f4f8 0%, #e8edf5 100%)" : "#f8fafc",
+              border: `1px solid ${hasBank ? "#b0bdd0" : "#e2e8f0"}`,
+              borderTop: "3px solid #0f2342",
               borderRadius: 8,
               padding: "12px 14px",
               opacity: hasBank ? 1 : 0.65,
@@ -188,21 +188,20 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
               transition: "box-shadow 0.15s",
               boxSizing: "border-box" as const,
               display: "flex",
-              flexDirection: "row" as const,
+              flexDirection: "column" as const,
               alignItems: "center",
-              justifyContent: "center",
-              gap: 20,
+              textAlign: "center" as const,
             }}
             onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)"; }}
             onMouseLeave={e => { e.currentTarget.style.boxShadow = ""; }}
           >
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "#64748b" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.08em", color: "#475569", marginBottom: 6 }}>
               Bank Account Balance
             </div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: hasBank ? "#0e3416" : "#94a3b8" }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: hasBank ? "#0f2342" : "#94a3b8", flex: 1, letterSpacing: "0.01em" }}>
               {hasBank ? fmt(stats.bankAccountBalance ?? 0) : "Not entered"}
             </div>
-            <div style={{ fontSize: 10, color: "#699172", fontWeight: 600 }}>View details →</div>
+            <div style={{ fontSize: 10, color: "#699172", marginTop: 6, fontWeight: 600 }}>View details →</div>
           </div>
         </Link>
       </div>
