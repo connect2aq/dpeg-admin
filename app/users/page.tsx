@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { adminApi, type UserListItem, type PagedResult, type CreateUserAdminRequest } from '@/lib/api';
+import { downloadCsv } from '@/lib/exportCsv';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 const STATUSES = ['', 'InProgress', 'UnderReview', 'Active', 'Inactive', 'Test', 'NeverApplied', 'HasDeposit', 'HasActiveInvestment', 'AwaitingApproval', 'LatestRejected'];
@@ -40,6 +41,7 @@ function UsersContent() {
   const [page, setPage] = useState(1);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'investors' | 'admins'>('investors');
+  const [exporting, setExporting] = useState(false);
 
   // Multi-select state
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -52,6 +54,42 @@ function UsersContent() {
   const [createForm, setCreateForm] = useState<CreateUserAdminRequest>(emptyCreateForm);
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState('');
+
+  const exportToExcel = async () => {
+    setExporting(true);
+    const params: Record<string, string | number> = { page: 1, pageSize: 100000 };
+    if (search) params.search = search;
+    const specialFilters = ['Test', 'NeverApplied', 'HasDeposit', 'HasActiveInvestment', 'AwaitingApproval', 'LatestRejected'];
+    if (status && !specialFilters.includes(status)) params.status = status;
+    if (viewMode === 'admins') params.isAdmin = 'true';
+    if (status === 'NeverApplied') params.neverApplied = 'true';
+    if (status === 'HasDeposit') params.hasDeposit = 'true';
+    if (status === 'HasActiveInvestment') params.hasActiveInvestment = 'true';
+    if (status === 'AwaitingApproval') params.awaitingApproval = 'true';
+    if (status === 'LatestRejected') params.latestRejected = 'true';
+    const r = await adminApi.users(params);
+    if (r.success) {
+      const items = status === 'Test' ? r.data.items.filter(u => u.isTestUser) : r.data.items;
+      if (viewMode === 'investors') {
+        const headers = ['ID', 'First Name', 'Last Name', 'Email', 'Status', 'Email Verified', 'Onboarding Step', 'Applications', 'Test User', 'Registered'];
+        const rows = items.map(u => [
+          u.id, u.firstName, u.lastName, u.email, u.status,
+          u.emailVerified ? 'Yes' : 'No', `${u.currentOnboardingStep}/7`,
+          u.applicationCount, u.isTestUser ? 'Yes' : 'No',
+          new Date(u.createdOn).toLocaleDateString(),
+        ]);
+        downloadCsv([headers, ...rows], 'users.csv');
+      } else {
+        const headers = ['ID', 'First Name', 'Last Name', 'Email', 'Status', 'Admin Role', 'Registered'];
+        const rows = items.map(u => [
+          u.id, u.firstName, u.lastName, u.email, u.status,
+          u.adminRole ?? '', new Date(u.createdOn).toLocaleDateString(),
+        ]);
+        downloadCsv([headers, ...rows], 'admin-users.csv');
+      }
+    }
+    setExporting(false);
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -190,6 +228,10 @@ function UsersContent() {
             {STATUSES.map(s => <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>)}
           </select>
           <button type="submit" className="btn-primary">Search</button>
+          <button type="button" onClick={exportToExcel} disabled={exporting}
+            style={{ padding: '10px 18px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: exporting ? 'not-allowed' : 'pointer', opacity: exporting ? 0.7 : 1 }}>
+            {exporting ? 'Exporting…' : '↓ Export'}
+          </button>
         </form>
 
         {/* Action toolbar */}
