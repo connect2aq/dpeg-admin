@@ -314,6 +314,7 @@ export interface CapitalLedgerEntry {
   ppmRefNo?: string;
   units?: number;
   amount: number;
+  dividendPaid?: number;
   runningBalance: number;
 }
 

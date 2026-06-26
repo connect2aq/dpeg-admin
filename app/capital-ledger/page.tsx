@@ -82,11 +82,12 @@ function CapitalLedgerContent() {
           e.email,
           e.ppmRefNo ?? '',
           e.units ?? '',
-          e.amount,
+          e.entryType !== 'Dividend' && e.amount !== 0 ? e.amount : '',
+          e.dividendPaid != null ? e.dividendPaid : '',
           e.runningBalance,
         ]);
       downloadCsv(
-        [['ID', 'App ID', 'Date', 'Type', 'Inv. Type', 'Investor', 'Email', 'PPM Ref', 'Units', 'Amount', 'Running Balance'], ...rows],
+        [['ID', 'App ID', 'Date', 'Type', 'Inv. Type', 'Investor', 'Email', 'PPM Ref', 'Units', 'Amount', 'Dividend Paid', 'Running Balance'], ...rows],
         'capital-ledger.csv',
       );
     }
@@ -174,15 +175,17 @@ function CapitalLedgerContent() {
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Investor</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>Units</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>Amount</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#b45309' }}>Dividend Paid</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>Running Balance</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleEntries.length === 0 && (
-                  <tr><td colSpan={9} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>No entries found.</td></tr>
+                  <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>No entries found.</td></tr>
                 )}
                 {visibleEntries.map((e, i) => {
                   const colors = TYPE_COLORS[e.entryType] ?? TYPE_COLORS.Contribution;
+                  const showAmount = e.entryType !== 'Dividend';
                   const isCredit = e.amount > 0;
                   return (
                     <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
@@ -218,8 +221,16 @@ function CapitalLedgerContent() {
                       <td style={{ padding: '11px 16px', textAlign: 'right', color: '#374151' }}>
                         {e.units != null ? e.units : '—'}
                       </td>
-                      <td style={{ padding: '11px 16px', textAlign: 'right', fontWeight: 700, color: isCredit ? '#15803d' : '#be123c', whiteSpace: 'nowrap' }}>
-                        {isCredit ? '+' : '−'}{fmtFull(Math.abs(e.amount))}
+                      <td style={{ padding: '11px 16px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap',
+                        color: showAmount ? (isCredit ? '#15803d' : '#be123c') : '#cbd5e1' }}>
+                        {showAmount
+                          ? <>{isCredit ? '+' : '−'}{fmtFull(Math.abs(e.amount))}</>
+                          : '—'}
+                      </td>
+                      <td style={{ padding: '11px 16px', textAlign: 'right', fontWeight: 700, color: '#b45309', whiteSpace: 'nowrap' }}>
+                        {e.dividendPaid != null && e.dividendPaid !== 0
+                          ? <>−{fmtFull(Math.abs(e.dividendPaid))}</>
+                          : <span style={{ color: '#cbd5e1' }}>—</span>}
                       </td>
                       <td style={{ padding: '11px 16px', textAlign: 'right', fontWeight: 600, color: '#0f2342', whiteSpace: 'nowrap' }}>
                         {fmtFull(e.runningBalance)}
@@ -236,6 +247,9 @@ function CapitalLedgerContent() {
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0f2342', fontSize: 13 }}>
                       Net: {fmtFull(visibleEntries.reduce((s, e) => s + e.amount, 0))}
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#b45309', fontSize: 13 }}>
+                      −{fmtFull(Math.abs(visibleEntries.reduce((s, e) => s + (e.dividendPaid ?? 0), 0)))}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0f2342', fontSize: 13 }}>
                       {data && fmtFull(data.closingBalance)}
