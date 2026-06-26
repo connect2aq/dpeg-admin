@@ -33,13 +33,20 @@ const fmt = (n: number) =>
 const fmtFull = (n: number) =>
   `${n < 0 ? '−$' : '$'}${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+const TYPE_LABELS: Record<string, string> = {
+  'Contribution':        'Contributions',
+  'Redemption':          'Redemptions',
+  'Dividend':            'Dividends',
+  'Redemption,Dividend': 'Redemptions + Dividends',
+};
+
 function CapitalLedgerContent() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<CapitalLedger | null>(null);
   const [loading, setLoading] = useState(true);
   const [from, setFrom] = useState(() => searchParams.get('from') ?? '');
   const [to, setTo] = useState(() => searchParams.get('to') ?? '');
-  const [typeFilter, setTypeFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState(() => searchParams.get('type') ?? '');
   const [search, setSearch] = useState('');
   const [appIdFilter, setAppIdFilter] = useState('');
   const [exporting, setExporting] = useState(false);
@@ -53,8 +60,9 @@ function CapitalLedgerContent() {
 
   useEffect(() => { load(); }, [load]);
 
+  const activeTypes = typeFilter ? typeFilter.split(',') : [];
   const visibleEntries = (data?.entries ?? []).filter(e => {
-    if (typeFilter && e.entryType !== typeFilter) return false;
+    if (activeTypes.length > 0 && !activeTypes.includes(e.entryType)) return false;
     if (search) {
       const q = search.toLowerCase();
       if (!e.investorName.toLowerCase().includes(q) && !e.email.toLowerCase().includes(q)) return false;
@@ -71,7 +79,7 @@ function CapitalLedgerContent() {
     const r = await adminApi.capitalLedger({ from: from || undefined, to: to || undefined });
     if (r.success && r.data) {
       const rows = r.data.entries
-        .filter(e => !typeFilter || e.entryType === typeFilter)
+        .filter(e => activeTypes.length === 0 || activeTypes.includes(e.entryType))
         .map(e => [
           entryLabel(e),
           e.applicationId ? `#${e.applicationId}` : '',
@@ -114,6 +122,20 @@ function CapitalLedgerContent() {
           </div>
         </div>
 
+        {/* Active filter banner — shown when arriving from dashboard deep-link */}
+        {typeFilter && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, padding: '12px 18px', background: '#fffbeb', border: '2px solid #f59e0b', borderRadius: 10 }}>
+            <span style={{ fontSize: 13, color: '#92400e' }}>Filtered by:</span>
+            <span style={{ fontSize: 15, fontWeight: 800, color: '#92400e', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+              {TYPE_LABELS[typeFilter] ?? typeFilter}
+            </span>
+            <button onClick={() => setTypeFilter('')}
+              style={{ marginLeft: 'auto', padding: '4px 12px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+              × Clear Filter
+            </button>
+          </div>
+        )}
+
         {/* Filters */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
           <input type="date" value={from} onChange={e => setFrom(e.target.value)}
@@ -127,11 +149,12 @@ function CapitalLedgerContent() {
             Clear
           </button>
           <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
-            style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, background: 'white' }}>
+            style={{ padding: '9px 12px', border: typeFilter ? '2px solid #f59e0b' : '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: typeFilter ? 700 : 400, background: typeFilter ? '#fffbeb' : 'white', color: typeFilter ? '#92400e' : '#374151' }}>
             <option value="">All Types</option>
             <option value="Contribution">Contributions</option>
             <option value="Redemption">Redemptions</option>
             <option value="Dividend">Dividends</option>
+            <option value="Redemption,Dividend">Redemptions + Dividends</option>
           </select>
           <input type="text" placeholder="Search investor…" value={search} onChange={e => setSearch(e.target.value)}
             style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, flex: '1 1 180px' }} />

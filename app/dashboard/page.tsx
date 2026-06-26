@@ -148,10 +148,10 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
       {/* 3 rows × 4 columns — all cards same width and height */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, alignItems: "stretch" }}>
         {/* Row 1 */}
-        {box("Total Deposits to Date",   fmt(stats.totalDeployedCommencement),       "#0e3416", false, "/capital-ledger")}
-        {arrow("Redeemed",               `−${fmt(stats.totalWithdrawnCommencement)}`, "#ef4444", false, "/capital-ledger")}
+        {box("Total Deposits to Date",   fmt(stats.totalDeployedCommencement),       "#0e3416", false, "/capital-ledger?type=Contribution")}
+        {arrow("Redeemed",               `−${fmt(stats.totalWithdrawnCommencement)}`, "#ef4444", false, "/capital-ledger?type=Redemption")}
         {box("Balance Remaining",        fmt(remaining),                              "#6366f1")}
-        {arrow("Dividend Paid",          `−${fmt(stats.interestPaidCommencement)}`,   "#f59e0b", false, "/capital-ledger",
+        {arrow("Dividend Paid",          `−${fmt(stats.interestPaidCommencement)}`,   "#f59e0b", false, "/capital-ledger?type=Redemption,Dividend",
           `${fmt(stats.monthlyDistributionsCommencement)} monthly divs + ${fmt(stats.redemptionInterestCommencement)} on exit`)}
 
         {/* Row 2 */}
@@ -279,14 +279,14 @@ export default function DashboardPage() {
                 value={fmt(dateFrom && dateTo ? stats.totalDepositedDateRange : stats.totalDeployedCommencement)}
                 sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "Since Inception (default)"}
                 color="#0e3416"
-                href="/capital-ledger"
+                href="/capital-ledger?type=Contribution"
               />
               <KpiCard
                 label="Total Redeemed"
                 value={fmt(stats.totalWithdrawnDateRange)}
                 sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "Since Inception (default)"}
                 color="#6366f1"
-                href="/capital-ledger"
+                href="/capital-ledger?type=Redemption"
               />
               <KpiCard
                 label="Dividend Paid"
@@ -294,7 +294,7 @@ export default function DashboardPage() {
                 breakdown={`${fmt(stats.monthlyDistributionsDateRange)} monthly divs + ${fmt(stats.redemptionInterestDateRange)} on exit`}
                 sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "Since Inception (default)"}
                 color="#10b981"
-                href="/capital-ledger"
+                href="/capital-ledger?type=Redemption,Dividend"
               />
             </div>
 
