@@ -163,7 +163,7 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
         {box("Interest Received from Bank", hasInterestReceived ? fmt(stats.interestReceived ?? 0) : "Not entered",  "#0f2342", !hasInterestReceived, "/settings")}
 
         {/* Row 3 */}
-        {box("Other Charges / Expenses",    hasOtherCharges ? fmt(stats.otherCharges ?? 0) : "Not entered",          "#ef4444", !hasOtherCharges,      "/settings")}
+        {arrow("Other Charges / Expenses",   hasOtherCharges ? `−${fmt(stats.otherCharges ?? 0)}` : "Not entered",    "#ef4444", !hasOtherCharges,      "/settings")}
         {hasDeployed
           ? box("Total Balance Available", fmt(available ?? 0),                       "#699172")
           : box("Total Balance Available", "Not entered",                             "#b8923a", true)}
