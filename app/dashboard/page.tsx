@@ -148,10 +148,10 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
       {/* 3 rows × 4 columns — all cards same width and height */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, alignItems: "stretch" }}>
         {/* Row 1 */}
-        {box("Total Deposits to Date",   fmt(stats.totalDeployedCommencement),       "#0e3416", false, "/applications?status=Active")}
-        {arrow("Redeemed",               `−${fmt(stats.totalWithdrawnCommencement)}`, "#ef4444", false, "/redemptions?status=Active")}
+        {box("Total Deposits to Date",   fmt(stats.totalDeployedCommencement),       "#0e3416", false, "/capital-ledger")}
+        {arrow("Redeemed",               `−${fmt(stats.totalWithdrawnCommencement)}`, "#ef4444", false, "/capital-ledger")}
         {box("Balance Remaining",        fmt(remaining),                              "#6366f1")}
-        {arrow("Dividend Paid",          `−${fmt(stats.interestPaidCommencement)}`,   "#f59e0b", false, "/distributions",
+        {arrow("Dividend Paid",          `−${fmt(stats.interestPaidCommencement)}`,   "#f59e0b", false, "/capital-ledger",
           `${fmt(stats.monthlyDistributionsCommencement)} monthly divs + ${fmt(stats.redemptionInterestCommencement)} on exit`)}
 
         {/* Row 2 */}
@@ -286,7 +286,7 @@ export default function DashboardPage() {
                 value={fmt(stats.totalWithdrawnDateRange)}
                 sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "Since Inception (default)"}
                 color="#6366f1"
-                href="/redemptions?status=Active"
+                href="/capital-ledger"
               />
               <KpiCard
                 label="Dividend Paid"
@@ -294,7 +294,7 @@ export default function DashboardPage() {
                 breakdown={`${fmt(stats.monthlyDistributionsDateRange)} monthly divs + ${fmt(stats.redemptionInterestDateRange)} on exit`}
                 sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "Since Inception (default)"}
                 color="#10b981"
-                href="/distributions"
+                href="/capital-ledger"
               />
             </div>
 
