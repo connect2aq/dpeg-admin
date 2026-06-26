@@ -101,7 +101,7 @@ export interface DashboardStats {
   // Date range reflected back
   dateRangeFrom?: string;
   dateRangeTo?: string;
-  recentApplications: ApplicationSummary[];
+  recentApplications: ApplicationListItem[];
 }
 
 export interface UserListItem {

@@ -402,23 +402,40 @@ export default function DashboardPage() {
                 <table>
                   <thead>
                     <tr>
-                      <th>ID</th>
+                      <th>ID / REF</th>
+                      <th>Account User</th>
                       <th>Investor</th>
                       <th>Type</th>
                       <th>Units</th>
                       <th>Amount</th>
                       <th>Status</th>
+                      <th>Effective Date</th>
                       <th>Submitted</th>
                     </tr>
                   </thead>
                   <tbody>
                     {stats.recentApplications.map((a) => (
                       <tr key={a.id}>
-                        <td style={{ fontFamily: "monospace", fontWeight: 600 }}>
-                          <Link href={`/applications/${a.id}`} style={{ color: "#0e3416", textDecoration: "none" }}>#{a.id}</Link>
+                        <td>
+                          <div style={{ fontFamily: "monospace", fontWeight: 700 }}>
+                            <Link href={`/applications/${a.id}`} style={{ color: "#0e3416", textDecoration: "none" }}>#{a.id}</Link>
+                          </div>
+                          {a.ppmRefNO && <div style={{ fontSize: 11, color: "#94a3b8" }}>PPM {a.ppmRefNO}</div>}
                         </td>
                         <td>
-                          {a.userId && a.investorName ? (
+                          {a.userId ? (
+                            <>
+                              <div style={{ fontWeight: 600 }}>
+                                <Link href={`/users/${a.userId}`} style={{ color: "#0e3416", textDecoration: "none" }}>{a.userFirstName} {a.userLastName}</Link>
+                              </div>
+                              <div style={{ fontSize: 11, color: "#94a3b8" }}>{a.userEmail}</div>
+                            </>
+                          ) : (
+                            <span style={{ color: "#94a3b8" }}>—</span>
+                          )}
+                        </td>
+                        <td>
+                          {a.investorName ? (
                             <Link href={`/users/${a.userId}`} style={{ color: "#699172", fontWeight: 600, textDecoration: "none" }}>{a.investorName}</Link>
                           ) : (
                             <span style={{ color: "#94a3b8" }}>—</span>
@@ -428,6 +445,9 @@ export default function DashboardPage() {
                         <td>{a.numUnits ?? "—"}</td>
                         <td>{a.totalAmount ? `$${a.totalAmount.toLocaleString()}` : "—"}</td>
                         <td><StatusBadge status={a.status} /></td>
+                        <td style={{ color: "#64748b", fontSize: 13 }}>
+                          {a.effectiveDate ? new Date(a.effectiveDate).toLocaleDateString() : "—"}
+                        </td>
                         <td style={{ color: "#64748b", fontSize: 13 }}>
                           {a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : "—"}
                         </td>
