@@ -145,33 +145,34 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
       <div style={{ fontSize: 13, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>
         Balance Flow (Since Inception){stats.balanceAsAtDate && ` — Balance as at ${new Date(stats.balanceAsAtDate).toLocaleDateString()}`}
       </div>
-      {/* Row 1 — 5 columns */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6, alignItems: "stretch", marginBottom: 6 }}>
-        {box("Total Deposits to Date",  fmt(stats.totalDeployedCommencement),    "#0e3416", false, "/applications?status=Active")}
-        {arrow("Redeemed",              `−${fmt(stats.totalWithdrawnCommencement)}`, "#ef4444", false, "/redemptions?status=Active")}
-        {box("Balance Remaining",       fmt(remaining),                           "#6366f1")}
-        {arrow("Dividend Paid",         `−${fmt(stats.interestPaidCommencement)}`,  "#f59e0b", false, "/distributions",
+      {/* 3 rows × 4 columns — all cards same width and height */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, alignItems: "stretch" }}>
+        {/* Row 1 */}
+        {box("Total Deposits to Date",   fmt(stats.totalDeployedCommencement),       "#0e3416", false, "/applications?status=Active")}
+        {arrow("Redeemed",               `−${fmt(stats.totalWithdrawnCommencement)}`, "#ef4444", false, "/redemptions?status=Active")}
+        {box("Balance Remaining",        fmt(remaining),                              "#6366f1")}
+        {arrow("Dividend Paid",          `−${fmt(stats.interestPaidCommencement)}`,   "#f59e0b", false, "/distributions",
           `${fmt(stats.monthlyDistributionsCommencement)} monthly divs + ${fmt(stats.redemptionInterestCommencement)} on exit`)}
-        {box("After Dividends",         fmt(afterDividend),                       "#10b981")}
-      </div>
 
-      {/* Row 2 — 7 columns */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, alignItems: "stretch" }}>
+        {/* Row 2 */}
+        {box("After Dividends",          fmt(afterDividend),                          "#10b981")}
         {hasDeployed
-          ? arrow("Deployed",              `−${fmt(stats.deployedAmount ?? 0)}`,                                          "#8b5cf6", false, "/settings")
-          : arrow("Deployed",              "Pending",                                                                     "#8b5cf6", true,  "/settings")}
-        {box("Dividend Received",          hasDividendReceived ? fmt(stats.dividendReceived ?? 0) : "Not entered",        "#b8923a", !hasDividendReceived, hasDividendReceived ? undefined : "/settings")}
+          ? arrow("Deployed",            `−${fmt(stats.deployedAmount ?? 0)}`,        "#8b5cf6", false, "/settings")
+          : arrow("Deployed",            "Pending",                                   "#8b5cf6", true,  "/settings")}
+        {box("Dividend Received",        hasDividendReceived ? fmt(stats.dividendReceived ?? 0) : "Not entered", "#b8923a", !hasDividendReceived, hasDividendReceived ? undefined : "/settings")}
         {hasDeployed
-          ? box("Balance Available",       fmt(available ?? 0),                                                           "#699172")
-          : box("Balance Available",       "Not entered",                                                                 "#b8923a", true)}
-        {box("Interest Received",          hasInterestReceived ? fmt(stats.interestReceived ?? 0) : "Not entered",        "#0f2342", !hasInterestReceived, hasInterestReceived ? undefined : "/settings")}
-        {box("Other Charges / Expenses",   hasOtherCharges ? fmt(stats.otherCharges ?? 0) : "Not entered",                "#ef4444", !hasOtherCharges, hasOtherCharges ? undefined : "/settings")}
+          ? box("Balance Available",     fmt(available ?? 0),                         "#699172")
+          : box("Balance Available",     "Not entered",                               "#b8923a", true)}
+
+        {/* Row 3 */}
+        {box("Interest Received",        hasInterestReceived ? fmt(stats.interestReceived ?? 0) : "Not entered",  "#0f2342", !hasInterestReceived, hasInterestReceived ? undefined : "/settings")}
+        {box("Other Charges / Expenses", hasOtherCharges ? fmt(stats.otherCharges ?? 0) : "Not entered",          "#ef4444", !hasOtherCharges, hasOtherCharges ? undefined : "/settings")}
         {hasBank && variance != null
-          ? arrow("Variance",              `${variance >= 0 ? "+" : "−"}${fmt(Math.abs(variance))}`,                     variance >= 0 ? "#10b981" : "#ef4444")
-          : arrow("Variance",              "N/A",                                                                         "#94a3b8", true)}
+          ? arrow("Variance",            `${variance >= 0 ? "+" : "−"}${fmt(Math.abs(variance))}`, variance >= 0 ? "#10b981" : "#ef4444")
+          : arrow("Variance",            "N/A",                                                     "#94a3b8", true)}
         {hasBank
-          ? box("Bank Account Balance",    fmt(stats.bankAccountBalance ?? 0),                                            "#64748b", false, "/settings")
-          : box("Bank Account Balance",    "Not entered",                                                                 "#64748b", true,  "/settings")}
+          ? box("Bank Account Balance",  fmt(stats.bankAccountBalance ?? 0),          "#64748b", false, "/settings")
+          : box("Bank Account Balance",  "Not entered",                               "#64748b", true,  "/settings")}
       </div>
       {!hasDeployed && (
         <div style={{ fontSize: 11, color: "#b8923a", marginTop: 10 }}>
@@ -239,14 +240,6 @@ export default function DashboardPage() {
               <KpiCard label="Pending Reviews" value={stats.pendingReviews} sub="Applications awaiting admin approval" color="#f59e0b" href="/applications?status=UnderReview" />
             </div>
 
-            {/* Conversion Funnel */}
-            <SectionLabel>Conversion Funnel — Unconverted Prospects</SectionLabel>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20, marginBottom: 4, alignItems: "stretch" }}>
-              <KpiCard label="Never Applied" value={stats.neverApplied} sub="Registered, no application submitted" color="#94a3b8" href="/users?filter=neverApplied" />
-              <KpiCard label="Awaiting Approval" value={stats.awaitingApproval} sub="Submitted, pending admin review" color="#f59e0b" href="/users?filter=awaitingApproval" />
-              <KpiCard label="Latest App Rejected" value={stats.latestRejected} sub="No successful investment — most recent app rejected" color="#ef4444" href="/users?filter=latestRejected" />
-            </div>
-
             {/* Date Range Filter */}
             <SectionLabel>Capital Flows — Date Range</SectionLabel>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
@@ -283,7 +276,7 @@ export default function DashboardPage() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20, marginBottom: 4, alignItems: "stretch" }}>
               <KpiCard
                 label="Capital Raised"
-                value={fmt(stats.totalDepositedDateRange)}
+                value={fmt(dateFrom && dateTo ? stats.totalDepositedDateRange : stats.totalDeployedCommencement)}
                 sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "Since Inception (default)"}
                 color="#0e3416"
                 href="/capital-ledger"
