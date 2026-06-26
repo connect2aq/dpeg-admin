@@ -224,6 +224,7 @@ export interface RedemptionListItem {
   email?: string;
   status: string;
   createdOn: string;
+  trancheApplicationId?: number;
 }
 
 export interface RedemptionDetail extends RedemptionListItem {

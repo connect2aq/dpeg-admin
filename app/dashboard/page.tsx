@@ -264,7 +264,7 @@ export default function DashboardPage() {
             {/* Depositors */}
             <SectionLabel>Depositors</SectionLabel>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 20, marginBottom: 4, alignItems: "stretch" }}>
-              <KpiCard label="Total Depositors" value={stats.totalDepositors} sub="Unique investors with active capital" color="#10b981" href="/users?filter=hasDeposit" />
+              <KpiCard label="Total Depositors" value={stats.totalDepositors} sub="Unique investors" color="#10b981" href="/users?filter=hasDeposit" />
               <KpiCard label="Active Depositors" value={stats.activeInvestors} sub="With current balance (not fully redeemed)" color="#6366f1" href="/users?filter=hasActiveInvestment" />
               <KpiCard label="Total Deposits" value={stats.totalDepositCount} sub="All investment tranches ever deposited" color="#699172" href="/applications?filter=deposited" />
               <KpiCard label="Active Agreements" value={stats.totalInvestmentFiles} sub="Open active investment tranches" color="#b8923a" href="/applications?status=Active" />

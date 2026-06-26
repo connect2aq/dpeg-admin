@@ -781,11 +781,12 @@ export default function UserDetailPage() {
             <div style={{ overflowX: 'auto' }}>
               <table>
                 <thead>
-                  <tr><th>Investor</th><th>Units to Redeem</th><th>Effective Date</th><th>Redemption Amount</th><th>Status</th><th></th></tr>
+                  <tr><th>App ID</th><th>Investor</th><th>Units to Redeem</th><th>Effective Date</th><th>Redemption Amount</th><th>Status</th><th></th></tr>
                 </thead>
                 <tbody>
                   {userRedemptions.map(r => (
                     <tr key={r.id}>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 600, color: '#64748b' }}>{r.trancheApplicationId ? `#${r.trancheApplicationId}` : '—'}</td>
                       <td style={{ fontWeight: 600 }}>{r.sellingPartnerName || r.email || '—'}</td>
                       <td>{r.unitsToRedeem ?? '—'}</td>
                       <td style={{ fontSize: 13, color: '#64748b' }}>{r.effectiveDate || '—'}</td>
