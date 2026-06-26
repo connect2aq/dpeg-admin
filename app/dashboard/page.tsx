@@ -165,7 +165,7 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
         {box("Sponsored Equity",            hasSponsoredEquity  ? fmt(stats.sponsoredEquity  ?? 0) : "Not entered",  "#699172", !hasSponsoredEquity,  "/settings")}
 
         {/* Row 3 */}
-        {box("Interest Received from Bank", hasInterestReceived ? fmt(stats.interestReceived ?? 0) : "Not entered",  "#0f2342", !hasInterestReceived, "/settings")}
+        {box("Profit Received from Bank", hasInterestReceived ? fmt(stats.interestReceived ?? 0) : "Not entered",  "#0f2342", !hasInterestReceived, "/settings")}
         {arrow("Other Charges / Expenses",   hasOtherCharges ? `−${fmt(stats.otherCharges ?? 0)}` : "Not entered",    "#ef4444", !hasOtherCharges,      "/settings")}
         {hasDeployed
           ? box("Total Balance Available", fmt(available ?? 0),                       "#699172")
