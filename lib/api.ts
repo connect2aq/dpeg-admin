@@ -323,6 +323,7 @@ export interface CapitalLedger {
   totalContributions: number;
   totalRedemptions: number;
   totalDistributions: number;
+  totalRedemptionDistributions: number;
   totalPendingAccruals: number;
   closingBalance: number;
 }

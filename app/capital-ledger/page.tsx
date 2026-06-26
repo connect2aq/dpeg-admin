@@ -145,12 +145,16 @@ function CapitalLedgerContent() {
         {/* Summary */}
         {data && (
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
-            {data.openingBalance !== 0 && statCard('Opening Balance', fmt(data.openingBalance), '#0f2342', from ? `as at ${from}` : undefined)}
-            {statCard('Total Contributions', fmt(data.totalContributions), '#15803d', `${data.entries.filter(e => e.amount > 0).length} entries`)}
-            {statCard('Total Redemptions', `−${fmt(data.totalRedemptions)}`, '#be123c', `${data.entries.filter(e => e.entryType === 'Redemption').length} entries`)}
-            {statCard('Dividends Paid', `−${fmt(data.totalDistributions)}`, '#b45309', `${data.entries.filter(e => e.entryType === 'Dividend').length} entries`)}
-            {statCard('Net Balance', fmt(data.closingBalance), '#0f2342', 'closing balance')}
-            {data.totalPendingAccruals > 0 && statCard('Accrued & Unpaid', `~${fmt(data.totalPendingAccruals)}`, '#7c3aed', 'pending daily accruals')}
+            {data.openingBalance !== 0 && statCard('Opening Balance', fmtFull(data.openingBalance), '#0f2342', from ? `as at ${from}` : undefined)}
+            {statCard('Total Contributions', fmtFull(data.totalContributions), '#15803d', `${data.entries.filter(e => e.amount > 0).length} entries`)}
+            {statCard('Total Redemptions', `−${fmtFull(data.totalRedemptions)}`, '#be123c', `${data.entries.filter(e => e.entryType === 'Redemption').length} entries`)}
+            {statCard('Dividends Paid', `−${fmtFull(data.totalDistributions + data.totalRedemptionDistributions)}`, '#b45309',
+              data.totalRedemptionDistributions > 0
+                ? `${fmtFull(data.totalDistributions)} monthly + ${fmtFull(data.totalRedemptionDistributions)} on exit`
+                : `${data.entries.filter(e => e.entryType === 'Dividend').length} entries`
+            )}
+            {statCard('Net Balance', fmtFull(data.closingBalance), '#0f2342', 'closing balance')}
+            {data.totalPendingAccruals > 0 && statCard('Accrued & Unpaid', `~${fmtFull(data.totalPendingAccruals)}`, '#7c3aed', 'pending daily accruals')}
           </div>
         )}
 
