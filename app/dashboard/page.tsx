@@ -160,13 +160,13 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
           ? arrow("Deployed",            `−${fmt(stats.deployedAmount ?? 0)}`,        "#8b5cf6", false, "/settings")
           : arrow("Deployed",            "Pending",                                   "#8b5cf6", true,  "/settings")}
         {box("Dividend Received",        hasDividendReceived ? fmt(stats.dividendReceived ?? 0) : "Not entered", "#b8923a", !hasDividendReceived, hasDividendReceived ? undefined : "/settings")}
-        {hasDeployed
-          ? box("Total Balance Available",     fmt(available ?? 0),                         "#699172")
-          : box("Total Balance Available",     "Not entered",                               "#b8923a", true)}
+        {box("Interest Received from Bank", hasInterestReceived ? fmt(stats.interestReceived ?? 0) : "Not entered", "#0f2342", !hasInterestReceived, hasInterestReceived ? undefined : "/settings")}
 
         {/* Row 3 */}
-        {box("Interest Received from Bank", hasInterestReceived ? fmt(stats.interestReceived ?? 0) : "Not entered",  "#0f2342", !hasInterestReceived, hasInterestReceived ? undefined : "/settings")}
         {box("Other Charges / Expenses", hasOtherCharges ? fmt(stats.otherCharges ?? 0) : "Not entered",          "#ef4444", !hasOtherCharges, hasOtherCharges ? undefined : "/settings")}
+        {hasDeployed
+          ? box("Total Balance Available", fmt(available ?? 0),                       "#699172")
+          : box("Total Balance Available", "Not entered",                             "#b8923a", true)}
         {hasBank && variance != null
           ? arrow("Variance",            `${variance >= 0 ? "+" : "−"}${fmt(Math.abs(variance))}`, variance >= 0 ? "#10b981" : "#ef4444")
           : arrow("Variance",            "N/A",                                                     "#94a3b8", true)}
