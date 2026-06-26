@@ -66,7 +66,7 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-full overflow-hidden">
       {/* Mobile overlay — closes sidebar on tap */}
       <div
         className={`sidebar-overlay${mobileOpen ? ' visible' : ''}`}
