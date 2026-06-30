@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { adminApi } from "@/lib/api";
 import Image from "next/image";
 
 const NAV = [
@@ -11,6 +12,8 @@ const NAV = [
   { href: "/applications", label: "Applications", icon: "📋" },
   { href: "/redemptions", label: "Redemptions", icon: "↩" },
   { href: "/distributions", label: "Distributions", icon: "$" },
+  { href: "/capital-ledger", label: "Fund Capital Ledger", icon: "⊞" },
+  { href: "/investor-statements", label: "Investor Statements", icon: "📄" },
   { href: "/statements", label: "Statements", icon: "≡" },
   { href: "/daily-interest", label: "Daily Interest", icon: "%" },
   { href: "/odoo-logs", label: "Odoo Logs", icon: "⇄" },
@@ -19,6 +22,7 @@ const NAV = [
   { href: "/audit-log", label: "Audit Log", icon: "🔍" },
   { href: "/settings", label: "Settings", icon: "⚙" },
   { href: "/historical-import", label: "Historical Import", icon: "⬆" },
+  { href: "/smtp-test", label: "SMTP Test", icon: "✉" },
 ];
 
 export default function AdminLayout({
@@ -30,6 +34,24 @@ export default function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [pendingBadge, setPendingBadge] = useState(0);
+
+  const adminRole = user?.adminRole ?? "SuperAdmin";
+
+  useEffect(() => {
+    if (!user) return;
+    adminApi
+      .getPendingCounts()
+      .then((r) => {
+        if (!r.success || !r.data) return;
+        if (adminRole === "Checker") setPendingBadge(r.data.pendingForChecker);
+        else if (adminRole === "Approver")
+          setPendingBadge(r.data.checkedForApprover);
+        else if (adminRole === "SuperAdmin")
+          setPendingBadge(r.data.pendingForChecker + r.data.checkedForApprover);
+      })
+      .catch(() => {});
+  }, [user, adminRole]);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
@@ -49,7 +71,7 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-full overflow-hidden">
       {/* Mobile overlay — closes sidebar on tap */}
       <div
         className={`sidebar-overlay${mobileOpen ? " visible" : ""}`}
@@ -58,7 +80,7 @@ export default function AdminLayout({
 
       {/* ── Sidebar ───────────────────────────────────────── */}
       <aside
-        className={`sidebar-nav flex-shrink-0 flex flex-col${mobileOpen ? " open" : ""}`}
+        className={`sidebar-nav flex-shrink-0 flex flex-col min-h-0${mobileOpen ? " open" : ""}`}
         style={{
           width: "var(--sidebar-width)",
           background: "var(--forest)",
@@ -95,7 +117,43 @@ export default function AdminLayout({
         </div>
 
         {/* Navigation */}
-        <nav style={{ flex: 1, padding: "14px 12px" }}>
+        <nav
+          style={{
+            flex: 1,
+            padding: "14px 12px",
+            overflowY: "auto",
+            minHeight: 0,
+          }}
+        >
+          {/* Pending Approvals — visible to Checker, Approver, SuperAdmin */}
+          {adminRole !== "Maker" && (
+            <Link
+              href="/pending-approvals"
+              className={`sidebar-link ${pathname.startsWith("/pending-approvals") ? "active" : ""}`}
+              onClick={() => setMobileOpen(false)}
+              style={{ position: "relative" }}
+            >
+              <span style={{ fontSize: 15, width: 20, flexShrink: 0 }}>⏳</span>
+              Pending Approvals
+              {pendingBadge > 0 && (
+                <span
+                  style={{
+                    marginLeft: "auto",
+                    background: "#b8923a",
+                    color: "white",
+                    borderRadius: 10,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "1px 6px",
+                    minWidth: 18,
+                    textAlign: "center",
+                  }}
+                >
+                  {pendingBadge}
+                </span>
+              )}
+            </Link>
+          )}
           {NAV.map(({ href, label, icon }) => (
             <Link
               key={href}
@@ -109,6 +167,21 @@ export default function AdminLayout({
               {label}
             </Link>
           ))}
+          {adminRole === "SuperAdmin" &&
+            process.env.NEXT_PUBLIC_HANGFIRE_URL && (
+              <a
+                href={process.env.NEXT_PUBLIC_HANGFIRE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="sidebar-link"
+                onClick={() => setMobileOpen(false)}
+              >
+                <span style={{ fontSize: 15, width: 20, flexShrink: 0 }}>
+                  ⚙
+                </span>
+                Job Monitor
+              </a>
+            )}
         </nav>
 
         {/* User footer */}
@@ -129,16 +202,34 @@ export default function AdminLayout({
           >
             Signed in as
           </div>
-          <div
-            style={{
-              fontSize: 13.5,
-              color: "#ffffff",
-              fontWeight: 600,
-              marginBottom: 10,
-            }}
+          <Link
+            href={`/users/${user.userId}`}
+            onClick={() => setMobileOpen(false)}
+            title="View my account (change password, etc.)"
+            style={{ textDecoration: "none", display: "block" }}
           >
-            {user.firstName} {user.lastName}
-          </div>
+            <div
+              style={{
+                fontSize: 13.5,
+                color: "#ffffff",
+                fontWeight: 600,
+                marginBottom: 2,
+              }}
+            >
+              {user.firstName} {user.lastName}
+            </div>
+            <div
+              style={{
+                fontSize: 10.5,
+                color: "#b8923a",
+                fontWeight: 600,
+                marginBottom: 8,
+                letterSpacing: "0.04em",
+              }}
+            >
+              {adminRole} · My Account
+            </div>
+          </Link>
           <button
             onClick={() => {
               logout();

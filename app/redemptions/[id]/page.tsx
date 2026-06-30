@@ -4,9 +4,9 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
-import { adminApi, type RedemptionDetail, type DocuSignEnvelopeStatus } from '@/lib/api';
+import { adminApi, STATIC_BASE, type RedemptionDetail, type DocuSignEnvelopeStatus } from '@/lib/api';
 
-const STATUSES = ['UnderReview', 'Rejected', 'Redeemed'];
+const STATUSES = ['UnderReview', 'Active', 'Rejected'];
 
 // DB DateTime columns come back without timezone info; append Z so JS treats them as UTC
 const asUtc = (iso?: string | null) =>
@@ -38,12 +38,19 @@ export default function RedemptionDetailPage() {
   const [note, setNote] = useState('');
   const [updating, setUpdating] = useState(false);
   const [msg, setMsg] = useState('');
+  const [approveConfirm, setApproveConfirm] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [approveMsg, setApproveMsg] = useState('');
 
   const [dsStatus, setDsStatus] = useState<DocuSignEnvelopeStatus | null>(null);
   const [dsLoading, setDsLoading] = useState(false);
   const [dsError, setDsError] = useState('');
   const [dsSending, setDsSending] = useState(false);
   const [dsSendMsg, setDsSendMsg] = useState('');
+  const [dsDownloading, setDsDownloading] = useState(false);
+  const [signedDocFile, setSignedDocFile] = useState<File | null>(null);
+  const [signedDocUploading, setSignedDocUploading] = useState(false);
+  const [signedDocMsg, setSignedDocMsg] = useState('');
 
   useEffect(() => {
     adminApi.redemption(Number(id))
@@ -59,11 +66,27 @@ export default function RedemptionDetailPage() {
   const updateStatus = async () => {
     if (!redemption || newStatus === redemption.status) return;
     setUpdating(true);
-    const r = await adminApi.updateRedemptionStatus(redemption.id, newStatus, note || undefined);
+    const r = await adminApi.updateRedemptionStatus(redemption.id, newStatus, note || undefined, false);
     setMsg(r.success ? 'Status updated.' : r.message);
     if (r.success) setRedemption(a => a ? { ...a, status: newStatus } : a);
     setUpdating(false);
     setTimeout(() => setMsg(''), 3000);
+  };
+
+  const approveAndNotify = async () => {
+    if (!redemption) return;
+    setApproving(true);
+    const r = await adminApi.updateRedemptionStatus(redemption.id, 'Active', undefined, true);
+    if (r.success) {
+      setRedemption(a => a ? { ...a, status: 'Active' } : a);
+      setNewStatus('Active');
+      setApproveMsg('Approved. Investor has been notified.');
+    } else {
+      setApproveMsg(r.message || 'Failed to approve.');
+    }
+    setApproving(false);
+    setApproveConfirm(false);
+    setTimeout(() => setApproveMsg(''), 5000);
   };
 
   const loadDsStatus = async () => {
@@ -87,6 +110,39 @@ export default function RedemptionDetailPage() {
     }
     setDsSending(false);
     setTimeout(() => setDsSendMsg(''), 5000);
+  };
+
+  const uploadSignedDoc = async () => {
+    if (!redemption || !signedDocFile) return;
+    setSignedDocUploading(true);
+    setSignedDocMsg('');
+    try {
+      const r = await adminApi.uploadRedemptionSignedDocument(redemption.id, signedDocFile);
+      if (r.success) {
+        setRedemption(a => a ? { ...a, signedDocumentPath: r.data } : a);
+        setSignedDocMsg('Document uploaded successfully.');
+        setSignedDocFile(null);
+      } else {
+        setSignedDocMsg(r.message || 'Upload failed.');
+      }
+    } catch {
+      setSignedDocMsg('Network error. Please try again.');
+    } finally {
+      setSignedDocUploading(false);
+      setTimeout(() => setSignedDocMsg(''), 5000);
+    }
+  };
+
+  const downloadDsDocument = async () => {
+    if (!redemption?.docuSignEnvelopeId) return;
+    setDsDownloading(true);
+    try {
+      await adminApi.downloadDocuSignDocument(redemption.docuSignEnvelopeId);
+    } catch {
+      alert('Failed to download document. Please try again.');
+    } finally {
+      setDsDownloading(false);
+    }
   };
 
   if (loading) return <AdminLayout><div style={{ padding: 40, color: '#64748b' }}>Loading...</div></AdminLayout>;
@@ -113,6 +169,14 @@ export default function RedemptionDetailPage() {
             <p style={{ color: '#64748b', marginTop: 4 }}>
               {redemption.investorType} · {redemption.email ?? 'No email'}
             </p>
+            <span style={{
+              display: 'inline-block', marginTop: 6, padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+              background: redemption.isAdminCreated ? '#eff6ff' : '#fdf4ff',
+              color: redemption.isAdminCreated ? '#1d4ed8' : '#7e22ce',
+              border: `1px solid ${redemption.isAdminCreated ? '#bfdbfe' : '#e9d5ff'}`,
+            }}>
+              {redemption.isAdminCreated ? 'Admin Created' : 'Investor Submitted'}
+            </span>
           </div>
           <StatusBadge status={redemption.status} />
         </div>
@@ -123,7 +187,7 @@ export default function RedemptionDetailPage() {
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
             <select value={newStatus} onChange={e => setNewStatus(e.target.value)}
               style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
-              {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              {(STATUSES.includes(redemption.status) ? STATUSES : [redemption.status, ...STATUSES]).map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             <input
               type="text"
@@ -144,6 +208,57 @@ export default function RedemptionDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Approve & Notify — shown while under review AND not yet notified */}
+        {redemption.status === 'UnderReview' && !redemption.investorNotifiedAt && (
+          <div className="card" style={{ marginBottom: 24, border: '1.5px solid #e2e8f0' }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 8 }}>Approve &amp; Notify Investor</h2>
+            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>
+              This will set the status to <strong>Active</strong> and send notification emails to the investor.
+              To change status without sending notifications, use the status dropdown above.
+            </p>
+            {!approveConfirm ? (
+              <button
+                onClick={() => setApproveConfirm(true)}
+                style={{ padding: '9px 20px', background: '#0f2342', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
+                Approve &amp; Notify Investor
+              </button>
+            ) : (
+              <div style={{ padding: '14px 16px', background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: 8 }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#9a3412', marginBottom: 12 }}>
+                  ⚠ This will send notification emails to the investor and the admin team. This cannot be undone. Proceed?
+                </p>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={approveAndNotify}
+                    disabled={approving}
+                    style={{ padding: '8px 18px', background: '#b8923a', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#fff', cursor: approving ? 'default' : 'pointer', opacity: approving ? 0.7 : 1 }}>
+                    {approving ? 'Sending…' : 'Confirm & Send Notifications'}
+                  </button>
+                  <button
+                    onClick={() => setApproveConfirm(false)}
+                    disabled={approving}
+                    style={{ padding: '8px 16px', background: '#f1f5f9', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            {approveMsg && (
+              <p style={{ marginTop: 10, fontSize: 13, color: approveMsg.includes('Approved') ? '#10b981' : '#ef4444' }}>{approveMsg}</p>
+            )}
+          </div>
+        )}
+
+        {/* Notification already sent — shown instead of the approve button */}
+        {redemption.investorNotifiedAt && (
+          <div style={{ marginBottom: 24, padding: '12px 16px', background: '#f0fdf4', border: '1.5px solid #a7f3d0', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 16 }}>✓</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#065f46' }}>
+              Investor notified on {new Date(asUtc(redemption.investorNotifiedAt)!).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        )}
 
         {/* Partner / investor info */}
         <div className="card" style={{ marginBottom: 20 }}>
@@ -210,6 +325,57 @@ export default function RedemptionDetailPage() {
           </div>
         )}
 
+        {/* Signed Document (historical redemptions without DocuSign) */}
+        {!redemption.docuSignEnvelopeId && (
+          <div className="card" style={{ marginTop: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342' }}>Signed Agreement Document</h2>
+              {redemption.signedDocumentPath && (
+                <a
+                  href={`${STATIC_BASE}${redemption.signedDocumentPath.startsWith('/') ? redemption.signedDocumentPath : '/' + redemption.signedDocumentPath}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ padding: '6px 14px', background: '#0f2342', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  ↗ View Document
+                </a>
+              )}
+            </div>
+            {redemption.signedDocumentPath ? (
+              <div style={{ marginBottom: 16 }}>
+                <iframe
+                  src={`${STATIC_BASE}${redemption.signedDocumentPath.startsWith('/') ? redemption.signedDocumentPath : '/' + redemption.signedDocumentPath}`}
+                  title="Signed Agreement"
+                  style={{ width: '100%', height: 400, border: '1px solid #e2e8f0', borderRadius: 8 }}
+                />
+              </div>
+            ) : (
+              <p style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>
+                No signed agreement on file. Upload a scanned PDF for this historical account.
+              </p>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 16px', background: '#f1f5f9', border: '1.5px dashed #cbd5e1', borderRadius: 8, fontSize: 13, fontWeight: 500, color: '#475569', cursor: 'pointer', transition: 'all 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = '#b8923a', e.currentTarget.style.color = '#b8923a')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = '#cbd5e1', e.currentTarget.style.color = '#475569')}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                {signedDocFile ? signedDocFile.name : 'Choose file (PDF, JPG, PNG)'}
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setSignedDocFile(e.target.files?.[0] ?? null)} style={{ display: 'none' }} />
+              </label>
+              <button
+                onClick={uploadSignedDoc}
+                disabled={!signedDocFile || signedDocUploading}
+                style={{ padding: '7px 18px', background: '#b8923a', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#fff', cursor: (!signedDocFile || signedDocUploading) ? 'default' : 'pointer', opacity: (!signedDocFile || signedDocUploading) ? 0.5 : 1 }}>
+                {signedDocUploading ? 'Uploading…' : redemption.signedDocumentPath ? 'Replace Document' : 'Upload Document'}
+              </button>
+              {signedDocMsg && (
+                <span style={{ fontSize: 12, color: signedDocMsg.includes('successfully') ? '#10b981' : '#ef4444' }}>{signedDocMsg}</span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* DocuSign section */}
         {redemption.docuSignEnvelopeId && (
           <div className="card" style={{ marginTop: 20 }}>
@@ -230,6 +396,12 @@ export default function RedemptionDetailPage() {
                   style={{ padding: '4px 10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, color: '#94a3b8', cursor: dsLoading ? 'default' : 'pointer', opacity: dsLoading ? 0.6 : 1 }}>
                   {dsLoading ? 'Refreshing…' : 'Refresh from DocuSign'}
                 </button>
+                {isCompleted && (
+                  <button onClick={downloadDsDocument} disabled={dsDownloading}
+                    style={{ padding: '6px 14px', background: '#0f2342', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', cursor: dsDownloading ? 'default' : 'pointer', opacity: dsDownloading ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>⬇</span>{dsDownloading ? 'Downloading…' : 'Download PDF'}
+                  </button>
+                )}
               </div>
             </div>
 

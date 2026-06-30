@@ -38,6 +38,8 @@ export const api = {
     request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
   delete: <T>(path: string) =>
     request<T>(path, { method: "DELETE" }),
+  deleteWithBody: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: "DELETE", body: JSON.stringify(body) }),
 };
 
 export interface AdminUser {
@@ -45,6 +47,7 @@ export interface AdminUser {
   email: string;
   firstName: string;
   lastName: string;
+  adminRole: string; // Maker | Checker | Approver | SuperAdmin
 }
 
 export interface PagedResult<T> {
@@ -61,18 +64,44 @@ export interface DashboardStats {
   activeInvestors: number;
   totalDepositors: number;
   totalInvestmentFiles: number;
+  totalDepositCount: number;
+  // Unconverted registrant funnel
+  neverApplied: number;
+  awaitingApproval: number;
+  latestRejected: number;
   // Application pipeline
   pendingReviews: number;
   totalApplications: number;
   pendingRedemptions: number;
-  // AUM & capital flows
+  // AUM & capital flows — all-time (since inception)
   totalAUM: number;
   totalUnits: number;
   totalDeployedCommencement: number;
   totalWithdrawnCommencement: number;
+  interestPaidCommencement: number;
+  monthlyDistributionsCommencement: number;
+  redemptionInterestCommencement: number;
+  // AUM & capital flows — date range
+  totalDepositedDateRange: number;
+  totalWithdrawnDateRange: number;
+  interestPaidDateRange: number;
+  monthlyDistributionsDateRange: number;
+  redemptionInterestDateRange: number;
+  // YTD (legacy)
   ytdDeployed: number;
   ytdWithdrawn: number;
-  recentApplications: ApplicationSummary[];
+  // Manually entered management figures
+  deployedAmount?: number;
+  bankAccountBalance?: number;
+  interestReceived?: number;
+  dividendReceived?: number;
+  sponsoredEquity?: number;
+  otherCharges?: number;
+  balanceAsAtDate?: string;
+  // Date range reflected back
+  dateRangeFrom?: string;
+  dateRangeTo?: string;
+  recentApplications: ApplicationListItem[];
 }
 
 export interface UserListItem {
@@ -86,6 +115,8 @@ export interface UserListItem {
   createdOn: string;
   applicationCount: number;
   isTestUser: boolean;
+  isAdmin: boolean;
+  adminRole?: string;
 }
 
 export interface UserDetail extends UserListItem {
@@ -94,6 +125,8 @@ export interface UserDetail extends UserListItem {
 
 export interface ApplicationSummary {
   id: number;
+  userId?: number;
+  investorName?: string;
   investorType: string;
   investmentType?: string;
   status: string;
@@ -110,6 +143,7 @@ export interface ApplicationListItem extends ApplicationSummary {
   userLastName: string;
   userEmail: string;
   investorName?: string;
+  effectiveDate?: string;
 }
 
 export interface ApplicationDetail extends ApplicationListItem {
@@ -122,6 +156,7 @@ export interface ApplicationDetail extends ApplicationListItem {
   docuSignSentAt?: string;
   docuSignCompletedAt?: string;
   docuSignSignersJson?: string;
+  signedDocumentPath?: string;
   investorProfile?: {
     firstName?: string;
     lastName?: string;
@@ -137,6 +172,7 @@ export interface ApplicationDetail extends ApplicationListItem {
     ein?: string;
     // Identity
     dateOfBirth?: string;
+    ssNumberMasked?: string;
     ownershipType?: string;
     // Spouse
     spouseFullName?: string;
@@ -161,7 +197,6 @@ export interface ApplicationDetail extends ApplicationListItem {
     drivingLicenseNo?: string;
     drivingLicenseState?: string;
     drivingLicensePath?: string;
-    taxCertificateNo?: string;
     taxCertificatePath?: string;
   };
   investment?: {
@@ -185,9 +220,11 @@ export interface RedemptionListItem {
   unitsToRedeem?: string;
   totalUnitsOwned?: string;
   aggregatePurchasePrice?: string;
+  netAggregatePrice?: string;
   email?: string;
   status: string;
   createdOn: string;
+  trancheApplicationId?: number;
 }
 
 export interface RedemptionDetail extends RedemptionListItem {
@@ -198,6 +235,8 @@ export interface RedemptionDetail extends RedemptionListItem {
   printedName?: string;
   originalPurchaseDate?: string;
   proratedPreferredReturn?: string;
+  distributionClawback?: string;
+  netAggregatePrice?: string;
   addressLine1?: string;
   addressLine2?: string;
   addressLine3?: string;
@@ -207,10 +246,13 @@ export interface RedemptionDetail extends RedemptionListItem {
   docuSignSentAt?: string;
   docuSignCompletedAt?: string;
   docuSignSignersJson?: string;
+  signedDocumentPath?: string;
   bankName?: string;
   bankAccountHolderName?: string;
   bankAccountNumber?: string;
   bankRoutingNumber?: string;
+  investorNotifiedAt?: string;
+  isAdminCreated?: boolean;
 }
 
 export interface AuditLogItem {
@@ -237,6 +279,56 @@ export interface DashboardTrends {
   monthlyApplications: { month: string; total: number; approved: number }[];
   investorTypeBreakdown: { type: string; count: number }[];
   monthlyCapital: { month: string; deployed: number }[];
+}
+
+export interface InvestorCapitalAccountEntry {
+  date: string;
+  entryType: 'Contribution' | 'Redemption' | 'Dividend' | 'Clawback';
+  investmentType?: string; // 'ShortTerm' | 'LongTerm'
+  applicationId?: number;
+  ppmRefNo?: string;
+  units?: number;
+  amount: number;
+  income: number;   // positive = received; negative = clawback
+  runningBalance: number;
+}
+
+export interface InvestorCapitalAccount {
+  entries: InvestorCapitalAccountEntry[];
+  totalContributions: number;
+  totalCapitalRedeemed: number;
+  totalDividends: number;
+  totalRedemptionIncome: number;
+  totalClawbacks: number;
+  totalIncome: number;
+  netPosition: number;
+  accrued: number;
+}
+
+export interface CapitalLedgerEntry {
+  date: string;
+  entryType: 'Contribution' | 'Redemption' | 'Dividend';
+  investmentType?: string; // 'ShortTerm' | 'LongTerm'
+  investorName: string;
+  email: string;
+  entryId?: number;
+  applicationId?: number;
+  ppmRefNo?: string;
+  units?: number;
+  amount: number;
+  dividendPaid?: number;
+  runningBalance: number;
+}
+
+export interface CapitalLedger {
+  entries: CapitalLedgerEntry[];
+  openingBalance: number;
+  totalContributions: number;
+  totalRedemptions: number;
+  totalDistributions: number;
+  totalRedemptionDistributions: number;
+  totalPendingAccruals: number;
+  closingBalance: number;
 }
 
 // ── Historical Import ────────────────────────────────────────────────────────
@@ -426,7 +518,14 @@ export const adminApi = {
         lastName: string;
       }>
     >("/login", { email, password }),
-  dashboard: () => api.get<ApiResponse<DashboardStats>>("/dashboard"),
+  dashboard: (params?: { from?: string; to?: string }) => {
+    const qs = params && (params.from || params.to)
+      ? '?' + new URLSearchParams(Object.fromEntries(
+          Object.entries(params).filter(([, v]) => v != null)
+        ) as Record<string, string>)
+      : '';
+    return api.get<ApiResponse<DashboardStats>>(`/dashboard${qs}`);
+  },
   dashboardTrends: () => api.get<ApiResponse<DashboardTrends>>("/dashboard/trends"),
   users: (params: Record<string, string | number>) => {
     const q = new URLSearchParams(params as Record<string, string>).toString();
@@ -468,6 +567,46 @@ export const adminApi = {
     api.get<ApiResponse<DocuSignEnvelopeStatus>>(
       `/docusign-envelopes/${envelopeId}/status`,
     ),
+  uploadRedemptionSignedDocument: async (redemptionId: number, file: File): Promise<ApiResponse<string>> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${BASE}/redemptions/${redemptionId}/upload-signed-document`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    const text = await res.text();
+    return text ? JSON.parse(text) : { success: false, data: '', message: 'Empty response' };
+  },
+  uploadSignedDocument: async (appId: number, file: File): Promise<ApiResponse<string>> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${BASE}/applications/${appId}/upload-signed-document`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    const text = await res.text();
+    return text ? JSON.parse(text) : { success: false, data: '', message: 'Empty response' };
+  },
+  downloadDocuSignDocument: async (envelopeId: string): Promise<void> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+    const res = await fetch(`${BASE}/docusign-envelopes/${envelopeId}/document`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Download failed');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `docusign-${envelopeId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  },
   redemptions: (params: Record<string, string | number>) => {
     const q = new URLSearchParams(params as Record<string, string>).toString();
     return api.get<ApiResponse<PagedResult<RedemptionListItem>>>(
@@ -476,8 +615,8 @@ export const adminApi = {
   },
   redemption: (id: number) =>
     api.get<ApiResponse<RedemptionDetail>>(`/redemptions/${id}`),
-  updateRedemptionStatus: (id: number, status: string, reviewNote?: string) =>
-    api.put<ApiResponse<string>>(`/redemptions/${id}/status`, { status, reviewNote }),
+  updateRedemptionStatus: (id: number, status: string, reviewNote?: string, sendNotification = false) =>
+    api.put<ApiResponse<string>>(`/redemptions/${id}/status`, { status, reviewNote, sendNotification }),
   sendRedemptionDocuSignEnvelope: (id: number) =>
     api.post<ApiResponse<string>>(`/redemptions/${id}/send-docusign`, {}),
   auditLogs: (params: Record<string, string | number | boolean>) => {
@@ -492,6 +631,10 @@ export const adminApi = {
     api.get<ApiResponse<BankDetails>>('/bank-details'),
   saveBankDetails: (dto: BankDetails) =>
     api.put<ApiResponse<string>>('/bank-details', dto),
+  getDailyBalances: () =>
+    api.get<ApiResponse<DailyBalanceLog[]>>('/daily-balances'),
+  saveDailyBalance: (dto: DailyBalanceLog) =>
+    api.put<ApiResponse<string>>('/daily-balances', dto),
   getNotificationEmails: () =>
     api.get<ApiResponse<NotificationEmail[]>>('/notification-emails'),
   addNotificationEmail: (emailAddress: string, label?: string) =>
@@ -523,6 +666,115 @@ export const adminApi = {
     const q = new URLSearchParams(params as Record<string, string>).toString();
     return api.get<ApiResponse<PagedResult<DailyInterestItem>>>(`/daily-interest?${q}`);
   },
+  pushDailyInterestToOdoo: (id: number) =>
+    api.post<ApiResponse<{ message: string }>>(`/daily-interest/${id}/push-to-odoo`, {}),
+  previewDeleteDailyInterest: (ids: number[]) =>
+    api.post<ApiResponse<DeleteDailyInterestPreviewResult>>('/daily-interest/delete-preview', { ids }),
+  batchDeleteDailyInterest: (ids: number[], cascadeMonthly: boolean) =>
+    api.deleteWithBody<ApiResponse<DeleteDailyInterestResult>>('/daily-interest/batch', { ids, cascadeMonthly }),
+  resetMonthDistribution: (applicationId: number, year: number, month: number) =>
+    api.post<ApiResponse<ResetMonthResult>>('/daily-interest/reset-month', { applicationId, year, month }),
+
+  // ── Admin CRUD: Bulk Delete ────────────────────────────────────────────
+  bulkDeleteUsers: (userIds: number[]) =>
+    api.deleteWithBody<ApiResponse<string>>('/users', { userIds }),
+  bulkDeleteApplications: (applicationIds: number[]) =>
+    api.deleteWithBody<ApiResponse<string>>('/applications', { applicationIds }),
+  bulkDeleteRedemptions: (redemptionIds: number[]) =>
+    api.deleteWithBody<ApiResponse<string>>('/redemptions', { redemptionIds }),
+  createUser: (dto: CreateUserAdminRequest) =>
+    api.post<ApiResponse<UserDetail>>('/users', dto),
+
+  // ── Admin CRUD: Investment (Application) ──────────────────────────────
+  createApplication: (userId: number, dto: CreateApplicationRequest) =>
+    api.post<ApiResponse<ApplicationDetail>>(`/users/${userId}/applications`, dto),
+  updateApplicationFull: (id: number, dto: CreateApplicationRequest) =>
+    api.put<ApiResponse<string>>(`/applications/${id}/full`, dto),
+  deleteApplication: (id: number) =>
+    api.delete<ApiResponse<string>>(`/applications/${id}`),
+
+  // ── Admin CRUD: Redemption ─────────────────────────────────────────────
+  getRedemptionPreview: (trancheApplicationId: number, unitsToRedeem: number, effectiveDate: string) =>
+    api.get<ApiResponse<RedemptionCalculationPreview>>(
+      `/redemption-preview?trancheApplicationId=${trancheApplicationId}&unitsToRedeem=${unitsToRedeem}&effectiveDate=${effectiveDate}`,
+    ),
+  createRedemption: (dto: CreateRedemptionAdminRequest) =>
+    api.post<ApiResponse<RedemptionDetail>>('/redemptions', dto),
+  updateRedemptionFull: (id: number, dto: CreateRedemptionAdminRequest) =>
+    api.put<ApiResponse<string>>(`/redemptions/${id}/full`, dto),
+  deleteRedemption: (id: number) =>
+    api.delete<ApiResponse<string>>(`/redemptions/${id}`),
+
+  // ── Bulk catch-up ─────────────────────────────────────────────────────
+  runBulkCatchUp: (from: string, to: string) =>
+    api.post<ApiResponse<{ appsProcessed: number; logsCreated: number; errors: string[] }>>('/distributions/catch-up', { from, to }),
+
+  fixHistoricalCatchUp: () =>
+    api.post<ApiResponse<unknown[]>>('/distributions/fix-historical-catchup', {}),
+
+  // ── Manual distribution run ───────────────────────────────────────────
+  simulateDistribution: (asOfDate: string) =>
+    api.post<ApiResponse<DistributionRunResult[]>>('/distributions/simulate', { asOfDate }),
+  executeDistribution: (asOfDate: string) =>
+    api.post<ApiResponse<DistributionRunResult[]>>('/distributions/execute', { asOfDate }),
+  pushDistributionToOdoo: (id: number) =>
+    api.post<ApiResponse<{ ok: boolean; msg: string }>>(`/distributions/${id}/push-odoo`, {}),
+  batchPushToOdoo: (ids: number[]) =>
+    api.post<ApiResponse<{ pushed: number; failed: number }>>('/distributions/batch-push-odoo', { ids }),
+  editDistributionPaidDate: (id: number, paidDate: string) =>
+    api.post<ApiResponse<{ status?: string }>>(`/distributions/${id}/edit-paid-date`, { paidDate }),
+  bulkMarkDistributionPaid: (ids: number[], paidDate: string) =>
+    api.post<ApiResponse<{ marked: number; failed: number }>>('/distributions/bulk-mark-paid', { ids, paidDate }),
+  bulkPushDailyInterestToOdoo: (ids: number[]) =>
+    api.post<ApiResponse<{ pushed: number; failed: number }>>('/daily-interest/bulk-push-odoo', { ids }),
+
+  // ── Admin CRUD: Distribution ───────────────────────────────────────────
+  createDistribution: (dto: CreateDistributionRequest) =>
+    api.post<ApiResponse<UserDistributionItem>>('/distributions', dto),
+  updateDistribution: (id: number, dto: CreateDistributionRequest) =>
+    api.put<ApiResponse<string>>(`/distributions/${id}`, dto),
+  deleteDistribution: (id: number) =>
+    api.delete<ApiResponse<string>>(`/distributions/${id}`),
+
+  // ── User-scoped reads ──────────────────────────────────────────────────
+  getUserDistributions: (userId: number) =>
+    api.get<ApiResponse<UserDistributionItem[]>>(`/users/${userId}/distributions`),
+  getUserRedemptions: (userId: number) =>
+    api.get<ApiResponse<RedemptionListItem[]>>(`/users/${userId}/redemptions`),
+
+  // ── Maker-Checker-Approver Workflow ────────────────────────────────────
+  getPendingChanges: (params: Record<string, string | number> = {}) => {
+    const q = new URLSearchParams(Object.fromEntries(Object.entries(params).map(([k,v]) => [k, String(v)]))).toString();
+    return api.get<ApiResponse<PagedResult<PendingChangeItem>>>(`/pending-changes${q ? '?' + q : ''}`);
+  },
+  getPendingCounts: () =>
+    api.get<ApiResponse<PendingCounts>>('/pending-changes/counts'),
+  getPendingChange: (id: number) =>
+    api.get<ApiResponse<PendingChangeDetail>>(`/pending-changes/${id}`),
+  getActivePendingForRecord: (entityType: string, entityId: number) =>
+    api.get<ApiResponse<PendingChangeItem | null>>(`/pending-changes/for-record?entityType=${entityType}&entityId=${entityId}`),
+  getActivePendingForRecords: (entityType: string, entityIds: number[]) =>
+    api.get<ApiResponse<PendingChangeItem[]>>(`/pending-changes/for-records?entityType=${entityType}&entityIds=${entityIds.join(',')}`),
+  checkChange: (id: number, note?: string) =>
+    api.post<ApiResponse<string>>(`/pending-changes/${id}/check`, { note }),
+  approveChange: (id: number, note?: string) =>
+    api.post<ApiResponse<string>>(`/pending-changes/${id}/approve`, { note }),
+  rejectChange: (id: number, reason: string) =>
+    api.post<ApiResponse<string>>(`/pending-changes/${id}/reject`, { reason }),
+  cancelChange: (id: number) =>
+    api.post<ApiResponse<string>>(`/pending-changes/${id}/cancel`, {}),
+  setAdminRole: (userId: number, role: string | null) =>
+    api.put<ApiResponse<string>>(`/users/${userId}/admin-role`, { adminRole: role }),
+  changePassword: (userId: number, currentPassword: string, newPassword: string) =>
+    api.put<ApiResponse<string>>(`/users/${userId}/change-password`, { currentPassword, newPassword }),
+  resetPassword: (userId: number, newPassword: string) =>
+    api.put<ApiResponse<string>>(`/users/${userId}/reset-password`, { newPassword }),
+  capitalLedger: (params: { from?: string; to?: string } = {}) => {
+    const q = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString();
+    return api.get<ApiResponse<CapitalLedger>>(`/capital-ledger${q ? '?' + q : ''}`);
+  },
+  investorStatement: (userId: number) =>
+    api.get<ApiResponse<InvestorCapitalAccount>>(`/investor-statement/${userId}`),
 };
 
 export interface NotificationEmail {
@@ -540,6 +792,18 @@ export interface BankDetails {
   address: string;
 }
 
+export interface DailyBalanceLog {
+  id?: number;
+  date: string;
+  bankAccountBalance: number;
+  deployedAmount: number;
+  interestReceived: number;
+  dividendReceived: number;
+  sponsoredEquity: number;
+  otherCharges: number;
+  notes?: string;
+}
+
 export interface DistributionListItem {
   id: number;
   applicationId: number;
@@ -553,6 +817,22 @@ export interface DistributionListItem {
   bankName?: string;
   bankAccountNumber?: string;
   createdOn: string;
+}
+
+export interface DistributionRunResult {
+  applicationId: number;
+  distributionMonth: string;
+  investorName: string;
+  investorEmail: string;
+  ppmRefNo: string;
+  totalNetAmount: number;
+  recalculatedAmount: number;
+  hasMismatch: boolean;
+  totalDays: number;
+  bankName: string;
+  bankAccountNumber: string;
+  alreadyRan: boolean;
+  distributionLogId: number | null;
 }
 
 export interface StatementListItem {
@@ -619,4 +899,196 @@ export interface DailyInterestItem {
   odooResponseMsg?: string;
   includedInMonthlyDistribution: boolean;
   createdOn: string;
+}
+
+export interface AffectedMonthlyDistribution {
+  distributionLogId: number;
+  applicationId: number;
+  investorName: string;
+  distributionMonth: string;
+  odooStatus?: string;
+  paymentStatus: string;
+  totalNetAmount: number;
+  siblingLogsCount: number;
+}
+
+export interface DeleteDailyInterestPreviewResult {
+  safeCount: number;
+  conflictedCount: number;
+  affectedDistributions: AffectedMonthlyDistribution[];
+}
+
+export interface DeleteDailyInterestResult {
+  deleted: number;
+  cascadedDistributions: number;
+  siblingLogsReset: number;
+  skipped: number;
+}
+
+export interface ResetMonthResult {
+  logsReset: number;
+  distributionDeleted: boolean;
+  previousAmount: number;
+  odooStatus?: string | null;
+}
+
+// ── Admin CRUD request/response types ─────────────────────────────────────
+
+export interface CreateUserAdminRequest {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+}
+
+export interface CreateApplicationRequest {
+  investorType: string;
+  investmentType?: string;
+  entitySubType?: string;
+  effectiveDate?: string;
+  submittedAt?: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  dateOfBirth?: string;
+  streetAddress?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  citizenship?: string;
+  employer?: string;
+  maritalStatus?: string;
+  ownershipType?: string;
+  mailingAddress?: string;
+  dayPhone?: string;
+  nightPhone?: string;
+  spouseFullName?: string;
+  spouseEmail?: string;
+  spouseDateOfBirth?: string;
+  entityName?: string;
+  ein?: string;
+  stateFormation?: string;
+  signatoryName?: string;
+  signatoryTitle?: string;
+  custodianName?: string;
+  custodianAcct?: string;
+  custodianPhone?: string;
+  custodianEmail?: string;
+  ssNumber?: string;
+  spouseSSN?: string;
+  drivingLicenseNo?: string;
+  drivingLicenseState?: string;
+  numUnits: number;
+  totalAmount: number;
+  ppmRefNO?: number;
+  paymentMethod?: string;
+  distributionPreference?: string;
+  bankName?: string;
+  accHolder?: string;
+  routingNumber?: string;
+  accNumber?: string;
+}
+
+export interface CreateRedemptionAdminRequest {
+  trancheApplicationId?: number;
+  sellingPartnerName?: string;
+  investorType: string;
+  entityName?: string;
+  signatoryName?: string;
+  signatoryTitle?: string;
+  totalUnitsOwned?: string;
+  unitsToRedeem?: string;
+  originalPurchaseDate?: string;
+  aggregatePurchasePrice?: string;
+  proratedPreferredReturn?: string;
+  distributionClawback?: string;
+  netAggregatePrice?: string;
+  effectiveDate?: string;
+  printedName?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  addressLine3?: string;
+  email?: string;
+  status?: string;
+}
+
+export interface RedemptionCalculationPreview {
+  totalUnits: number;
+  redeemUnits: number;
+  originalPurchasePrice: number;
+  daysInvested: number;
+  monthsInvested: number;
+  yearsInvested: number;
+  isShortTerm: boolean;
+  returnPerUnit: number;
+  proratedPreferredReturn: number;
+  aggregatePurchasePrice: number;
+  isEarlyExit: boolean;
+  completedMonthsDistributed: number;
+  distributionClawback: number;
+  netAggregatePrice: number;
+}
+
+export interface CreateDistributionRequest {
+  applicationId: number;
+  userId: number;
+  distributionMonth: string;
+  totalNetAmount: number;
+  paymentStatus: string;
+  paidAt?: string;
+  bankName?: string;
+  bankAccountHolderName?: string;
+  bankAccountNumber?: string;
+  bankRoutingNumber?: string;
+}
+
+export interface UserDistributionItem {
+  id: number;
+  applicationId: number;
+  ppmRefNO?: number;
+  distributionMonth: string;
+  totalNetAmount: number;
+  paymentStatus: string;
+  paidAt?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  createdOn: string;
+}
+
+// ── Maker-Checker-Approver Workflow types ─────────────────────────────────
+
+export interface PendingChangeItem {
+  id: number;
+  operationType: string;
+  entityType: string;
+  entityId?: number;
+  targetUserId?: number;
+  description: string;
+  status: string; // Pending | Checked | Approved | Rejected | Cancelled
+  makerUserId: number;
+  makerName: string;
+  makerEmail: string;
+  makerNote?: string;
+  createdOn: string;
+  checkerUserId?: number;
+  checkerName?: string;
+  checkerNote?: string;
+  checkedAt?: string;
+  approverUserId?: number;
+  approverName?: string;
+  approverNote?: string;
+  approvedAt?: string;
+  rejectedByUserId?: number;
+  rejectedByName?: string;
+  rejectionReason?: string;
+  rejectedAt?: string;
+}
+
+export interface PendingChangeDetail extends PendingChangeItem {
+  payloadJson: string;
+}
+
+export interface PendingCounts {
+  pendingForChecker: number;
+  checkedForApprover: number;
 }

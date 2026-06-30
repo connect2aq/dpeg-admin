@@ -52,6 +52,16 @@
   --focus-ring: rgba(14, 52, 22, 0.12);
 }
 
+/* ── Remove number input spinners ──────────────────────── */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 /* ── Base ───────────────────────────────────────────────── */
 body {
   font-family: "DM Sans", system-ui, sans-serif;
@@ -86,6 +96,21 @@ body {
   color: #a8c9ae;
   border-left: 3px solid var(--sage);
   padding-left: 13px;
+}
+
+/* Sidebar nav scrollbar — subtle on dark background */
+.sidebar-nav nav::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-nav nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-nav nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+}
+.sidebar-nav nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
 }
 
 /* ── Cards ──────────────────────────────────────────────── */

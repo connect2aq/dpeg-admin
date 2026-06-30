@@ -4,6 +4,8 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
+import { InvestmentEditModal } from '@/components/InvestmentEditModal';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { adminApi, STATIC_BASE, type ApplicationDetail, type DocuSignEnvelopeStatus } from '@/lib/api';
 
 const STATUSES = ['UnderReview', 'Active', 'Rejected'];
@@ -83,6 +85,13 @@ export default function ApplicationDetailPage() {
   const [dsSyncMsg, setDsSyncMsg] = useState('');
   const [dsSending, setDsSending] = useState(false);
   const [dsSendMsg, setDsSendMsg] = useState('');
+  const [dsDownloading, setDsDownloading] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [signedDocFile, setSignedDocFile] = useState<File | null>(null);
+  const [signedDocUploading, setSignedDocUploading] = useState(false);
+  const [signedDocMsg, setSignedDocMsg] = useState('');
+  const { user } = useAdminAuth();
+  const isSuperAdmin = user?.adminRole === 'SuperAdmin';
 
   useEffect(() => {
     adminApi.application(Number(id))
@@ -172,6 +181,39 @@ export default function ApplicationDetailPage() {
     setTimeout(() => setDsSendMsg(''), 5000);
   };
 
+  const downloadDsDocument = async () => {
+    if (!app?.docuSignEnvelopeId) return;
+    setDsDownloading(true);
+    try {
+      await adminApi.downloadDocuSignDocument(app.docuSignEnvelopeId);
+    } catch {
+      alert('Failed to download document. Please try again.');
+    } finally {
+      setDsDownloading(false);
+    }
+  };
+
+  const uploadSignedDoc = async () => {
+    if (!app || !signedDocFile) return;
+    setSignedDocUploading(true);
+    setSignedDocMsg('');
+    try {
+      const r = await adminApi.uploadSignedDocument(app.id, signedDocFile);
+      if (r.success) {
+        setApp(a => a ? { ...a, signedDocumentPath: r.data } : a);
+        setSignedDocMsg('Document uploaded successfully.');
+        setSignedDocFile(null);
+      } else {
+        setSignedDocMsg(r.message || 'Upload failed.');
+      }
+    } catch {
+      setSignedDocMsg('Network error. Please try again.');
+    } finally {
+      setSignedDocUploading(false);
+      setTimeout(() => setSignedDocMsg(''), 5000);
+    }
+  };
+
   const syncDsDate = async () => {
     if (!app) return;
     setDsSyncing(true); setDsSyncMsg('');
@@ -208,7 +250,14 @@ export default function ApplicationDetailPage() {
               {app.userFirstName} {app.userLastName} · {app.userEmail}
             </p>
           </div>
-          <StatusBadge status={app.status} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              onClick={() => setShowEditModal(true)}
+              style={{ padding: '8px 18px', background: '#0f2342', color: 'white', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+              Edit
+            </button>
+            <StatusBadge status={app.status} />
+          </div>
         </div>
 
         {/* Status Update */}
@@ -351,6 +400,9 @@ export default function ApplicationDetailPage() {
               <InfoRow label="Citizenship" value={app.investorProfile.citizenship} />
               <InfoRow label="Marital Status" value={app.investorProfile.maritalStatus} />
               <InfoRow label="Ownership Type" value={app.investorProfile.ownershipType} />
+              <InfoRow label="SSN" value={app.investorProfile.ssNumberMasked} />
+              <InfoRow label="Driving License No" value={app.investorProfile.drivingLicenseNo} />
+              <InfoRow label="Driving License State" value={app.investorProfile.drivingLicenseState} />
             </div>
 
             <SectionLabel>Contact</SectionLabel>
@@ -403,6 +455,26 @@ export default function ApplicationDetailPage() {
                 </div>
               </>
             )}
+
+            {(app.investorProfile.drivingLicensePath || app.investorProfile.taxCertificatePath) && (
+              <>
+                <SectionLabel>Identity Documents</SectionLabel>
+                {app.investorProfile.drivingLicensePath && (
+                  <DocumentPreview
+                    label="Driving License"
+                    number={app.investorProfile.drivingLicenseNo}
+                    state={app.investorProfile.drivingLicenseState}
+                    path={app.investorProfile.drivingLicensePath}
+                  />
+                )}
+                {app.investorProfile.taxCertificatePath && (
+                  <DocumentPreview
+                    label="Tax Certificate"
+                    path={app.investorProfile.taxCertificatePath}
+                  />
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -442,6 +514,12 @@ export default function ApplicationDetailPage() {
                   )}
                   {dsSyncMsg && (
                     <span style={{ fontSize: 12, color: dsSyncMsg.includes('set') || dsSyncMsg.includes('Set') ? '#10b981' : '#ef4444' }}>{dsSyncMsg}</span>
+                  )}
+                  {isCompleted && (
+                    <button onClick={downloadDsDocument} disabled={dsDownloading}
+                      style={{ padding: '6px 14px', background: '#0f2342', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', cursor: dsDownloading ? 'default' : 'pointer', opacity: dsDownloading ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>⬇</span>{dsDownloading ? 'Downloading…' : 'Download PDF'}
+                    </button>
                   )}
                 </div>
               </div>
@@ -513,6 +591,57 @@ export default function ApplicationDetailPage() {
           );
         })()}
 
+        {/* Signed Document (historical accounts without DocuSign) */}
+        {!app.docuSignEnvelopeId && (
+          <div className="card" style={{ marginTop: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342' }}>Signed Agreement Document</h2>
+              {app.signedDocumentPath && (
+                <a
+                  href={`${STATIC_BASE}${app.signedDocumentPath.startsWith('/') ? app.signedDocumentPath : '/' + app.signedDocumentPath}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ padding: '6px 14px', background: '#0f2342', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  ↗ View Document
+                </a>
+              )}
+            </div>
+            {app.signedDocumentPath ? (
+              <div style={{ marginBottom: 16 }}>
+                <iframe
+                  src={`${STATIC_BASE}${app.signedDocumentPath.startsWith('/') ? app.signedDocumentPath : '/' + app.signedDocumentPath}`}
+                  title="Signed Agreement"
+                  style={{ width: '100%', height: 400, border: '1px solid #e2e8f0', borderRadius: 8 }}
+                />
+              </div>
+            ) : (
+              <p style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>
+                No signed agreement on file. Upload a scanned PDF for this historical account.
+              </p>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 16px', background: '#f1f5f9', border: '1.5px dashed #cbd5e1', borderRadius: 8, fontSize: 13, fontWeight: 500, color: '#475569', cursor: 'pointer', transition: 'all 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = '#b8923a', e.currentTarget.style.color = '#b8923a')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = '#cbd5e1', e.currentTarget.style.color = '#475569')}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                {signedDocFile ? signedDocFile.name : 'Choose file (PDF, JPG, PNG)'}
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setSignedDocFile(e.target.files?.[0] ?? null)} style={{ display: 'none' }} />
+              </label>
+              <button
+                onClick={uploadSignedDoc}
+                disabled={!signedDocFile || signedDocUploading}
+                style={{ padding: '7px 18px', background: '#b8923a', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#fff', cursor: (!signedDocFile || signedDocUploading) ? 'default' : 'pointer', opacity: (!signedDocFile || signedDocUploading) ? 0.5 : 1 }}>
+                {signedDocUploading ? 'Uploading…' : app.signedDocumentPath ? 'Replace Document' : 'Upload Document'}
+              </button>
+              {signedDocMsg && (
+                <span style={{ fontSize: 12, color: signedDocMsg.includes('successfully') ? '#10b981' : '#ef4444' }}>{signedDocMsg}</span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* User link */}
         {app.userId && (
           <div style={{ marginTop: 20 }}>
@@ -522,6 +651,18 @@ export default function ApplicationDetailPage() {
           </div>
         )}
       </div>
+
+      {showEditModal && (
+        <InvestmentEditModal
+          applicationId={app.id}
+          isSuperAdmin={isSuperAdmin}
+          onClose={() => setShowEditModal(false)}
+          onSaved={(_pending, _msg) => {
+            setShowEditModal(false);
+            adminApi.application(app.id).then(r => { if (r.success && r.data) setApp(r.data); });
+          }}
+        />
+      )}
     </AdminLayout>
   );
 }

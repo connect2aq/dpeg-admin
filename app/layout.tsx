@@ -20,14 +20,17 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="h-full">
-      <body className="h-full">
+      <body className="h-full flex flex-col">
         <Providers>
           {isStaging && (
-            <div className="bg-amber-500 text-amber-950 text-center py-2 font-bold text-sm tracking-wider uppercase sticky top-0 z-50 shadow-md">
+            <div className="bg-amber-500 text-amber-950 text-center py-2 font-bold text-sm tracking-wider uppercase flex-shrink-0 z-50 shadow-md">
               This is a Testing Portal
             </div>
           )}
-          {children}</Providers>
+          <div className="flex-1 min-h-0">
+            {children}
+          </div>
+        </Providers>
       </body>
     </html>
   );

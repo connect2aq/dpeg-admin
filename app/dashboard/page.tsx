@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import AdminLayout from "@/components/AdminLayout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { adminApi, type DashboardStats, type DashboardTrends } from "@/lib/api";
@@ -12,63 +13,203 @@ function KpiCard({
   label,
   value,
   sub,
+  breakdown,
   color,
+  href,
 }: {
   label: string;
   value: string | number;
   sub?: string;
+  breakdown?: string;
   color?: string;
+  href?: string;
 }) {
-  return (
+  const inner = (
     <div
       className="card"
-      style={{ borderTop: `3px solid ${color ?? "#699172"}` }}
+      style={{
+        borderTop: `3px solid ${color ?? "#699172"}`,
+        cursor: href ? "pointer" : "default",
+        transition: "box-shadow 0.15s",
+        height: "100%",
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+      }}
+      onMouseEnter={e => { if (href) (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)"; }}
+      onMouseLeave={e => { if (href) (e.currentTarget as HTMLDivElement).style.boxShadow = ""; }}
     >
-      <div
-        style={{
-          fontSize: 12,
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          color: "#64748b",
-          marginBottom: 8,
-        }}
-      >
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", marginBottom: 8 }}>
         {label}
       </div>
-      <div
-        style={{
-          fontSize: 32,
-          fontWeight: 700,
-          color: "#0e3416",
-          lineHeight: 1,
-        }}
-      >
+      <div style={{ fontSize: 26, fontWeight: 700, color: "#0e3416", lineHeight: 1.1, flex: 1 }}>
         {value}
       </div>
-      {sub && (
-        <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 6 }}>
-          {sub}
-        </div>
-      )}
+      {breakdown && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 5 }}>{breakdown}</div>}
+      {sub && <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>{sub}</div>}
+      {href && <div style={{ fontSize: 11, color: "#699172", marginTop: 8, fontWeight: 600 }}>View details →</div>}
     </div>
   );
+  return href ? <Link href={href} style={{ textDecoration: "none", display: "block", height: "100%" }}>{inner}</Link> : inner;
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        fontSize: 11,
-        fontWeight: 700,
-        textTransform: "uppercase",
-        letterSpacing: "0.08em",
-        color: "#94a3b8",
-        marginBottom: 12,
-        marginTop: 28,
-      }}
-    >
+    <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#94a3b8", marginBottom: 12, marginTop: 28 }}>
       {children}
+    </div>
+  );
+}
+
+function BalanceFlow({ stats }: { stats: DashboardStats }) {
+  const fmt = (n: number) => `$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const remaining            = stats.totalDeployedCommencement - stats.totalWithdrawnCommencement;
+  const afterDividend        = remaining - stats.interestPaidCommencement;
+  const hasDeployed          = stats.deployedAmount != null;
+  const hasInterestReceived  = stats.interestReceived != null;
+  const hasDividendReceived  = stats.dividendReceived != null;
+  const hasSponsoredEquity   = stats.sponsoredEquity != null;
+  const hasOtherCharges      = stats.otherCharges != null;
+  // Balance Available = after dividends − deployed + interest received + dividend received + sponsored equity − other charges
+  const available = hasDeployed
+    ? afterDividend
+        - (stats.deployedAmount ?? 0)
+        + (hasInterestReceived ? (stats.interestReceived ?? 0) : 0)
+        + (hasDividendReceived ? (stats.dividendReceived ?? 0) : 0)
+        + (hasSponsoredEquity ? (stats.sponsoredEquity ?? 0) : 0)
+        - (hasOtherCharges ? (stats.otherCharges ?? 0) : 0)
+    : null;
+  const hasBank  = stats.bankAccountBalance != null;
+  const variance = hasDeployed && hasBank ? (stats.bankAccountBalance ?? 0) - (available ?? 0) : null;
+
+  const boxStyle = (accent: string, muted?: boolean, clickable?: boolean): React.CSSProperties => ({
+    background: muted ? "#f8fafc" : "#fff",
+    border: `1px solid ${muted ? "#e2e8f0" : "#cbd5e1"}`,
+    borderTop: `3px solid ${accent}`,
+    borderRadius: 8,
+    padding: "12px 14px",
+    opacity: muted ? 0.65 : 1,
+    cursor: clickable ? "pointer" : "default",
+    transition: "box-shadow 0.15s",
+    height: "100%",
+    boxSizing: "border-box" as const,
+    display: "flex",
+    flexDirection: "column" as const,
+  });
+
+  const arrowStyle = (color: string, muted?: boolean, clickable?: boolean): React.CSSProperties => ({
+    background: muted ? "#f8fafc" : `${color}0d`,
+    border: `1px solid ${muted ? "#e2e8f0" : `${color}40`}`,
+    borderTop: `3px solid ${muted ? "#e2e8f0" : color}`,
+    borderRadius: 8,
+    padding: "12px 14px",
+    opacity: muted ? 0.65 : 1,
+    cursor: clickable ? "pointer" : "default",
+    transition: "box-shadow 0.15s",
+    height: "100%",
+    boxSizing: "border-box" as const,
+    display: "flex",
+    flexDirection: "column" as const,
+  });
+
+  const hover = (href?: string) => ({
+    onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => { if (href) e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)"; },
+    onMouseLeave: (e: React.MouseEvent<HTMLDivElement>) => { if (href) e.currentTarget.style.boxShadow = ""; },
+  });
+
+  const box = (label: string, value: string, accent: string, muted?: boolean, href?: string, sub?: string) => {
+    const inner = (
+      <div style={boxStyle(accent, muted, !!href)} {...hover(href)}>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", marginBottom: 6 }}>{label}</div>
+        <div style={{ fontSize: 17, fontWeight: 700, color: muted ? "#94a3b8" : "#0e3416", flex: 1 }}>{value}</div>
+        {sub && <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>{sub}</div>}
+        {href && <div style={{ fontSize: 10, color: "#699172", marginTop: 6, fontWeight: 600 }}>View details →</div>}
+      </div>
+    );
+    return href ? <Link href={href} style={{ textDecoration: "none", display: "block", height: "100%" }}>{inner}</Link> : inner;
+  };
+
+  const arrow = (label: string, amount: string, color: string, muted?: boolean, href?: string, sub?: string) => {
+    const inner = (
+      <div style={arrowStyle(color, muted, !!href)} {...hover(href)}>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: muted ? "#94a3b8" : color, marginBottom: 6 }}>→ {label}</div>
+        <div style={{ fontSize: 17, fontWeight: 700, color: muted ? "#94a3b8" : color, flex: 1 }}>{amount}</div>
+        {sub && <div style={{ fontSize: 10, color: muted ? "#94a3b8" : `${color}cc`, marginTop: 4 }}>{sub}</div>}
+        {href && <div style={{ fontSize: 10, color: "#699172", marginTop: 6, fontWeight: 600 }}>View details →</div>}
+      </div>
+    );
+    return href ? <Link href={href} style={{ textDecoration: "none", display: "block", height: "100%" }}>{inner}</Link> : inner;
+  };
+
+  return (
+    <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "20px 24px", marginBottom: 4 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>
+        Balance Flow (Since Inception){stats.balanceAsAtDate && ` — Balance as at ${new Date(stats.balanceAsAtDate).toLocaleDateString()}`}
+      </div>
+      {/* Row 1–3: 4 columns; Row 4: Bank Account Balance full width */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, alignItems: "stretch" }}>
+        {/* Row 1 */}
+        {box("Total Deposits to Date",   fmt(stats.totalDeployedCommencement),       "#0e3416", false, "/capital-ledger?type=Contribution")}
+        {arrow("Redeemed",               `−${fmt(stats.totalWithdrawnCommencement)}`, "#ef4444", false, "/capital-ledger?type=Redemption")}
+        {box("Balance Remaining",        fmt(remaining),                              "#6366f1")}
+        {arrow("Dividend Paid",          `−${fmt(stats.interestPaidCommencement)}`,   "#f59e0b", false, "/capital-ledger?type=Redemption,Dividend",
+          `${fmt(stats.monthlyDistributionsCommencement)} monthly divs + ${fmt(stats.redemptionInterestCommencement)} on exit`)}
+
+        {/* Row 2 */}
+        {box("After Dividends",          fmt(afterDividend),                          "#10b981")}
+        {hasDeployed
+          ? arrow("Deployed",            `−${fmt(stats.deployedAmount ?? 0)}`,        "#8b5cf6", false, "/settings")
+          : arrow("Deployed",            "Pending",                                   "#8b5cf6", true,  "/settings")}
+        {box("Dividend Received",           hasDividendReceived ? fmt(stats.dividendReceived ?? 0) : "Not entered",  "#b8923a", !hasDividendReceived, "/settings")}
+        {box("Sponsored Equity",            hasSponsoredEquity  ? fmt(stats.sponsoredEquity  ?? 0) : "Not entered",  "#699172", !hasSponsoredEquity,  "/settings")}
+
+        {/* Row 3 */}
+        {box("Profit Received from Bank", hasInterestReceived ? fmt(stats.interestReceived ?? 0) : "Not entered",  "#0f2342", !hasInterestReceived, "/settings")}
+        {arrow("Other Charges / Expenses",   hasOtherCharges ? `−${fmt(stats.otherCharges ?? 0)}` : "Not entered",    "#ef4444", !hasOtherCharges,      "/settings")}
+        {hasDeployed
+          ? box("Total Balance Available", fmt(available ?? 0),                       "#699172")
+          : box("Total Balance Available", "Not entered",                             "#b8923a", true)}
+        {hasBank && variance != null
+          ? arrow("Variance",            `${variance >= 0 ? "+" : "−"}${fmt(Math.abs(variance))}`, variance >= 0 ? "#10b981" : "#ef4444")
+          : arrow("Variance",            "N/A",                                                     "#94a3b8", true)}
+
+        {/* Row 4: Bank Account Balance — full width, centered, same height as peer cards */}
+        <Link href="/settings" style={{ gridColumn: "1 / -1", textDecoration: "none", display: "block" }}>
+          <div
+            style={{
+              background: hasBank ? "linear-gradient(135deg, #f0f4f8 0%, #e8edf5 100%)" : "#f8fafc",
+              border: `1px solid ${hasBank ? "#b0bdd0" : "#e2e8f0"}`,
+              borderTop: "3px solid #0f2342",
+              borderRadius: 8,
+              padding: "12px 14px",
+              opacity: hasBank ? 1 : 0.65,
+              cursor: "pointer",
+              transition: "box-shadow 0.15s",
+              boxSizing: "border-box" as const,
+              display: "flex",
+              flexDirection: "column" as const,
+              alignItems: "center",
+              textAlign: "center" as const,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)"; }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = ""; }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.08em", color: "#475569", marginBottom: 6 }}>
+              Bank Account Balance
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: hasBank ? "#0f2342" : "#94a3b8", flex: 1, letterSpacing: "0.01em" }}>
+              {hasBank ? fmt(stats.bankAccountBalance ?? 0) : "Not entered"}
+            </div>
+            <div style={{ fontSize: 10, color: "#699172", marginTop: 6, fontWeight: 600 }}>View details →</div>
+          </div>
+        </Link>
+      </div>
+      {!hasDeployed && (
+        <div style={{ fontSize: 11, color: "#b8923a", marginTop: 10 }}>
+          ⚠ Enter today&apos;s Deployed Amount in Admin → Settings → Daily Balances to complete this flow.
+        </div>
+      )}
     </div>
   );
 }
@@ -76,12 +217,18 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 const PIE_COLORS = ["#0e3416", "#699172", "#b8923a", "#6366f1", "#10b981"];
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [trends, setTrends] = useState<DashboardTrends | null>(null);
+  const [stats, setStats]     = useState<DashboardStats | null>(null);
+  const [trends, setTrends]   = useState<DashboardTrends | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo]     = useState("");
 
-  useEffect(() => {
-    Promise.allSettled([adminApi.dashboard(), adminApi.dashboardTrends()])
+  const fetchDashboard = useCallback((from?: string, to?: string) => {
+    setLoading(true);
+    Promise.allSettled([
+      adminApi.dashboard(from || to ? { from: from || undefined, to: to || undefined } : undefined),
+      adminApi.dashboardTrends(),
+    ])
       .then(([sR, tR]) => {
         if (sR.status === "fulfilled" && sR.value.success) setStats(sR.value.data);
         if (tR.status === "fulfilled" && tR.value.success) setTrends(tR.value.data);
@@ -89,145 +236,115 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
+
+  const applyDateRange = () => {
+    if (dateFrom && dateTo) fetchDashboard(dateFrom, dateTo);
+  };
+
+  const clearDateRange = () => {
+    setDateFrom("");
+    setDateTo("");
+    fetchDashboard();
+  };
+
   const fmt = (n: number) =>
-    n >= 1_000_000
-      ? `$${(n / 1_000_000).toFixed(2)}M`
-      : `$${n.toLocaleString()}`;
+    `$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <AdminLayout>
       <div style={{ padding: "32px 36px" }}>
-        <h1
-          style={{
-            fontSize: 24,
-            fontWeight: 700,
-            color: "#0e3416",
-            marginBottom: 6,
-          }}
-        >
-          Dashboard
-        </h1>
-        <p style={{ fontSize: 14, color: "#64748b", marginBottom: 32 }}>
-          Overview of DPEG Real Estate Fund
-        </p>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: "#0e3416", marginBottom: 6 }}>Dashboard</h1>
+        <p style={{ fontSize: 14, color: "#64748b", marginBottom: 32 }}>Overview of DPEG Real Estate Fund</p>
 
         {loading ? (
           <div style={{ color: "#64748b" }}>Loading stats...</div>
         ) : stats ? (
           <>
-            {/* Registrants & Depositors */}
-            <SectionLabel>Registrants &amp; Depositors</SectionLabel>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                gap: 20,
-                marginBottom: 4,
-              }}
-            >
+            {/* Depositors */}
+            <SectionLabel>Depositors</SectionLabel>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 20, marginBottom: 4, alignItems: "stretch" }}>
+              <KpiCard label="Total Depositors" value={stats.totalDepositors} sub="Unique investors" color="#10b981" href="/users?filter=hasDeposit" />
+              <KpiCard label="Active Depositors" value={stats.activeInvestors} sub="With current balance (not fully redeemed)" color="#6366f1" href="/users?filter=hasActiveInvestment" />
+              <KpiCard label="Total Deposits" value={stats.totalDepositCount} sub="All investment tranches ever deposited" color="#699172" href="/applications?filter=deposited" />
+              <KpiCard label="Active Agreements" value={stats.totalInvestmentFiles} sub="Open active investment tranches" color="#b8923a" href="/applications?status=Active" />
+              <KpiCard label="Pending Reviews" value={stats.pendingReviews} sub="Applications awaiting admin approval" color="#f59e0b" href="/applications?status=UnderReview" />
+            </div>
+
+            {/* Date Range Filter */}
+            <SectionLabel>Capital Flows — Date Range</SectionLabel>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+              <label style={{ fontSize: 13, color: "#64748b", fontWeight: 600 }}>From</label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={e => setDateFrom(e.target.value)}
+                style={{ fontSize: 13, padding: "6px 10px", border: "1px solid #cbd5e1", borderRadius: 6, color: "#0e3416" }}
+              />
+              <label style={{ fontSize: 13, color: "#64748b", fontWeight: 600 }}>To</label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={e => setDateTo(e.target.value)}
+                style={{ fontSize: 13, padding: "6px 10px", border: "1px solid #cbd5e1", borderRadius: 6, color: "#0e3416" }}
+              />
+              <button
+                onClick={applyDateRange}
+                disabled={!dateFrom || !dateTo}
+                style={{ fontSize: 13, padding: "6px 16px", border: "none", borderRadius: 6, background: dateFrom && dateTo ? "#0e3416" : "#e2e8f0", color: dateFrom && dateTo ? "#fff" : "#94a3b8", cursor: dateFrom && dateTo ? "pointer" : "default", fontWeight: 600, transition: "background 0.15s" }}
+              >
+                Apply
+              </button>
+              {(dateFrom || dateTo) && (
+                <button
+                  onClick={clearDateRange}
+                  style={{ fontSize: 12, padding: "6px 12px", border: "1px solid #cbd5e1", borderRadius: 6, background: "#f8fafc", color: "#64748b", cursor: "pointer" }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, marginBottom: 4, alignItems: "stretch" }}>
               <KpiCard
-                label="Total Registrants"
-                value={stats.totalUsers}
-                sub="All individuals in database"
+                label="Capital Raised"
+                value={fmt(dateFrom && dateTo ? stats.totalDepositedDateRange : stats.totalDeployedCommencement)}
+                sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "Since Inception (default)"}
                 color="#0e3416"
+                href="/capital-ledger?type=Contribution"
               />
               <KpiCard
-                label="Active Accounts"
-                value={stats.activeInvestors}
-                sub="Accounts approved by admin"
+                label="Total Redeemed"
+                value={fmt(stats.totalWithdrawnDateRange)}
+                sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "Since Inception (default)"}
                 color="#6366f1"
+                href="/capital-ledger?type=Redemption"
               />
               <KpiCard
-                label="Depositors"
-                value={stats.totalDepositors}
-                sub="Registrants with deployed capital"
+                label="Dividend Paid"
+                value={fmt(stats.interestPaidDateRange)}
+                breakdown={`${fmt(stats.monthlyDistributionsDateRange)} monthly divs + ${fmt(stats.redemptionInterestDateRange)} on exit`}
+                sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "Since Inception (default)"}
                 color="#10b981"
+                href="/capital-ledger?type=Redemption,Dividend"
               />
               <KpiCard
-                label="Investment Files"
-                value={stats.totalInvestmentFiles}
-                sub="Open active investment tranches"
+                label="Sponsored Equity"
+                value={stats.sponsoredEquity != null ? fmt(stats.sponsoredEquity) : "Not entered"}
+                sub="Manually entered — update in Settings"
                 color="#699172"
+                href="/settings"
               />
             </div>
 
-            {/* Pipeline */}
-            <SectionLabel>Application Pipeline</SectionLabel>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                gap: 20,
-                marginBottom: 4,
-              }}
-            >
-              <KpiCard
-                label="Total Applications"
-                value={stats.totalApplications}
-                color="#64748b"
-              />
-              <KpiCard
-                label="Pending Reviews"
-                value={stats.pendingReviews}
-                sub="Awaiting admin approval"
-                color="#f59e0b"
-              />
-              <KpiCard
-                label="Pending Redemptions"
-                value={stats.pendingRedemptions}
-                sub="Awaiting admin approval"
-                color="#ef4444"
-              />
-            </div>
-
-            {/* Capital Flows */}
-            <SectionLabel>Capital Flows</SectionLabel>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                gap: 20,
-                marginBottom: 4,
-              }}
-            >
-              <KpiCard
-                label="Current AUM"
-                value={fmt(stats.totalAUM)}
-                sub={`${stats.totalUnits} active units`}
-                color="#699172"
-              />
-              <KpiCard
-                label="Total Deployed (All Time)"
-                value={fmt(stats.totalDeployedCommencement)}
-                sub="From commencement"
-                color="#0e3416"
-              />
-              <KpiCard
-                label="Total Withdrawn (All Time)"
-                value={fmt(stats.totalWithdrawnCommencement)}
-                sub="From commencement"
-                color="#6366f1"
-              />
-              <KpiCard
-                label="YTD Deployed"
-                value={fmt(stats.ytdDeployed)}
-                sub={`Jan 1 – today (${new Date().getFullYear()})`}
-                color="#10b981"
-              />
-              <KpiCard
-                label="YTD Withdrawn"
-                value={fmt(stats.ytdWithdrawn)}
-                sub={`Jan 1 – today (${new Date().getFullYear()})`}
-                color="#f59e0b"
-              />
-            </div>
+            {/* Balance Flow */}
+            <SectionLabel>Balance Flow</SectionLabel>
+            <BalanceFlow stats={stats} />
 
             {/* Charts */}
             {trends && (
               <>
                 <SectionLabel>Analytics</SectionLabel>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, marginBottom: 20 }}>
-                  {/* Applications by Month */}
                   <div className="card">
                     <div style={{ fontSize: 14, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>Applications by Month</div>
                     <ResponsiveContainer width="100%" height={200}>
@@ -243,7 +360,6 @@ export default function DashboardPage() {
                     </ResponsiveContainer>
                   </div>
 
-                  {/* Investor Type Breakdown */}
                   <div className="card">
                     <div style={{ fontSize: 14, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>Investor Type Breakdown</div>
                     <ResponsiveContainer width="100%" height={200}>
@@ -258,9 +374,8 @@ export default function DashboardPage() {
                     </ResponsiveContainer>
                   </div>
 
-                  {/* Monthly Capital Deployed */}
                   <div className="card">
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>Monthly Capital Deployed</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>Monthly Deposits</div>
                     <ResponsiveContainer width="100%" height={200}>
                       <LineChart data={trends.monthlyCapital} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -277,54 +392,64 @@ export default function DashboardPage() {
 
             {/* Recent Applications */}
             <div className="card" style={{ marginTop: 28 }}>
-              <h2
-                style={{
-                  fontSize: 16,
-                  fontWeight: 700,
-                  color: "#0e3416",
-                  marginBottom: 20,
-                }}
-              >
-                Recent Applications
-              </h2>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                <h2 style={{ fontSize: 16, fontWeight: 700, color: "#0e3416", margin: 0 }}>Recent Applications</h2>
+                <Link href="/applications" style={{ fontSize: 13, color: "#699172", fontWeight: 600, textDecoration: "none" }}>View all →</Link>
+              </div>
               {stats.recentApplications.length === 0 ? (
-                <p style={{ color: "#94a3b8", fontSize: 14 }}>
-                  No applications yet.
-                </p>
+                <p style={{ color: "#94a3b8", fontSize: 14 }}>No applications yet.</p>
               ) : (
                 <table>
                   <thead>
                     <tr>
-                      <th>ID</th>
-                      <th>Investor Type</th>
+                      <th>ID / REF</th>
+                      <th>Account User</th>
+                      <th>Investor</th>
+                      <th>Type</th>
                       <th>Units</th>
                       <th>Amount</th>
                       <th>Status</th>
+                      <th>Effective Date</th>
                       <th>Submitted</th>
                     </tr>
                   </thead>
                   <tbody>
                     {stats.recentApplications.map((a) => (
                       <tr key={a.id}>
-                        <td
-                          style={{ fontFamily: "monospace", fontWeight: 600 }}
-                        >
-                          #{a.id}
+                        <td>
+                          <div style={{ fontFamily: "monospace", fontWeight: 700 }}>
+                            <Link href={`/applications/${a.id}`} style={{ color: "#0e3416", textDecoration: "none" }}>#{a.id}</Link>
+                          </div>
+                          {a.ppmRefNO && <div style={{ fontSize: 11, color: "#94a3b8" }}>PPM {a.ppmRefNO}</div>}
+                        </td>
+                        <td>
+                          {a.userId ? (
+                            <>
+                              <div style={{ fontWeight: 600 }}>
+                                <Link href={`/users/${a.userId}`} style={{ color: "#0e3416", textDecoration: "none" }}>{a.userFirstName} {a.userLastName}</Link>
+                              </div>
+                              <div style={{ fontSize: 11, color: "#94a3b8" }}>{a.userEmail}</div>
+                            </>
+                          ) : (
+                            <span style={{ color: "#94a3b8" }}>—</span>
+                          )}
+                        </td>
+                        <td>
+                          {a.investorName ? (
+                            <Link href={`/users/${a.userId}`} style={{ color: "#699172", fontWeight: 600, textDecoration: "none" }}>{a.investorName}</Link>
+                          ) : (
+                            <span style={{ color: "#94a3b8" }}>—</span>
+                          )}
                         </td>
                         <td>{a.investorType}</td>
                         <td>{a.numUnits ?? "—"}</td>
-                        <td>
-                          {a.totalAmount
-                            ? `$${a.totalAmount.toLocaleString()}`
-                            : "—"}
-                        </td>
-                        <td>
-                          <StatusBadge status={a.status} />
+                        <td>{a.totalAmount ? `$${a.totalAmount.toLocaleString()}` : "—"}</td>
+                        <td><StatusBadge status={a.status} /></td>
+                        <td style={{ color: "#64748b", fontSize: 13 }}>
+                          {a.effectiveDate ? new Date(a.effectiveDate).toLocaleDateString() : "—"}
                         </td>
                         <td style={{ color: "#64748b", fontSize: 13 }}>
-                          {a.submittedAt
-                            ? new Date(a.submittedAt).toLocaleDateString()
-                            : "—"}
+                          {a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : "—"}
                         </td>
                       </tr>
                     ))}

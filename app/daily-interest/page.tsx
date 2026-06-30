@@ -1,7 +1,14 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/components/AdminLayout';
-import { adminApi, type DailyInterestItem, type PagedResult } from '@/lib/api';
+import {
+  adminApi,
+  type DailyInterestItem,
+  type PagedResult,
+  type DeleteDailyInterestPreviewResult,
+  type ResetMonthResult,
+} from '@/lib/api';
+import { downloadCsv } from '@/lib/exportCsv';
 
 const PAGE_SIZE = 25;
 
@@ -16,6 +23,19 @@ function OdooStatus({ status }: { status?: string | null }) {
   );
 }
 
+type DeleteModalState =
+  | { phase: 'idle' }
+  | { phase: 'loading' }
+  | { phase: 'confirm'; preview: DeleteDailyInterestPreviewResult; ids: number[] }
+  | { phase: 'deleting' }
+  | { phase: 'done'; deleted: number; cascaded: number; skipped: number };
+
+type ResetMonthModalState =
+  | { phase: 'idle' }
+  | { phase: 'confirm'; applicationId: number; year: number; month: number; investorName: string }
+  | { phase: 'resetting' }
+  | { phase: 'done'; result: ResetMonthResult };
+
 export default function DailyInterestPage() {
   const [result, setResult] = useState<PagedResult<DailyInterestItem> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,6 +44,36 @@ export default function DailyInterestPage() {
   const [to, setTo] = useState('');
   const [included, setIncluded] = useState('');
   const [page, setPage] = useState(1);
+  const [pushingDIId, setPushingDIId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [diBulkPushing, setDiBulkPushing] = useState(false);
+  const [diBulkResult, setDiBulkResult] = useState<string | null>(null);
+  const [deleteModal, setDeleteModal] = useState<DeleteModalState>({ phase: 'idle' });
+  const [resetModal, setResetModal] = useState<ResetMonthModalState>({ phase: 'idle' });
+  const [exporting, setExporting] = useState(false);
+
+  const exportToExcel = async () => {
+    setExporting(true);
+    const params: Record<string, string | number> = { page: 1, pageSize: 100000 };
+    if (appId) params.appId = appId;
+    if (from) params.from = from;
+    if (to) params.to = to;
+    if (included !== '') params.included = included;
+    const r = await adminApi.dailyInterestLogs(params);
+    if (r.success) {
+      const headers = ['ID', 'App ID', 'Investor Name', 'Email', 'Date', 'Units', 'Capital', 'Annual Rate %', 'Net Interest', 'Included in Monthly', 'Odoo Status', 'Created'];
+      const rows = r.data.items.map(d => [
+        d.id, d.applicationId, d.investorName, d.investorEmail ?? '',
+        new Date(d.date).toLocaleDateString(),
+        d.units, d.capital, d.annualRate, d.netInterest,
+        d.includedInMonthlyDistribution ? 'Yes' : 'No',
+        d.odooStatus ?? '',
+        new Date(d.createdOn).toLocaleDateString(),
+      ]);
+      downloadCsv([headers, ...rows], 'daily-interest.csv');
+    }
+    setExporting(false);
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -32,6 +82,7 @@ export default function DailyInterestPage() {
     if (from) params.from = from;
     if (to) params.to = to;
     if (included !== '') params.included = included;
+    setSelectedIds(new Set());
     adminApi.dailyInterestLogs(params)
       .then(r => { if (r.success) setResult(r.data); })
       .finally(() => setLoading(false));
@@ -39,8 +90,81 @@ export default function DailyInterestPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const totalPages = result ? Math.ceil(result.totalCount / PAGE_SIZE) : 1;
+  const handlePushDailyInterest = async (id: number) => {
+    setPushingDIId(id);
+    await adminApi.pushDailyInterestToOdoo(id);
+    setPushingDIId(null);
+    load();
+  };
 
+  const handleBulkPushDailyInterest = async () => {
+    const ids = [...selectedIds];
+    setDiBulkPushing(true);
+    setDiBulkResult(null);
+    const r = await adminApi.bulkPushDailyInterestToOdoo(ids);
+    setDiBulkPushing(false);
+    if (r.success) {
+      setDiBulkResult(`Pushed ${r.data.pushed} record${r.data.pushed !== 1 ? 's' : ''}${r.data.failed > 0 ? `, ${r.data.failed} failed` : ''}.`);
+      setSelectedIds(new Set());
+      load();
+    }
+  };
+
+  const handleDeleteClick = async () => {
+    const ids = [...selectedIds];
+    setDeleteModal({ phase: 'loading' });
+    const r = await adminApi.previewDeleteDailyInterest(ids);
+    if (r.success) {
+      setDeleteModal({ phase: 'confirm', preview: r.data, ids });
+    } else {
+      setDeleteModal({ phase: 'idle' });
+    }
+  };
+
+  const handleDeleteConfirm = async (cascadeMonthly: boolean) => {
+    const modal = deleteModal;
+    if (modal.phase !== 'confirm') return;
+    setDeleteModal({ phase: 'deleting' });
+    const r = await adminApi.batchDeleteDailyInterest(modal.ids, cascadeMonthly);
+    if (r.success) {
+      setDeleteModal({
+        phase: 'done',
+        deleted: r.data.deleted,
+        cascaded: r.data.cascadedDistributions,
+        skipped: r.data.skipped,
+      });
+      setSelectedIds(new Set());
+      load();
+    } else {
+      setDeleteModal({ phase: 'idle' });
+    }
+  };
+
+  const handleResetMonth = (row: DailyInterestItem) => {
+    const d = new Date(row.date);
+    setResetModal({
+      phase: 'confirm',
+      applicationId: row.applicationId,
+      year: d.getFullYear(),
+      month: d.getMonth() + 1,
+      investorName: row.investorName,
+    });
+  };
+
+  const handleResetConfirm = async () => {
+    if (resetModal.phase !== 'confirm') return;
+    const { applicationId, year, month } = resetModal;
+    setResetModal({ phase: 'resetting' });
+    const r = await adminApi.resetMonthDistribution(applicationId, year, month);
+    if (r.success) {
+      setResetModal({ phase: 'done', result: r.data });
+      load();
+    } else {
+      setResetModal({ phase: 'idle' });
+    }
+  };
+
+  const totalPages = result ? Math.ceil(result.totalCount / PAGE_SIZE) : 1;
   const totalInterest = result?.items.reduce((s, i) => s + i.netInterest, 0) ?? 0;
 
   const th: React.CSSProperties = {
@@ -52,6 +176,9 @@ export default function DailyInterestPage() {
     padding: '10px 14px', fontSize: 13, color: '#374151',
     borderBottom: '1px solid #f1f5f9',
   };
+
+  const allPageIds = (result?.items ?? []).map(r => r.id);
+  const allSelected = allPageIds.length > 0 && allPageIds.every(id => selectedIds.has(id));
 
   return (
     <AdminLayout>
@@ -74,6 +201,10 @@ export default function DailyInterestPage() {
             <option value="true">Included in Distribution</option>
             <option value="false">Pending Distribution</option>
           </select>
+          <button onClick={exportToExcel} disabled={exporting}
+            style={{ padding: '9px 18px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: exporting ? 'not-allowed' : 'pointer', opacity: exporting ? 0.7 : 1 }}>
+            {exporting ? 'Exporting…' : '↓ Export'}
+          </button>
         </div>
 
         {/* Summary bar */}
@@ -92,6 +223,62 @@ export default function DailyInterestPage() {
           </div>
         )}
 
+        {/* Bulk action bar */}
+        {selectedIds.size > 0 && (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12, padding: '10px 16px', background: '#f0f9ff', border: '1.5px solid #bae6fd', borderRadius: 10 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#0369a1' }}>{selectedIds.size} selected</span>
+            <button
+              onClick={handleBulkPushDailyInterest}
+              disabled={diBulkPushing}
+              style={{ padding: '7px 16px', background: '#b8923a', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: diBulkPushing ? 0.6 : 1 }}>
+              {diBulkPushing ? 'Pushing…' : `Push to Odoo (${selectedIds.size})`}
+            </button>
+            <button
+              onClick={handleDeleteClick}
+              disabled={deleteModal.phase === 'loading' || deleteModal.phase === 'deleting'}
+              style={{ padding: '7px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (deleteModal.phase === 'loading' || deleteModal.phase === 'deleting') ? 0.6 : 1 }}>
+              {deleteModal.phase === 'loading' ? 'Checking…' : `Delete (${selectedIds.size})`}
+            </button>
+            <button onClick={() => setSelectedIds(new Set())}
+              style={{ marginLeft: 'auto', padding: '4px 10px', background: 'none', border: '1px solid #94a3b8', borderRadius: 6, fontSize: 12, cursor: 'pointer', color: '#64748b' }}>
+              Clear
+            </button>
+          </div>
+        )}
+
+        {diBulkResult && (
+          <div style={{ marginBottom: 10, padding: '8px 14px', background: '#f0fdf4', borderRadius: 8, fontSize: 13, color: '#15803d', fontWeight: 500 }}>
+            ✓ {diBulkResult}
+          </div>
+        )}
+
+        {/* Delete result banner */}
+        {deleteModal.phase === 'done' && (
+          <div style={{ marginBottom: 10, padding: '10px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, fontSize: 13, color: '#15803d', fontWeight: 500, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>
+              ✓ Deleted {deleteModal.deleted} record{deleteModal.deleted !== 1 ? 's' : ''}.
+              {deleteModal.cascaded > 0 && ` Cascade-deleted ${deleteModal.cascaded} monthly distribution log${deleteModal.cascaded !== 1 ? 's' : ''}.`}
+              {deleteModal.skipped > 0 && ` ${deleteModal.skipped} record${deleteModal.skipped !== 1 ? 's' : ''} skipped (already in monthly distribution).`}
+              {' '}Run Catch-Up to regenerate deleted records.
+            </span>
+            <button onClick={() => setDeleteModal({ phase: 'idle' })}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#15803d', marginLeft: 12 }}>×</button>
+          </div>
+        )}
+
+        {/* Reset month result banner */}
+        {resetModal.phase === 'done' && (
+          <div style={{ marginBottom: 10, padding: '10px 16px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, fontSize: 13, color: '#9a3412', fontWeight: 500, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>
+              ✓ Reset complete — {resetModal.result.logsReset} daily log{resetModal.result.logsReset !== 1 ? 's' : ''} unmarked.
+              {resetModal.result.distributionDeleted && ` Monthly distribution record deleted (was $${resetModal.result.previousAmount.toFixed(2)}${resetModal.result.odooStatus ? `, Odoo: ${resetModal.result.odooStatus}` : ''}).`}
+              {' '}Re-run Distribution Execute to include these logs in the corrected payout.
+            </span>
+            <button onClick={() => setResetModal({ phase: 'idle' })}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#9a3412', marginLeft: 12 }}>×</button>
+          </div>
+        )}
+
         {loading ? (
           <p style={{ color: '#64748b', fontSize: 14 }}>Loading…</p>
         ) : (
@@ -100,40 +287,80 @@ export default function DailyInterestPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    {['Date', 'Investor', 'App ID', 'Units', 'Capital', 'Rate', 'Net Interest', 'Odoo ID', 'Odoo Status', 'Distributed'].map(h => (
+                    <th style={{ ...th, width: 40, textAlign: 'center' }}>
+                      <input type="checkbox"
+                        checked={allSelected}
+                        onChange={e => {
+                          if (e.target.checked) setSelectedIds(new Set(allPageIds));
+                          else setSelectedIds(new Set());
+                        }} />
+                    </th>
+                    {['Date', 'Investor', 'App ID', 'Units', 'Capital', 'Rate', 'Net Interest', 'Odoo ID', 'Odoo Status', 'Distributed', 'Action'].map(h => (
                       <th key={h} style={th}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {result?.items.length === 0 && (
-                    <tr><td colSpan={10} style={{ ...td, textAlign: 'center', color: '#9ca3af', padding: 32 }}>No records found</td></tr>
+                    <tr><td colSpan={12} style={{ ...td, textAlign: 'center', color: '#9ca3af', padding: 32 }}>No records found</td></tr>
                   )}
-                  {result?.items.map(row => (
-                    <tr key={row.id} style={{ background: row.includedInMonthlyDistribution ? '#f8fafc' : undefined }}>
-                      <td style={{ ...td, fontWeight: 600, whiteSpace: 'nowrap' }}>{new Date(row.date).toLocaleDateString()}</td>
-                      <td style={td}>
-                        <div style={{ fontWeight: 500 }}>{row.investorName}</div>
-                        {row.investorEmail && <div style={{ fontSize: 11, color: '#9ca3af' }}>{row.investorEmail}</div>}
-                      </td>
-                      <td style={{ ...td, color: '#6b7280' }}>#{row.applicationId}</td>
-                      <td style={{ ...td, textAlign: 'center' }}>{row.units}</td>
-                      <td style={td}>${row.capital.toLocaleString()}</td>
-                      <td style={{ ...td, color: '#6b7280' }}>{(row.annualRate * 100).toFixed(0)}%</td>
-                      <td style={{ ...td, fontWeight: 700, color: '#0e3416' }}>${row.netInterest.toFixed(4)}</td>
-                      <td style={{ ...td, fontFamily: 'monospace', fontSize: 11 }}>{row.odooInterestId ?? '—'}</td>
-                      <td style={td}><OdooStatus status={row.odooStatus} /></td>
-                      <td style={{ ...td, textAlign: 'center' }}>
-                        <span style={{
-                          padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
-                          background: row.includedInMonthlyDistribution ? '#f0fdf4' : '#fef9c3',
-                          color: row.includedInMonthlyDistribution ? '#15803d' : '#854d0e',
-                        }}>
-                          {row.includedInMonthlyDistribution ? 'Yes' : 'Pending'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {result?.items.map(row => {
+                    const canPush = row.odooStatus !== 'Success';
+                    const isSelected = selectedIds.has(row.id);
+                    return (
+                      <tr key={row.id} style={{ background: isSelected ? '#eff6ff' : row.includedInMonthlyDistribution ? '#f8fafc' : undefined }}>
+                        <td style={{ ...td, textAlign: 'center', width: 40 }}>
+                          <input type="checkbox" checked={isSelected}
+                            onChange={e => setSelectedIds(prev => {
+                              const s = new Set(prev);
+                              if (e.target.checked) s.add(row.id); else s.delete(row.id);
+                              return s;
+                            })} />
+                        </td>
+                        <td style={{ ...td, fontWeight: 600, whiteSpace: 'nowrap' }}>{new Date(row.date).toLocaleDateString()}</td>
+                        <td style={td}>
+                          <div style={{ fontWeight: 500 }}>{row.investorName}</div>
+                          {row.investorEmail && <div style={{ fontSize: 11, color: '#9ca3af' }}>{row.investorEmail}</div>}
+                        </td>
+                        <td style={{ ...td, color: '#6b7280' }}>#{row.applicationId}</td>
+                        <td style={{ ...td, textAlign: 'center' }}>{row.units}</td>
+                        <td style={td}>${row.capital.toLocaleString()}</td>
+                        <td style={{ ...td, color: '#6b7280' }}>{(row.annualRate * 100).toFixed(0)}%</td>
+                        <td style={{ ...td, fontWeight: 700, color: '#0e3416' }}>${row.netInterest.toFixed(4)}</td>
+                        <td style={{ ...td, fontFamily: 'monospace', fontSize: 11 }}>{row.odooInterestId ?? '—'}</td>
+                        <td style={td}><OdooStatus status={row.odooStatus} /></td>
+                        <td style={{ ...td, textAlign: 'center' }}>
+                          <span style={{
+                            padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+                            background: row.includedInMonthlyDistribution ? '#f0fdf4' : '#fef9c3',
+                            color: row.includedInMonthlyDistribution ? '#15803d' : '#854d0e',
+                          }}>
+                            {row.includedInMonthlyDistribution ? 'Yes' : 'Pending'}
+                          </span>
+                        </td>
+                        <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'nowrap' }}>
+                            {canPush && (
+                              <button
+                                onClick={() => handlePushDailyInterest(row.id)}
+                                disabled={pushingDIId === row.id}
+                                style={{ padding: '4px 11px', background: '#b8923a', color: '#fff', border: 'none', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: pushingDIId === row.id ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                                {pushingDIId === row.id ? '…' : 'Push to Odoo'}
+                              </button>
+                            )}
+                            {row.includedInMonthlyDistribution && (
+                              <button
+                                onClick={() => handleResetMonth(row)}
+                                title="Unmark this month's distribution so it can be re-run with corrected daily logs"
+                                style={{ padding: '4px 11px', background: '#f97316', color: '#fff', border: 'none', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                Reset Month
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -151,6 +378,151 @@ export default function DailyInterestPage() {
           </>
         )}
       </div>
+
+      {/* Reset Month confirmation modal */}
+      {(resetModal.phase === 'confirm' || resetModal.phase === 'resetting') && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: 32, width: 500, maxWidth: '95vw', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#0f2342', marginBottom: 6 }}>Reset Monthly Distribution</h2>
+
+            {resetModal.phase === 'confirm' && (() => {
+              const monthLabel = new Date(resetModal.year, resetModal.month - 1, 1)
+                .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+              return (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                    <div style={{ padding: '12px 14px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, fontSize: 13, color: '#9a3412' }}>
+                      <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                        {resetModal.investorName} — App #{resetModal.applicationId} — {monthLabel}
+                      </div>
+                      <div>This will:</div>
+                      <ul style={{ margin: '6px 0 0 18px', lineHeight: 1.7 }}>
+                        <li>Delete the <strong>{monthLabel}</strong> monthly distribution record for this investor</li>
+                        <li>Reset all daily interest logs for this month to <strong>Pending</strong></li>
+                      </ul>
+                    </div>
+                    <div style={{ padding: '10px 14px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, fontSize: 12, color: '#075985' }}>
+                      After resetting, go to the <strong>Distributions</strong> page and re-run <strong>Execute</strong> for this month to create a corrected distribution that includes all daily logs (including any newly catch-upped ones).
+                    </div>
+                    <div style={{ padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 12, color: '#991b1b' }}>
+                      If this distribution was already pushed to Odoo, you will need to correct that entry in Odoo separately.
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => setResetModal({ phase: 'idle' })}
+                      style={{ padding: '9px 18px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: '#fff', color: '#374151' }}>
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleResetConfirm}
+                      style={{ padding: '9px 18px', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: '#f97316', color: '#fff' }}>
+                      Reset & Unmark
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+
+            {resetModal.phase === 'resetting' && (
+              <p style={{ color: '#64748b', fontSize: 14 }}>Resetting distribution…</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {(deleteModal.phase === 'confirm' || deleteModal.phase === 'deleting') && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: 32, width: 520, maxWidth: '95vw', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#0f2342', marginBottom: 6 }}>Confirm Delete</h2>
+
+            {deleteModal.phase === 'confirm' && (() => {
+              const { preview } = deleteModal;
+              const hasConflict = preview.conflictedCount > 0;
+              return (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                    <div style={{ padding: '10px 14px', background: '#f0fdf4', borderRadius: 8, fontSize: 13, color: '#15803d' }}>
+                      <strong>{preview.safeCount}</strong> record{preview.safeCount !== 1 ? 's' : ''} can be deleted cleanly (not in any monthly distribution).
+                    </div>
+
+                    {hasConflict && (
+                      <div style={{ padding: '12px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#991b1b' }}>
+                        <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                          {preview.conflictedCount} record{preview.conflictedCount !== 1 ? 's' : ''} already included in monthly distributions.
+                        </div>
+                        <div style={{ marginBottom: 8, color: '#b91c1c' }}>
+                          Deleting these will cascade-delete the following monthly distribution log{preview.affectedDistributions.length !== 1 ? 's' : ''} and reset all daily logs in those months — they will need to be reprocessed.
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {preview.affectedDistributions.map(d => (
+                            <div key={d.distributionLogId} style={{ background: '#fff', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px', fontSize: 12 }}>
+                              <div style={{ fontWeight: 600, color: '#0f2342' }}>
+                                {d.investorName} — App #{d.applicationId}
+                              </div>
+                              <div style={{ color: '#6b7280', marginTop: 2 }}>
+                                Month: <strong>{new Date(d.distributionMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</strong>
+                                {' · '}Amount: <strong>${d.totalNetAmount.toFixed(2)}</strong>
+                                {' · '}{d.siblingLogsCount} daily log{d.siblingLogsCount !== 1 ? 's' : ''} will be reset
+                              </div>
+                              <div style={{ marginTop: 4, display: 'flex', gap: 6 }}>
+                                {d.odooStatus && (
+                                  <span style={{ padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: d.odooStatus === 'Sent' ? '#fef9c3' : '#f1f5f9', color: d.odooStatus === 'Sent' ? '#854d0e' : '#475569' }}>
+                                    Odoo: {d.odooStatus}
+                                  </span>
+                                )}
+                                <span style={{ padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#f1f5f9', color: '#475569' }}>
+                                  {d.paymentStatus}
+                                </span>
+                                {d.odooStatus === 'Sent' && (
+                                  <span style={{ padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#fef2f2', color: '#b91c1c' }}>
+                                    Already sent to Odoo — corrected push needed after regeneration
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => setDeleteModal({ phase: 'idle' })}
+                      style={{ padding: '9px 18px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: '#fff', color: '#374151' }}>
+                      Cancel
+                    </button>
+                    {hasConflict && preview.safeCount > 0 && (
+                      <button
+                        onClick={() => handleDeleteConfirm(false)}
+                        style={{ padding: '9px 18px', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: '#b8923a', color: '#fff' }}>
+                        Delete Safe Only ({preview.safeCount})
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDeleteConfirm(hasConflict)}
+                      style={{ padding: '9px 18px', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: '#dc2626', color: '#fff' }}>
+                      {hasConflict ? `Delete All + Cascade (${deleteModal.ids.length})` : `Delete (${deleteModal.ids.length})`}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+
+            {deleteModal.phase === 'deleting' && (
+              <p style={{ color: '#64748b', fontSize: 14 }}>Deleting records…</p>
+            )}
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }
