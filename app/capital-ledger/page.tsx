@@ -40,6 +40,22 @@ const TYPE_LABELS: Record<string, string> = {
   'Redemption,Dividend': 'Redemptions + Dividends',
 };
 
+const SORTABLE_COLUMNS = {
+  id: 'EntryId',
+  applicationId: 'ApplicationId',
+  date: 'Date',
+  type: 'EntryType',
+  investmentType: 'InvestmentType',
+  investor: 'InvestorName',
+  units: 'Units',
+  amount: 'Amount',
+  dividendPaid: 'DividendPaid',
+  runningBalance: 'RunningBalance',
+} as const;
+
+type SortKey = keyof typeof SORTABLE_COLUMNS;
+type SortDir = 'asc' | 'desc';
+
 function CapitalLedgerContent() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<CapitalLedger | null>(null);
@@ -50,6 +66,8 @@ function CapitalLedgerContent() {
   const [search, setSearch] = useState('');
   const [appIdFilter, setAppIdFilter] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>('date');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -61,7 +79,7 @@ function CapitalLedgerContent() {
   useEffect(() => { load(); }, [load]);
 
   const activeTypes = typeFilter ? typeFilter.split(',') : [];
-  const visibleEntries = (data?.entries ?? []).filter(e => {
+  const filteredEntries = (data?.entries ?? []).filter(e => {
     if (activeTypes.length > 0 && !activeTypes.includes(e.entryType)) return false;
     if (search) {
       const q = search.toLowerCase();
@@ -74,12 +92,100 @@ function CapitalLedgerContent() {
     return true;
   });
 
+  const sortedEntries = [...filteredEntries].sort((a, b) => {
+    const left = (() => {
+      switch (sortKey) {
+        case 'id': return a.entryId ?? -1;
+        case 'applicationId': return a.applicationId ?? -1;
+        case 'date': return new Date(a.date).getTime();
+        case 'type': return a.entryType;
+        case 'investmentType': return a.investmentType ?? '';
+        case 'investor': return a.investorName ?? '';
+        case 'units': return a.units ?? -1;
+        case 'amount': return a.amount;
+        case 'dividendPaid': return a.dividendPaid ?? 0;
+        case 'runningBalance': return a.runningBalance;
+      }
+    })();
+
+    const right = (() => {
+      switch (sortKey) {
+        case 'id': return b.entryId ?? -1;
+        case 'applicationId': return b.applicationId ?? -1;
+        case 'date': return new Date(b.date).getTime();
+        case 'type': return b.entryType;
+        case 'investmentType': return b.investmentType ?? '';
+        case 'investor': return b.investorName ?? '';
+        case 'units': return b.units ?? -1;
+        case 'amount': return b.amount;
+        case 'dividendPaid': return b.dividendPaid ?? 0;
+        case 'runningBalance': return b.runningBalance;
+      }
+    })();
+
+    if (typeof left === 'number' && typeof right === 'number') {
+      return sortDir === 'asc' ? left - right : right - left;
+    }
+
+    const result = String(left).localeCompare(String(right), undefined, { sensitivity: 'base' });
+    return sortDir === 'asc' ? result : -result;
+  });
+
   const exportToExcel = async () => {
     setExporting(true);
     const r = await adminApi.capitalLedger({ from: from || undefined, to: to || undefined });
     if (r.success && r.data) {
-      const rows = r.data.entries
-        .filter(e => activeTypes.length === 0 || activeTypes.includes(e.entryType))
+      const rows = [...r.data.entries]
+        .filter(e => {
+          if (activeTypes.length > 0 && !activeTypes.includes(e.entryType)) return false;
+          if (search) {
+            const q = search.toLowerCase();
+            if (!e.investorName.toLowerCase().includes(q) && !e.email.toLowerCase().includes(q)) return false;
+          }
+          if (appIdFilter) {
+            const id = appIdFilter.replace('#', '').trim();
+            if (String(e.applicationId ?? '') !== id) return false;
+          }
+          return true;
+        })
+        .sort((a, b) => {
+          const left = (() => {
+            switch (sortKey) {
+              case 'id': return a.entryId ?? -1;
+              case 'applicationId': return a.applicationId ?? -1;
+              case 'date': return new Date(a.date).getTime();
+              case 'type': return a.entryType;
+              case 'investmentType': return a.investmentType ?? '';
+              case 'investor': return a.investorName ?? '';
+              case 'units': return a.units ?? -1;
+              case 'amount': return a.amount;
+              case 'dividendPaid': return a.dividendPaid ?? 0;
+              case 'runningBalance': return a.runningBalance;
+            }
+          })();
+
+          const right = (() => {
+            switch (sortKey) {
+              case 'id': return b.entryId ?? -1;
+              case 'applicationId': return b.applicationId ?? -1;
+              case 'date': return new Date(b.date).getTime();
+              case 'type': return b.entryType;
+              case 'investmentType': return b.investmentType ?? '';
+              case 'investor': return b.investorName ?? '';
+              case 'units': return b.units ?? -1;
+              case 'amount': return b.amount;
+              case 'dividendPaid': return b.dividendPaid ?? 0;
+              case 'runningBalance': return b.runningBalance;
+            }
+          })();
+
+          if (typeof left === 'number' && typeof right === 'number') {
+            return sortDir === 'asc' ? left - right : right - left;
+          }
+
+          const result = String(left).localeCompare(String(right), undefined, { sensitivity: 'base' });
+          return sortDir === 'asc' ? result : -result;
+        })
         .map(e => [
           entryLabel(e),
           e.applicationId ? `#${e.applicationId}` : '',
@@ -101,6 +207,33 @@ function CapitalLedgerContent() {
     }
     setExporting(false);
   };
+
+  const toggleSort = (nextKey: SortKey) => {
+    if (sortKey === nextKey) {
+      setSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setSortKey(nextKey);
+    setSortDir('asc');
+  };
+
+  const sortIndicator = (key: SortKey) => {
+    if (sortKey !== key) return " ⇵";
+    return sortDir === 'asc' ? ' ↑' : ' ↓';
+  };
+
+  const sortableHeaderStyle = (key: SortKey, align: 'left' | 'right' = 'left') => ({
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    cursor: 'pointer',
+    font: 'inherit',
+    color: sortKey === key ? '#0f2342' : '#475569',
+    fontWeight: sortKey === key ? 700 : 600,
+    whiteSpace: 'nowrap' as const,
+    width: '100%',
+    textAlign: align,
+  });
 
   const statCard = (label: string, value: string, color: string, sub?: string) => (
     <div style={{ background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '14px 20px', minWidth: 170 }}>
@@ -187,100 +320,142 @@ function CapitalLedgerContent() {
           {loading ? (
             <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Loading…</div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0' }}>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>ID</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>App ID</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Date</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Type</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Inv. Type</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Investor</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>Units</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>Amount</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#b45309' }}>Dividend Paid</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>Running Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleEntries.length === 0 && (
-                  <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>No entries found.</td></tr>
-                )}
-                {visibleEntries.map((e, i) => {
-                  const colors = TYPE_COLORS[e.entryType] ?? TYPE_COLORS.Contribution;
-                  const showAmount = e.entryType !== 'Dividend';
-                  const isCredit = e.amount > 0;
-                  return (
-                    <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
-                      <td style={{ padding: '11px 16px', whiteSpace: 'nowrap' }}>
-                        {e.entryId
-                          ? <Link href={entryHref(e)} style={{ color: '#0f2342', textDecoration: 'none', fontWeight: 700, fontSize: 12 }}>{entryLabel(e)}</Link>
-                          : '—'}
-                      </td>
-                      <td style={{ padding: '11px 16px', whiteSpace: 'nowrap' }}>
-                        {e.applicationId
-                          ? <Link href={`/applications/${e.applicationId}`} style={{ color: '#374151', textDecoration: 'none', fontWeight: 600, fontSize: 12 }}>#{e.applicationId}</Link>
-                          : <span style={{ color: '#cbd5e1', fontSize: 12 }}>—</span>}
-                      </td>
-                      <td style={{ padding: '11px 16px', color: '#374151', whiteSpace: 'nowrap' }}>
-                        {new Date(e.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-                      </td>
-                      <td style={{ padding: '11px 16px' }}>
-                        <span style={{ background: colors.badge, color: colors.text, fontWeight: 600, fontSize: 11, borderRadius: 5, padding: '3px 8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          {e.entryType}
-                        </span>
-                      </td>
-                      <td style={{ padding: '11px 16px', whiteSpace: 'nowrap' }}>
-                        {e.investmentType ? (
-                          <span style={{ background: e.investmentType === 'ShortTerm' ? '#eff6ff' : '#f5f3ff', color: e.investmentType === 'ShortTerm' ? '#1d4ed8' : '#6d28d9', fontWeight: 600, fontSize: 11, borderRadius: 5, padding: '3px 8px' }}>
-                            {e.investmentType === 'ShortTerm' ? 'Short Term' : 'Long Term'}
+            <div className="table-scroll">
+              <table style={{ minWidth: 1180, borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0' }}>
+                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>
+                      <button onClick={() => toggleSort('id')} style={sortableHeaderStyle('id')}>
+                        ID{sortIndicator('id')}
+                      </button>
+                    </th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>
+                      <button onClick={() => toggleSort('applicationId')} style={sortableHeaderStyle('applicationId')}>
+                        App ID{sortIndicator('applicationId')}
+                      </button>
+                    </th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>
+                      <button onClick={() => toggleSort('date')} style={sortableHeaderStyle('date')}>
+                        Date{sortIndicator('date')}
+                      </button>
+                    </th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>
+                      <button onClick={() => toggleSort('type')} style={sortableHeaderStyle('type')}>
+                        Type{sortIndicator('type')}
+                      </button>
+                    </th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>
+                      <button onClick={() => toggleSort('investmentType')} style={sortableHeaderStyle('investmentType')}>
+                        Inv. Type{sortIndicator('investmentType')}
+                      </button>
+                    </th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>
+                      <button onClick={() => toggleSort('investor')} style={sortableHeaderStyle('investor')}>
+                        Investor{sortIndicator('investor')}
+                      </button>
+                    </th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>
+                      <button onClick={() => toggleSort('units')} style={sortableHeaderStyle('units', 'right')}>
+                        Units{sortIndicator('units')}
+                      </button>
+                    </th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>
+                      <button onClick={() => toggleSort('amount')} style={sortableHeaderStyle('amount', 'right')}>
+                        Amount{sortIndicator('amount')}
+                      </button>
+                    </th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>
+                      <button onClick={() => toggleSort('dividendPaid')} style={sortableHeaderStyle('dividendPaid', 'right')}>
+                        Dividend Paid{sortIndicator('dividendPaid')}
+                      </button>
+                    </th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>
+                      <button onClick={() => toggleSort('runningBalance')} style={sortableHeaderStyle('runningBalance', 'right')}>
+                        Running Balance{sortIndicator('runningBalance')}
+                      </button>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedEntries.length === 0 && (
+                    <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>No entries found.</td></tr>
+                  )}
+                  {sortedEntries.map((e, i) => {
+                    const colors = TYPE_COLORS[e.entryType] ?? TYPE_COLORS.Contribution;
+                    const showAmount = e.entryType !== 'Dividend';
+                    const isCredit = e.amount > 0;
+                    return (
+                      <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                        <td style={{ padding: '11px 16px', whiteSpace: 'nowrap' }}>
+                          {e.entryId
+                            ? <Link href={entryHref(e)} style={{ color: '#0f2342', textDecoration: 'none', fontWeight: 700, fontSize: 12 }}>{entryLabel(e)}</Link>
+                            : '—'}
+                        </td>
+                        <td style={{ padding: '11px 16px', whiteSpace: 'nowrap' }}>
+                          {e.applicationId
+                            ? <Link href={`/applications/${e.applicationId}`} style={{ color: '#374151', textDecoration: 'none', fontWeight: 600, fontSize: 12 }}>#{e.applicationId}</Link>
+                            : <span style={{ color: '#cbd5e1', fontSize: 12 }}>—</span>}
+                        </td>
+                        <td style={{ padding: '11px 16px', color: '#374151', whiteSpace: 'nowrap' }}>
+                          {new Date(e.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                        </td>
+                        <td style={{ padding: '11px 16px' }}>
+                          <span style={{ background: colors.badge, color: colors.text, fontWeight: 600, fontSize: 11, borderRadius: 5, padding: '3px 8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            {e.entryType}
                           </span>
-                        ) : <span style={{ color: '#cbd5e1', fontSize: 12 }}>—</span>}
+                        </td>
+                        <td style={{ padding: '11px 16px', whiteSpace: 'nowrap' }}>
+                          {e.investmentType ? (
+                            <span style={{ background: e.investmentType === 'ShortTerm' ? '#eff6ff' : '#f5f3ff', color: e.investmentType === 'ShortTerm' ? '#1d4ed8' : '#6d28d9', fontWeight: 600, fontSize: 11, borderRadius: 5, padding: '3px 8px' }}>
+                              {e.investmentType === 'ShortTerm' ? 'Short Term' : 'Long Term'}
+                            </span>
+                          ) : <span style={{ color: '#cbd5e1', fontSize: 12 }}>—</span>}
+                        </td>
+                        <td style={{ padding: '11px 16px' }}>
+                          <div style={{ fontWeight: 600, color: '#1e293b' }}>{e.investorName || '—'}</div>
+                          <div style={{ fontSize: 11, color: '#94a3b8' }}>{e.email}</div>
+                        </td>
+                        <td style={{ padding: '11px 16px', textAlign: 'right', color: '#374151' }}>
+                          {e.units != null ? e.units : '—'}
+                        </td>
+                        <td style={{ padding: '11px 16px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap',
+                          color: showAmount ? (isCredit ? '#15803d' : '#be123c') : '#cbd5e1' }}>
+                          {showAmount
+                            ? <>{isCredit ? '+' : '−'}{fmtFull(Math.abs(e.amount))}</>
+                            : '—'}
+                        </td>
+                        <td style={{ padding: '11px 16px', textAlign: 'right', fontWeight: 700, color: '#b45309', whiteSpace: 'nowrap' }}>
+                          {e.dividendPaid != null && e.dividendPaid !== 0
+                            ? <>−{fmtFull(Math.abs(e.dividendPaid))}</>
+                            : <span style={{ color: '#cbd5e1' }}>—</span>}
+                        </td>
+                        <td style={{ padding: '11px 16px', textAlign: 'right', fontWeight: 600, color: '#0f2342', whiteSpace: 'nowrap' }}>
+                          {fmtFull(e.runningBalance)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                {sortedEntries.length > 0 && (
+                  <tfoot>
+                    <tr style={{ background: '#f8fafc', borderTop: '2px solid #e2e8f0' }}>
+                      <td colSpan={7} style={{ padding: '12px 16px', fontWeight: 700, color: '#374151', fontSize: 13 }}>
+                        {sortedEntries.length} entries
                       </td>
-                      <td style={{ padding: '11px 16px' }}>
-                        <div style={{ fontWeight: 600, color: '#1e293b' }}>{e.investorName || '—'}</div>
-                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{e.email}</div>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0f2342', fontSize: 13 }}>
+                        Net: {fmtFull(sortedEntries.reduce((s, e) => s + e.amount, 0))}
                       </td>
-                      <td style={{ padding: '11px 16px', textAlign: 'right', color: '#374151' }}>
-                        {e.units != null ? e.units : '—'}
+                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#b45309', fontSize: 13 }}>
+                        −{fmtFull(Math.abs(sortedEntries.reduce((s, e) => s + (e.dividendPaid ?? 0), 0)))}
                       </td>
-                      <td style={{ padding: '11px 16px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap',
-                        color: showAmount ? (isCredit ? '#15803d' : '#be123c') : '#cbd5e1' }}>
-                        {showAmount
-                          ? <>{isCredit ? '+' : '−'}{fmtFull(Math.abs(e.amount))}</>
-                          : '—'}
-                      </td>
-                      <td style={{ padding: '11px 16px', textAlign: 'right', fontWeight: 700, color: '#b45309', whiteSpace: 'nowrap' }}>
-                        {e.dividendPaid != null && e.dividendPaid !== 0
-                          ? <>−{fmtFull(Math.abs(e.dividendPaid))}</>
-                          : <span style={{ color: '#cbd5e1' }}>—</span>}
-                      </td>
-                      <td style={{ padding: '11px 16px', textAlign: 'right', fontWeight: 600, color: '#0f2342', whiteSpace: 'nowrap' }}>
-                        {fmtFull(e.runningBalance)}
+                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0f2342', fontSize: 13 }}>
+                        {data && fmtFull(data.closingBalance)}
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-              {visibleEntries.length > 0 && (
-                <tfoot>
-                  <tr style={{ background: '#f8fafc', borderTop: '2px solid #e2e8f0' }}>
-                    <td colSpan={7} style={{ padding: '12px 16px', fontWeight: 700, color: '#374151', fontSize: 13 }}>
-                      {visibleEntries.length} entries
-                    </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0f2342', fontSize: 13 }}>
-                      Net: {fmtFull(visibleEntries.reduce((s, e) => s + e.amount, 0))}
-                    </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#b45309', fontSize: 13 }}>
-                      −{fmtFull(Math.abs(visibleEntries.reduce((s, e) => s + (e.dividendPaid ?? 0), 0)))}
-                    </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0f2342', fontSize: 13 }}>
-                      {data && fmtFull(data.closingBalance)}
-                    </td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
+                  </tfoot>
+                )}
+              </table>
+            </div>
           )}
         </div>
       </div>
