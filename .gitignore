@@ -33,6 +33,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env.local
 
+# Executive Copilot memory store (local/dev persistence only — does not survive a
+# production deploy yet; see lib/executiveCopilot/memoryStore.ts)
+/data/
+
 # vercel
 .vercel
 

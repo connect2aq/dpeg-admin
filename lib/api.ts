@@ -1,3 +1,20 @@
+import {
+  dashboardPath,
+  dashboardTrendsPath,
+  redemptionsPath,
+  redemptionPath,
+  docuSignEnvelopesPath,
+  applicationsPath,
+  pendingChangesPath,
+  pendingCountsPath,
+  auditLogsPath,
+  distributionsPath,
+  capitalLedgerPath,
+  usersPath,
+  bankDetailsPath,
+  dailyBalancesPath,
+} from "./apiContracts";
+
 const BASE = process.env.NEXT_PUBLIC_API_URL;
 // Static files (wwwroot) are served from the app root, not under /api/admin
 export const STATIC_BASE = (BASE ?? '').replace(/\/api\/admin\/?$/, '').replace(/\/api\/?$/, '').replace(/\/$/, '');
@@ -518,30 +535,18 @@ export const adminApi = {
         lastName: string;
       }>
     >("/login", { email, password }),
-  dashboard: (params?: { from?: string; to?: string }) => {
-    const qs = params && (params.from || params.to)
-      ? '?' + new URLSearchParams(Object.fromEntries(
-          Object.entries(params).filter(([, v]) => v != null)
-        ) as Record<string, string>)
-      : '';
-    return api.get<ApiResponse<DashboardStats>>(`/dashboard${qs}`);
-  },
-  dashboardTrends: () => api.get<ApiResponse<DashboardTrends>>("/dashboard/trends"),
-  users: (params: Record<string, string | number>) => {
-    const q = new URLSearchParams(params as Record<string, string>).toString();
-    return api.get<ApiResponse<PagedResult<UserListItem>>>(`/users?${q}`);
-  },
+  dashboard: (params?: { from?: string; to?: string }) =>
+    api.get<ApiResponse<DashboardStats>>(dashboardPath(params)),
+  dashboardTrends: () => api.get<ApiResponse<DashboardTrends>>(dashboardTrendsPath()),
+  users: (params: Record<string, string | number>) =>
+    api.get<ApiResponse<PagedResult<UserListItem>>>(usersPath(params)),
   user: (id: number) => api.get<ApiResponse<UserDetail>>(`/users/${id}`),
   updateUserStatus: (id: number, status: string) =>
     api.put<ApiResponse<string>>(`/users/${id}/status`, { status }),
   setUserIsTest: (id: number, isTestUser: boolean) =>
     api.put<ApiResponse<string>>(`/users/${id}/is-test`, { isTestUser }),
-  applications: (params: Record<string, string | number>) => {
-    const q = new URLSearchParams(params as Record<string, string>).toString();
-    return api.get<ApiResponse<PagedResult<ApplicationListItem>>>(
-      `/applications?${q}`,
-    );
-  },
+  applications: (params: Record<string, string | number>) =>
+    api.get<ApiResponse<PagedResult<ApplicationListItem>>>(applicationsPath(params)),
   application: (id: number) =>
     api.get<ApiResponse<ApplicationDetail>>(`/applications/${id}`),
   updateApplicationStatus: (id: number, status: string, reviewNote?: string) =>
@@ -562,7 +567,7 @@ export const adminApi = {
   sendDocuSignEnvelope: (id: number) =>
     api.post<ApiResponse<string>>(`/applications/${id}/send-docusign`, {}),
   docuSignEnvelopes: () =>
-    api.get<ApiResponse<DocuSignEnvelopeItem[]>>("/docusign-envelopes"),
+    api.get<ApiResponse<DocuSignEnvelopeItem[]>>(docuSignEnvelopesPath()),
   docuSignEnvelopeStatus: (envelopeId: string) =>
     api.get<ApiResponse<DocuSignEnvelopeStatus>>(
       `/docusign-envelopes/${envelopeId}/status`,
@@ -607,32 +612,22 @@ export const adminApi = {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   },
-  redemptions: (params: Record<string, string | number>) => {
-    const q = new URLSearchParams(params as Record<string, string>).toString();
-    return api.get<ApiResponse<PagedResult<RedemptionListItem>>>(
-      `/redemptions?${q}`,
-    );
-  },
+  redemptions: (params: Record<string, string | number>) =>
+    api.get<ApiResponse<PagedResult<RedemptionListItem>>>(redemptionsPath(params)),
   redemption: (id: number) =>
-    api.get<ApiResponse<RedemptionDetail>>(`/redemptions/${id}`),
+    api.get<ApiResponse<RedemptionDetail>>(redemptionPath(id)),
   updateRedemptionStatus: (id: number, status: string, reviewNote?: string, sendNotification = false) =>
     api.put<ApiResponse<string>>(`/redemptions/${id}/status`, { status, reviewNote, sendNotification }),
   sendRedemptionDocuSignEnvelope: (id: number) =>
     api.post<ApiResponse<string>>(`/redemptions/${id}/send-docusign`, {}),
-  auditLogs: (params: Record<string, string | number | boolean>) => {
-    const q = new URLSearchParams(
-      Object.fromEntries(
-        Object.entries(params).map(([k, v]) => [k, String(v)]),
-      ),
-    ).toString();
-    return api.get<ApiResponse<PagedResult<AuditLogItem>>>(`/audit-logs?${q}`);
-  },
+  auditLogs: (params: Record<string, string | number | boolean>) =>
+    api.get<ApiResponse<PagedResult<AuditLogItem>>>(auditLogsPath(params)),
   getBankDetails: () =>
-    api.get<ApiResponse<BankDetails>>('/bank-details'),
+    api.get<ApiResponse<BankDetails>>(bankDetailsPath()),
   saveBankDetails: (dto: BankDetails) =>
     api.put<ApiResponse<string>>('/bank-details', dto),
   getDailyBalances: () =>
-    api.get<ApiResponse<DailyBalanceLog[]>>('/daily-balances'),
+    api.get<ApiResponse<DailyBalanceLog[]>>(dailyBalancesPath()),
   saveDailyBalance: (dto: DailyBalanceLog) =>
     api.put<ApiResponse<string>>('/daily-balances', dto),
   getNotificationEmails: () =>
@@ -641,10 +636,8 @@ export const adminApi = {
     api.post<ApiResponse<NotificationEmail>>('/notification-emails', { emailAddress, label }),
   deleteNotificationEmail: (id: number) =>
     api.delete<ApiResponse<string>>(`/notification-emails/${id}`),
-  distributions: (params: Record<string, string | number>) => {
-    const q = new URLSearchParams(params as Record<string, string>).toString();
-    return api.get<ApiResponse<PagedResult<DistributionListItem>>>(`/distributions?${q}`);
-  },
+  distributions: (params: Record<string, string | number>) =>
+    api.get<ApiResponse<PagedResult<DistributionListItem>>>(distributionsPath(params)),
   markDistributionPaid: (id: number, paidDate: string) =>
     api.post<ApiResponse<string>>(`/distributions/${id}/mark-paid`, { paidDate }),
   statements: (params: Record<string, string | number>) => {
@@ -743,12 +736,10 @@ export const adminApi = {
     api.get<ApiResponse<RedemptionListItem[]>>(`/users/${userId}/redemptions`),
 
   // ── Maker-Checker-Approver Workflow ────────────────────────────────────
-  getPendingChanges: (params: Record<string, string | number> = {}) => {
-    const q = new URLSearchParams(Object.fromEntries(Object.entries(params).map(([k,v]) => [k, String(v)]))).toString();
-    return api.get<ApiResponse<PagedResult<PendingChangeItem>>>(`/pending-changes${q ? '?' + q : ''}`);
-  },
+  getPendingChanges: (params: Record<string, string | number> = {}) =>
+    api.get<ApiResponse<PagedResult<PendingChangeItem>>>(pendingChangesPath(params)),
   getPendingCounts: () =>
-    api.get<ApiResponse<PendingCounts>>('/pending-changes/counts'),
+    api.get<ApiResponse<PendingCounts>>(pendingCountsPath()),
   getPendingChange: (id: number) =>
     api.get<ApiResponse<PendingChangeDetail>>(`/pending-changes/${id}`),
   getActivePendingForRecord: (entityType: string, entityId: number) =>
@@ -769,10 +760,8 @@ export const adminApi = {
     api.put<ApiResponse<string>>(`/users/${userId}/change-password`, { currentPassword, newPassword }),
   resetPassword: (userId: number, newPassword: string) =>
     api.put<ApiResponse<string>>(`/users/${userId}/reset-password`, { newPassword }),
-  capitalLedger: (params: { from?: string; to?: string } = {}) => {
-    const q = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v))).toString();
-    return api.get<ApiResponse<CapitalLedger>>(`/capital-ledger${q ? '?' + q : ''}`);
-  },
+  capitalLedger: (params: { from?: string; to?: string } = {}) =>
+    api.get<ApiResponse<CapitalLedger>>(capitalLedgerPath(params)),
   investorStatement: (userId: number) =>
     api.get<ApiResponse<InvestorCapitalAccount>>(`/investor-statement/${userId}`),
 };
