@@ -483,7 +483,7 @@ export default function ExecutiveCopilotCard() {
       )}
 
       <div style={{ marginTop: 10 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <div style={{ fontSize: 11, color: "#94a3b8" }}>Try asking:</div>
           <button
             onClick={refreshSampleQuestions}
