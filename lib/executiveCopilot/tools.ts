@@ -99,6 +99,30 @@ export function stripSensitiveFields(record: unknown, fields: readonly string[])
   return copy;
 }
 
+// Same as stripSensitiveFields, but for a paginated { items: [...] } result -- the shape
+// every list_* tool built on withPageDefaults returns.
+export function stripSensitiveFieldsFromItems(result: unknown, fields: readonly string[]): unknown {
+  if (typeof result !== "object" || result === null) return result;
+  const obj = result as Record<string, unknown>;
+  if (!Array.isArray(obj.items)) return result;
+  return { ...obj, items: obj.items.map((item) => stripSensitiveFields(item, fields)) };
+}
+
+// AdminDistributionListDTO includes the investor's real bank name and account number
+// alongside the payment-status fields list_distributions actually exists for -- never
+// needed to answer "which distributions are paid/unpaid" questions.
+const DISTRIBUTION_BANK_DETAIL_FIELDS = ["bankName", "bankAccountNumber"] as const;
+
+// AdminAuditLogDTO's OldValuesJson/NewValuesJson/MetadataJson are arbitrary serialized
+// blobs of whatever an admin action changed -- the backend already redacts the highest-
+// severity fields (SSN, driving license, bank account/routing number) at the point these
+// get written (see FormService.cs), but that's a guarantee about today's write paths, not
+// something this tool can verify going forward. Since list_audit_logs's stated purpose
+// (who did what, when, success/failure) doesn't need the raw before/after payload, these
+// are stripped unconditionally rather than trusting every current and future caller of
+// _audit.LogAsync to keep redacting consistently.
+const AUDIT_LOG_RAW_PAYLOAD_FIELDS = ["oldValuesJson", "newValuesJson", "metadataJson"] as const;
+
 function withPageDefaults(params: Record<string, unknown> = {}): Record<string, string | number> {
   const merged: Record<string, string | number> = { page: 1, pageSize: DEFAULT_PAGE_SIZE };
   for (const [k, v] of Object.entries(params)) {
@@ -368,10 +392,10 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
         },
       },
     },
-    execute: (input, token) => {
-      const p = withPageDefaults(input as Record<string, unknown>);
-      return backendGet(auditLogsPath(p as Record<string, string | number | boolean>), token);
-    },
+    execute: (input, token) =>
+      backendGet(auditLogsPath(withPageDefaults(input as Record<string, unknown>) as Record<string, string | number | boolean>), token).then(
+        (result) => stripSensitiveFieldsFromItems(result, AUDIT_LOG_RAW_PAYLOAD_FIELDS),
+      ),
     // Audit log entries carry both a generic entityId (meaning depends on entityName --
     // ambiguous the same way DocuSign's did) and a dedicated applicationId that, per
     // AdminService.cs's AuditEntry-logging call sites, is populated for
@@ -406,7 +430,9 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
     },
     execute: (input, token) => {
       const p = withPageDefaults(input as Record<string, unknown>);
-      return backendGet(distributionsPath(p), token);
+      return backendGet(distributionsPath(p), token).then((result) =>
+        stripSensitiveFieldsFromItems(result, DISTRIBUTION_BANK_DETAIL_FIELDS),
+      );
     },
     // Distributions have no detail page of their own in the admin app (no
     // app/distributions/[id] route) -- link back to the investor's application instead,

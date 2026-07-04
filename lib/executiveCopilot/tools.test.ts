@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { citationsFromRecords, byIdField, stripSensitiveFields, EXECUTIVE_COPILOT_TOOLS } from "./tools";
+import {
+  citationsFromRecords,
+  byIdField,
+  stripSensitiveFields,
+  stripSensitiveFieldsFromItems,
+  EXECUTIVE_COPILOT_TOOLS,
+} from "./tools";
 
 describe("byIdField", () => {
   it("returns the record's own numeric id", () => {
@@ -158,5 +164,114 @@ describe("stripSensitiveFields", () => {
       "bankRoutingNumber",
     ]) as Record<string, unknown>;
     expect(result).toEqual({ id: 34, investorName: "Apex Holding Strategies LP", docuSignStatus: "sent" });
+  });
+});
+
+describe("stripSensitiveFieldsFromItems", () => {
+  it("strips the given fields from every item in a paginated result", () => {
+    const result = {
+      items: [
+        { id: 1, investorName: "Alice", bankAccountNumber: "111", bankName: "Chase" },
+        { id: 2, investorName: "Bob", bankAccountNumber: "222", bankName: "Wells Fargo" },
+      ],
+      totalCount: 2,
+      page: 1,
+      pageSize: 20,
+    };
+    const stripped = stripSensitiveFieldsFromItems(result, ["bankAccountNumber", "bankName"]) as {
+      items: Record<string, unknown>[];
+      totalCount: number;
+    };
+    expect(stripped.items).toEqual([
+      { id: 1, investorName: "Alice" },
+      { id: 2, investorName: "Bob" },
+    ]);
+    // Pagination metadata alongside items should be untouched.
+    expect(stripped.totalCount).toBe(2);
+  });
+
+  it("actually strips the real audit-log payload fields", () => {
+    // Regression guard for AdminAuditLogDTO's raw JSON blob fields.
+    const result = {
+      items: [
+        {
+          id: 1,
+          eventType: "Admin.Application.StatusChanged",
+          success: true,
+          oldValuesJson: '{"status":"UnderReview"}',
+          newValuesJson: '{"status":"Active"}',
+          metadataJson: "{}",
+        },
+      ],
+    };
+    const stripped = stripSensitiveFieldsFromItems(result, ["oldValuesJson", "newValuesJson", "metadataJson"]) as {
+      items: Record<string, unknown>[];
+    };
+    expect(stripped.items[0]).toEqual({ id: 1, eventType: "Admin.Application.StatusChanged", success: true });
+  });
+
+  it("actually strips the real distribution bank fields", () => {
+    // Regression guard for AdminDistributionListDTO's bankName/bankAccountNumber.
+    const result = {
+      items: [
+        {
+          id: 5,
+          investorName: "Alice",
+          paymentStatus: "Paid",
+          bankName: "Chase",
+          bankAccountNumber: "000123456789",
+        },
+      ],
+    };
+    const stripped = stripSensitiveFieldsFromItems(result, ["bankName", "bankAccountNumber"]) as {
+      items: Record<string, unknown>[];
+    };
+    expect(stripped.items[0]).toEqual({ id: 5, investorName: "Alice", paymentStatus: "Paid" });
+  });
+
+  it("passes through a result with no items array unchanged", () => {
+    const result = { total: 5 };
+    expect(stripSensitiveFieldsFromItems(result, ["x"])).toEqual({ total: 5 });
+  });
+
+  it("passes through non-object input unchanged", () => {
+    expect(stripSensitiveFieldsFromItems(null, ["x"])).toBeNull();
+    expect(stripSensitiveFieldsFromItems(undefined, ["x"])).toBeUndefined();
+  });
+});
+
+// Guards against the exact bug this whole audit was triggered by: a tool that returns a
+// list of records with a financial-account or raw-payload field slipping through
+// unredacted. Every tool name here must have a corresponding entry in the map below
+// naming which fields (if any) it strips -- forces a deliberate decision for every new
+// tool rather than a silent gap.
+describe("sensitive-field redaction coverage", () => {
+  const KNOWN_SENSITIVE_TOOLS: Record<string, "redacts" | "no-sensitive-fields"> = {
+    get_dashboard_stats: "no-sensitive-fields",
+    get_dashboard_trends: "no-sensitive-fields",
+    list_redemptions: "no-sensitive-fields", // AdminRedemptionListDTO has no bank fields -- only the Detail subclass does
+    get_redemption_details: "redacts", // bankName/bankAccountHolderName/bankAccountNumber/bankRoutingNumber
+    list_docusign_envelopes: "no-sensitive-fields",
+    list_applications: "no-sensitive-fields",
+    list_pending_changes: "no-sensitive-fields", // PendingChangeListDTO has no PayloadJson -- only the Detail subclass does
+    get_pending_counts: "no-sensitive-fields",
+    list_audit_logs: "redacts", // oldValuesJson/newValuesJson/metadataJson
+    list_distributions: "redacts", // bankName/bankAccountNumber
+    get_capital_ledger: "no-sensitive-fields",
+    list_users: "no-sensitive-fields",
+    get_bank_details: "no-sensitive-fields", // the FUND's own bank details -- this tool's entire purpose, not investor data
+    get_daily_balances: "no-sensitive-fields",
+  };
+
+  it("has a documented redaction decision for every tool that currently exists", () => {
+    const allNames = EXECUTIVE_COPILOT_TOOLS.map((t) => t.definition.name);
+    const undocumented = allNames.filter((name) => !(name in KNOWN_SENSITIVE_TOOLS));
+    expect(undocumented).toEqual([]);
+  });
+
+  it("doesn't document a tool that no longer exists", () => {
+    const allNames = new Set(EXECUTIVE_COPILOT_TOOLS.map((t) => t.definition.name));
+    const stale = Object.keys(KNOWN_SENSITIVE_TOOLS).filter((name) => !allNames.has(name));
+    expect(stale).toEqual([]);
   });
 });
