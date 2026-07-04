@@ -82,15 +82,15 @@ const SAMPLE_QUESTION_POOL: string[] = [
   "How much cash do we have available today?",
   "Which redemptions are due this week but don't have a signed DocuSign yet?",
   "How does this month's distribution obligation compare to last month?",
-  "What changed today across pending approvals?",
+  "How is total capital raised trending over the past few months?",
   "Which investor type has the highest redemption rate?",
   "How much interest did we pay on redemptions last month?",
   "Show me investors still waiting on DocuSign.",
-  "Why did our cash position drop this month?",
-  "What's pending approval right now, and how old is the oldest item?",
+  "How has our cash position changed this month, and why?",
+  "How does this quarter's redemption activity compare to last quarter?",
   "How many new investment applications came in this week?",
   "Which distributions are still unpaid this month?",
-  "What does the audit log show for today?",
+  "Which investor segment is growing the fastest right now?",
   "How does this month's capital raised compare to last month's?",
   "Which applications are still under review, and for how long?",
   "What's our total capital deployed versus redeemed so far?",
@@ -426,7 +426,22 @@ export default function ExecutiveCopilotCard() {
         >
           {turns.map((t, i) => (
             <div key={i}>
-              <div style={{ fontWeight: 600, color: "#0e3416", fontSize: 14 }}>{t.question}</div>
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <div
+                  style={{
+                    fontWeight: 600,
+                    color: "#0e3416",
+                    background: "#eaf3ec",
+                    fontSize: 14,
+                    padding: "6px 12px",
+                    borderRadius: 10,
+                    maxWidth: "85%",
+                    textAlign: "right",
+                  }}
+                >
+                  {t.question}
+                </div>
+              </div>
               {t.loading && (
                 <div style={{ color: "#94a3b8", fontSize: 13, marginTop: 4 }}>
                   {THINKING_PHRASES[thinkingPhraseIndex]}
@@ -459,7 +474,7 @@ export default function ExecutiveCopilotCard() {
               ? "Listening — speak now…"
               : voiceState === "preparing"
                 ? "Preparing microphone…"
-                : "e.g. Why did our cash position drop this month?"
+                : ""
           }
           style={{ flex: 1, fontSize: 14, padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: 6, color: "#0e3416" }}
         />
