@@ -105,6 +105,7 @@ export default function ExecutiveCopilotCard() {
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const turnsContainerRef = useRef<HTMLDivElement | null>(null);
 
   const [providers, setProviders] = useState<ProviderStatus[] | null>(null);
   const [selectedProvider, setSelectedProvider] = useState("");
@@ -234,6 +235,15 @@ export default function ExecutiveCopilotCard() {
     }, 2500);
     return () => clearInterval(interval);
   }, [isLoading]);
+
+  // Keeps the newest turn in view — otherwise clicking a sample/follow-up question (or
+  // just asking another one) appends it below the fold of the scrollable turns list, so
+  // the admin has to manually scroll down to see the question was actually submitted and
+  // is being worked on. This is a plain DOM scroll, not a setState call, so it's unrelated
+  // to the set-state-in-effect rule other effects here have to work around.
+  useEffect(() => {
+    turnsContainerRef.current?.scrollTo({ top: turnsContainerRef.current.scrollHeight, behavior: "smooth" });
+  }, [turns]);
 
   const ask = async (questionOverride?: string) => {
     const question = (questionOverride ?? input).trim();
@@ -411,6 +421,7 @@ export default function ExecutiveCopilotCard() {
 
       {turns.length > 0 && (
         <div
+          ref={turnsContainerRef}
           style={{
             maxHeight: 400,
             overflowY: "auto",
