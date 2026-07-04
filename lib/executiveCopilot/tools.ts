@@ -84,6 +84,21 @@ export function byIdField(item: Record<string, unknown>): number | undefined {
   return typeof item.id === "number" ? item.id : undefined;
 }
 
+// AdminRedemptionDetailDTO includes the investor's real bank account/routing number
+// ("Bank details from linked investment tranche" per AdminDTOs.cs) alongside the
+// DocuSign/status fields get_redemption_details actually exists for. Those payment
+// details are never needed to answer a DocuSign-status or redemption-timing question, so
+// they're stripped here -- before the result becomes part of what's sent to the LLM
+// provider -- rather than just trusting the model not to repeat them.
+const REDEMPTION_BANK_DETAIL_FIELDS = ["bankName", "bankAccountHolderName", "bankAccountNumber", "bankRoutingNumber"] as const;
+
+export function stripSensitiveFields(record: unknown, fields: readonly string[]): unknown {
+  if (typeof record !== "object" || record === null) return record;
+  const copy = { ...(record as Record<string, unknown>) };
+  for (const field of fields) delete copy[field];
+  return copy;
+}
+
 function withPageDefaults(params: Record<string, unknown> = {}): Record<string, string | number> {
   const merged: Record<string, string | number> = { page: 1, pageSize: DEFAULT_PAGE_SIZE };
   for (const [k, v] of Object.entries(params)) {
@@ -193,7 +208,7 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
       const capped = (ids ?? []).slice(0, MAX_REDEMPTION_DETAIL_IDS);
       const results = await Promise.all(capped.map((id) => backendGet(redemptionPath(id), token)));
       return {
-        results,
+        results: results.map((r) => stripSensitiveFields(r, REDEMPTION_BANK_DETAIL_FIELDS)),
         truncated: (ids ?? []).length > MAX_REDEMPTION_DETAIL_IDS,
       };
     },

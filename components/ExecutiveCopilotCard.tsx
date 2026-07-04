@@ -96,6 +96,9 @@ export default function ExecutiveCopilotCard() {
   const [input, setInput] = useState("");
   const [notConfigured, setNotConfigured] = useState(false);
   const [thinkingPhraseIndex, setThinkingPhraseIndex] = useState(0);
+  // Transient per-turn "copied" feedback -- kept outside the Turn type since it's purely
+  // a momentary UI state, not something worth persisting on the turn itself.
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   // "preparing" covers the real gap between calling start() and the browser actually
   // being ready to capture audio — without this, the UI said "listening" immediately on
   // click and the first word or two spoken during that gap got dropped. "listening" only
@@ -119,6 +122,17 @@ export default function ExecutiveCopilotCard() {
 
   const stopAsking = () => {
     abortControllerRef.current?.abort();
+  };
+
+  const copyAnswer = async (index: number, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex((current) => (current === index ? null : current)), 1500);
+    } catch {
+      // Clipboard access can fail (permissions, non-secure context) -- not worth
+      // surfacing an error for a convenience button.
+    }
   };
 
   // Picks a fresh 3 on every mount (i.e. every page load), skipping whatever's already
@@ -461,6 +475,21 @@ export default function ExecutiveCopilotCard() {
               {t.answer && (
                 <div style={{ marginTop: 4 }}>
                   <CopilotMarkdownAnswer text={t.answer} citations={t.citations} />
+                  <button
+                    onClick={() => copyAnswer(i, t.answer!)}
+                    title="Copy response"
+                    style={{
+                      fontSize: 11,
+                      color: "#94a3b8",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: "2px 0",
+                      marginTop: 2,
+                    }}
+                  >
+                    {copiedIndex === i ? "✅ Copied" : "📋 Copy"}
+                  </button>
                 </div>
               )}
               {t.error && <div style={{ color: "#b91c1c", fontSize: 13, marginTop: 4 }}>{t.error}</div>}

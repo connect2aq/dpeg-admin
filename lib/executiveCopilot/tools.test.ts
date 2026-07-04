@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { citationsFromRecords, byIdField, EXECUTIVE_COPILOT_TOOLS } from "./tools";
+import { citationsFromRecords, byIdField, stripSensitiveFields, EXECUTIVE_COPILOT_TOOLS } from "./tools";
 
 describe("byIdField", () => {
   it("returns the record's own numeric id", () => {
@@ -108,5 +108,55 @@ describe("EXECUTIVE_COPILOT_TOOLS citation coverage", () => {
     const allNames = new Set(EXECUTIVE_COPILOT_TOOLS.map((t) => t.definition.name));
     const stale = [...NO_CITATIONS_NEEDED].filter((name) => !allNames.has(name));
     expect(stale).toEqual([]);
+  });
+});
+
+describe("stripSensitiveFields", () => {
+  it("removes the given fields from a record", () => {
+    const record = { id: 1, investorName: "Alice", bankAccountNumber: "123456789", bankRoutingNumber: "987654321" };
+    const result = stripSensitiveFields(record, ["bankAccountNumber", "bankRoutingNumber"]) as Record<string, unknown>;
+    expect(result).toEqual({ id: 1, investorName: "Alice" });
+    expect(result.bankAccountNumber).toBeUndefined();
+    expect(result.bankRoutingNumber).toBeUndefined();
+  });
+
+  it("does not mutate the original record", () => {
+    const record = { id: 1, bankAccountNumber: "123456789" };
+    stripSensitiveFields(record, ["bankAccountNumber"]);
+    expect(record.bankAccountNumber).toBe("123456789");
+  });
+
+  it("is a no-op for fields that aren't present", () => {
+    const record = { id: 1, investorName: "Alice" };
+    expect(stripSensitiveFields(record, ["bankAccountNumber"])).toEqual({ id: 1, investorName: "Alice" });
+  });
+
+  it("passes through non-object input unchanged", () => {
+    expect(stripSensitiveFields(null, ["x"])).toBeNull();
+    expect(stripSensitiveFields(undefined, ["x"])).toBeUndefined();
+    expect(stripSensitiveFields("a string", ["x"])).toBe("a string");
+    expect(stripSensitiveFields(42, ["x"])).toBe(42);
+  });
+
+  it("actually strips the redemption bank fields get_redemption_details returns", () => {
+    // Regression guard for the real AdminRedemptionDetailDTO shape (bankName,
+    // bankAccountHolderName, bankAccountNumber, bankRoutingNumber) -- this is what stops
+    // an investor's real bank account/routing number from ever reaching the LLM.
+    const redemptionDetail = {
+      id: 34,
+      investorName: "Apex Holding Strategies LP",
+      docuSignStatus: "sent",
+      bankName: "Chase",
+      bankAccountHolderName: "Apex Holding Strategies LP",
+      bankAccountNumber: "000123456789",
+      bankRoutingNumber: "021000021",
+    };
+    const result = stripSensitiveFields(redemptionDetail, [
+      "bankName",
+      "bankAccountHolderName",
+      "bankAccountNumber",
+      "bankRoutingNumber",
+    ]) as Record<string, unknown>;
+    expect(result).toEqual({ id: 34, investorName: "Apex Holding Strategies LP", docuSignStatus: "sent" });
   });
 });
