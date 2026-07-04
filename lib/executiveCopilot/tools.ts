@@ -58,7 +58,7 @@ async function backendGet<T>(path: string, token: string): Promise<T> {
 // safe runtime shape check rather than a static type dependency. idFor is a function, not
 // a fixed "id" field name, because some records (e.g. capital ledger entries) reference
 // the linkable ID under a different field (applicationId), not their own id.
-function citationsFromRecords(
+export function citationsFromRecords(
   records: unknown,
   type: string,
   idFor: (item: Record<string, unknown>) => number | undefined,
@@ -79,7 +79,7 @@ function citationsFromRecords(
 }
 
 // The common case: the record's own "id" field is the linkable ID.
-function byIdField(item: Record<string, unknown>): number | undefined {
+export function byIdField(item: Record<string, unknown>): number | undefined {
   return typeof item.id === "number" ? item.id : undefined;
 }
 

@@ -8,7 +8,8 @@
     "build:staging": "dotenv -e .env.staging -- next build",
     "start:production": "dotenv -e .env.production -- next start",
     "start:staging": "dotenv -e .env.staging -- next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
@@ -29,6 +30,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.9"
   }
 }
