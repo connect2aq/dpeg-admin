@@ -338,7 +338,7 @@ export default function ExecutiveCopilotCard() {
   if (notConfigured) {
     return (
       <div className="card" style={{ marginBottom: 24, borderTop: "3px solid #94a3b8" }}>
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b" }}>
+        <div style={{ fontSize: 24, fontWeight: 700, color: "#0e3416" }}>
           Executive Copilot
         </div>
         <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 6 }}>
@@ -351,7 +351,7 @@ export default function ExecutiveCopilotCard() {
   return (
     <div className="card" style={{ marginBottom: 24, borderTop: "3px solid #0e3416" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b" }}>
+        <div style={{ fontSize: 24, fontWeight: 700, color: "#0e3416" }}>
           Executive Copilot
         </div>
         {turns.length > 0 && (
@@ -406,40 +406,6 @@ export default function ExecutiveCopilotCard() {
             }
             return null;
           })()}
-        </div>
-      )}
-
-      {turns.length === 0 && (
-        <div style={{ marginTop: 10 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <div style={{ fontSize: 11, color: "#94a3b8" }}>Try asking:</div>
-            <button
-              onClick={refreshSampleQuestions}
-              style={{ fontSize: 11, color: "#699172", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}
-            >
-              More Ideas
-            </button>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {sampleQuestions.map((q) => (
-              <button
-                key={q}
-                onClick={() => ask(q)}
-                style={{
-                  textAlign: "left",
-                  fontSize: 13,
-                  padding: "6px 10px",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 6,
-                  background: "#f8fafc",
-                  color: "#0e3416",
-                  cursor: "pointer",
-                }}
-              >
-                {q}
-              </button>
-            ))}
-          </div>
         </div>
       )}
 
@@ -515,6 +481,38 @@ export default function ExecutiveCopilotCard() {
           ))}
         </div>
       )}
+
+      <div style={{ marginTop: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <div style={{ fontSize: 11, color: "#94a3b8" }}>Try asking:</div>
+          <button
+            onClick={refreshSampleQuestions}
+            style={{ fontSize: 11, color: "#699172", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}
+          >
+            More Ideas
+          </button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {sampleQuestions.map((q) => (
+            <button
+              key={q}
+              onClick={() => ask(q)}
+              style={{
+                textAlign: "left",
+                fontSize: 13,
+                padding: "6px 10px",
+                border: "1px solid #e2e8f0",
+                borderRadius: 6,
+                background: "#f8fafc",
+                color: "#0e3416",
+                cursor: "pointer",
+              }}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <input
