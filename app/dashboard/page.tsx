@@ -3,8 +3,6 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import AdminLayout from "@/components/AdminLayout";
 import { StatusBadge } from "@/components/StatusBadge";
-import ExecutiveCopilotCard from "@/components/ExecutiveCopilotCard";
-import { CopilotErrorBoundary } from "@/components/CopilotErrorBoundary";
 import { adminApi, type DashboardStats, type DashboardTrends } from "@/lib/api";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -256,9 +254,6 @@ export default function DashboardPage() {
   return (
     <AdminLayout>
       <div style={{ padding: "32px 36px" }}>
-        <CopilotErrorBoundary>
-          <ExecutiveCopilotCard />
-        </CopilotErrorBoundary>
         <h1 style={{ fontSize: 24, fontWeight: 700, color: "#0e3416", marginBottom: 6 }}>Dashboard</h1>
         <p style={{ fontSize: 14, color: "#64748b", marginBottom: 32 }}>Overview of DPEG Real Estate Fund</p>
 

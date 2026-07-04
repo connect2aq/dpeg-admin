@@ -7,6 +7,7 @@ import { adminApi } from "@/lib/api";
 import Image from "next/image";
 
 const NAV = [
+  { href: "/executive-copilot", label: "Executive Copilot", icon: "💬" },
   { href: "/dashboard", label: "Dashboard", icon: "▦" },
   { href: "/users", label: "Users", icon: "👤" },
   { href: "/applications", label: "Applications", icon: "📋" },

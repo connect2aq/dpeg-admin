@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) router.replace("/dashboard");
+    if (!loading && user) router.replace("/executive-copilot");
   }, [user, loading, router]);
 
   const submit = async (e: React.FormEvent) => {
@@ -24,7 +24,7 @@ export default function LoginPage() {
     if (err) {
       setError(err);
       setSubmitting(false);
-    } else router.push("/dashboard");
+    } else router.push("/executive-copilot");
   };
 
   return (

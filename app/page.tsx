@@ -7,7 +7,7 @@ export default function Root() {
   const { user, loading } = useAdminAuth();
   const router = useRouter();
   useEffect(() => {
-    if (!loading) router.replace(user ? '/dashboard' : '/login');
+    if (!loading) router.replace(user ? '/executive-copilot' : '/login');
   }, [user, loading, router]);
   return null;
 }
