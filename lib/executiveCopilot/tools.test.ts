@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { citationsFromRecords, byIdField } from "./tools";
+import { citationsFromRecords, byIdField, EXECUTIVE_COPILOT_TOOLS } from "./tools";
 
 describe("byIdField", () => {
   it("returns the record's own numeric id", () => {
@@ -66,5 +66,47 @@ describe("citationsFromRecords", () => {
     const records = [{ id: 1, investorName: "Alice" }, null, "garbage", 42];
     const citations = citationsFromRecords(records, "application", byIdField, hrefFor, (r) => r.investorName as string);
     expect(citations).toHaveLength(1);
+  });
+});
+
+// Guards against the exact class of bug this feature has repeatedly hit: a tool that
+// returns individually-linkable records (applications, redemptions, ...) shipping with no
+// extractCitations at all, so admins get a table full of names/IDs with zero links. This
+// isn't about question phrasing -- citations are tied to which tools ran, not how the
+// question was worded -- so the permanent fix is making "did we wire up citations for this
+// tool" a build-time fact instead of something only discovered when a real user question
+// stumbles onto the gap.
+describe("EXECUTIVE_COPILOT_TOOLS citation coverage", () => {
+  // Tools with genuinely no linkable per-record entity to cite (aggregates, counts,
+  // reference data). Every tool NOT in this list must have extractCitations wired up --
+  // adding tool #15 later without updating one of these two places is exactly the bug
+  // this test exists to catch.
+  const NO_CITATIONS_NEEDED = new Set([
+    "get_dashboard_stats",
+    "get_dashboard_trends",
+    "get_pending_counts",
+    "get_bank_details",
+    "get_daily_balances",
+  ]);
+
+  it("has extractCitations wired up for every tool that isn't explicitly allowlisted", () => {
+    const missing = EXECUTIVE_COPILOT_TOOLS.filter(
+      (t) => !t.extractCitations && !NO_CITATIONS_NEEDED.has(t.definition.name),
+    ).map((t) => t.definition.name);
+    expect(missing).toEqual([]);
+  });
+
+  it("doesn't allowlist a tool that actually has extractCitations", () => {
+    // Catches the allowlist going stale in the other direction -- a tool gaining
+    // citations later but never being removed from the "doesn't need them" list.
+    const withCitations = EXECUTIVE_COPILOT_TOOLS.filter((t) => t.extractCitations).map((t) => t.definition.name);
+    const overlap = withCitations.filter((name) => NO_CITATIONS_NEEDED.has(name));
+    expect(overlap).toEqual([]);
+  });
+
+  it("only allowlists tool names that actually exist", () => {
+    const allNames = new Set(EXECUTIVE_COPILOT_TOOLS.map((t) => t.definition.name));
+    const stale = [...NO_CITATIONS_NEEDED].filter((name) => !allNames.has(name));
+    expect(stale).toEqual([]);
   });
 });

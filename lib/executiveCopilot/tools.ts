@@ -27,6 +27,7 @@ const MAX_REDEMPTION_DETAIL_IDS = 20;
 // turn. The model can always ask again with a larger pageSize if it genuinely needs more.
 const DEFAULT_PAGE_SIZE = 20;
 const BACKEND_FETCH_TIMEOUT_MS = 15_000; // bounds a single hung backend call
+const CAPITAL_LEDGER_DEFAULT_WINDOW_DAYS = 90; // see get_capital_ledger below -- this endpoint has no pagination
 
 async function backendGet<T>(path: string, token: string): Promise<T> {
   const controller = new AbortController();
@@ -206,6 +207,35 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
       input_schema: { type: "object", properties: {} },
     },
     execute: (_input, token) => backendGet(docuSignEnvelopesPath(), token),
+    // Each entry's `applicationId` field is overloaded depending on recordType — verified
+    // against AdminRepository.GetApplicationsWithEnvelopesAsync: for an "Application" row
+    // it's the application's own id, but for a "Redemption" row it's set to the
+    // RedemptionForm's own id (ApplicationId = r.Id), NOT the parent investment
+    // application. Splitting by recordType before building citations is what makes this
+    // safe -- previously this tool had no extractCitations at all because of that
+    // ambiguity.
+    extractCitations: (result) => {
+      const items = Array.isArray(result) ? (result as Record<string, unknown>[]) : [];
+      const idFromApplicationIdField = (item: Record<string, unknown>) =>
+        typeof item.applicationId === "number" ? item.applicationId : undefined;
+      const labelFor = (r: Record<string, unknown>) => r.investorName as string;
+      return [
+        ...citationsFromRecords(
+          items.filter((r) => r.recordType === "Application"),
+          "application",
+          idFromApplicationIdField,
+          (id) => `/applications/${id}`,
+          labelFor,
+        ),
+        ...citationsFromRecords(
+          items.filter((r) => r.recordType === "Redemption"),
+          "redemption",
+          idFromApplicationIdField,
+          (id) => `/redemptions/${id}`,
+          labelFor,
+        ),
+      ];
+    },
   },
   {
     definition: {
@@ -258,6 +288,35 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
       const p = withPageDefaults(input as Record<string, unknown>);
       return backendGet(pendingChangesPath(p), token);
     },
+    // entityType/entityId are generic across the whole maker-checker-approver queue
+    // (verified against AdminController.cs's SubmitPendingChangeAsync call sites) --
+    // "Investment" changes pass the APPLICATION's own id as entityId (e.g.
+    // applications/{id}/full), "Redemption" changes pass the redemption's own id. Bulk
+    // operations (BulkUsers/BulkApplications/BulkRedemptions) and Distribution changes
+    // have no per-record detail page in the admin app, so they're left uncited. There's
+    // no investor-name field on this DTO to build a label from, so matching relies on the
+    // model displaying the entity ID itself (which the system prompt's one-row-per-record
+    // rule already asks for) rather than a name.
+    extractCitations: (result) => {
+      const items = (result as { items?: Array<Record<string, unknown>> })?.items ?? [];
+      const idFor = (item: Record<string, unknown>) => (typeof item.entityId === "number" ? item.entityId : undefined);
+      return [
+        ...citationsFromRecords(
+          items.filter((r) => r.entityType === "Investment"),
+          "application",
+          idFor,
+          (id) => `/applications/${id}`,
+          () => undefined,
+        ),
+        ...citationsFromRecords(
+          items.filter((r) => r.entityType === "Redemption"),
+          "redemption",
+          idFor,
+          (id) => `/redemptions/${id}`,
+          () => undefined,
+        ),
+      ];
+    },
   },
   {
     definition: {
@@ -291,6 +350,22 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
       const p = withPageDefaults(input as Record<string, unknown>);
       return backendGet(auditLogsPath(p as Record<string, string | number | boolean>), token);
     },
+    // Audit log entries carry both a generic entityId (meaning depends on entityName --
+    // ambiguous the same way DocuSign's did) and a dedicated applicationId that, per
+    // AdminService.cs's AuditEntry-logging call sites, is populated for
+    // application/redemption/distribution events alike since everything cascades from an
+    // Application. Linking via applicationId only (skipping entityId) is the same safe,
+    // unambiguous choice already used for get_capital_ledger. No investor-name field
+    // exists on this DTO, so label is left undefined -- matching relies on the model
+    // showing the application/entity ID itself.
+    extractCitations: (result) =>
+      citationsFromRecords(
+        (result as { items?: unknown[] })?.items,
+        "application",
+        (item) => (typeof item.applicationId === "number" ? item.applicationId : undefined),
+        (id) => `/applications/${id}`,
+        () => undefined,
+      ),
   },
   {
     definition: {
@@ -311,12 +386,23 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
       const p = withPageDefaults(input as Record<string, unknown>);
       return backendGet(distributionsPath(p), token);
     },
+    // Distributions have no detail page of their own in the admin app (no
+    // app/distributions/[id] route) -- link back to the investor's application instead,
+    // which is where distribution history is actually reviewed from.
+    extractCitations: (result) =>
+      citationsFromRecords(
+        (result as { items?: unknown[] })?.items,
+        "application",
+        (item) => (typeof item.applicationId === "number" ? item.applicationId : undefined),
+        (id) => `/applications/${id}`,
+        (r) => r.investorName as string,
+      ),
   },
   {
     definition: {
       name: "get_capital_ledger",
       description:
-        "Get the chronological capital-flow ledger (contributions, redemptions, distributions) for an optional date range, with running balances. Call this for questions tracing why the cash position changed.",
+        "Get the chronological capital-flow ledger (contributions, redemptions, distributions) for an optional date range, with running balances. This endpoint is NOT paginated — it returns every entry in the range you give it, so pass the narrowest from/to that answers the question. If you omit both, it defaults to the last 90 days rather than the fund's entire history. Call this for questions tracing why the cash position changed.",
       input_schema: {
         type: "object",
         properties: {
@@ -327,6 +413,21 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
     },
     execute: (input, token) => {
       const p = (input ?? {}) as { from?: string; to?: string };
+      // The backend has no pagination for this endpoint (confirmed against
+      // AdminController.cs's GetCapitalLedger) -- omitting both dates returns the fund's
+      // entire all-time ledger, which is both a large token cost per call and a source of
+      // mostly-unused citations (one per entry, regardless of whether the model ends up
+      // mentioning it). Defaulting to a recent window when neither is given bounds that
+      // worst case; a model that explicitly wants full history can still pass a wide
+      // from/to itself.
+      if (!p.from && !p.to) {
+        const to = new Date();
+        const from = new Date(to.getTime() - CAPITAL_LEDGER_DEFAULT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+        return backendGet(
+          capitalLedgerPath({ from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }),
+          token,
+        );
+      }
       return backendGet(capitalLedgerPath(p), token);
     },
     extractCitations: (result) =>
