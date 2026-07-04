@@ -4,7 +4,7 @@ import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import ExecutiveCopilotMemoryPanel from "@/components/ExecutiveCopilotMemoryPanel";
 import CopilotMarkdownAnswer from "@/components/CopilotMarkdownAnswer";
 import { friendlySourceLabels } from "@/lib/executiveCopilot/toolLabels";
-import { SAMPLE_QUESTION_POOL, pickRandomQuestions } from "@/lib/executiveCopilot/sampleQuestions";
+import { SAMPLE_QUESTION_POOL, pickNextQuestions } from "@/lib/executiveCopilot/sampleQuestions";
 import type { CopilotCitation } from "@/lib/copilotEngine";
 
 interface Turn {
@@ -15,6 +15,7 @@ interface Turn {
   loading: boolean;
   error?: string;
   stopped?: boolean;
+  followUps?: string[];
 }
 
 // The Web Speech API isn't part of TypeScript's standard DOM lib (it's a non-standard,
@@ -49,6 +50,21 @@ const THINKING_PHRASES = [
 // admin's model/effort choice survives logout/login and page reloads.
 const STORAGE_PROVIDER_KEY = "executiveCopilotProvider";
 const STORAGE_EFFORT_KEY = "executiveCopilotEffort";
+// Tracks which sample questions have already been shown so "More Ideas" cycles through
+// the whole pool before repeating, rather than picking independently at random each time
+// (which could show the same 3 again right away). Persisted the same way as the
+// provider/effort choice -- across reloads, not tied to the auth token.
+const STORAGE_SHOWN_QUESTIONS_KEY = "executiveCopilotShownQuestions";
+
+function readShownQuestions(): string[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_SHOWN_QUESTIONS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((q): q is string => typeof q === "string") : [];
+  } catch {
+    return [];
+  }
+}
 
 interface ProviderStatus {
   id: string;
@@ -104,15 +120,25 @@ export default function ExecutiveCopilotCard() {
     abortControllerRef.current?.abort();
   };
 
-  // Picks a fresh random 3 on every mount (i.e. every page load) so the suggestions
-  // aren't the same each time — Math.random() can't run during the server-rendered pass
-  // (it would produce different output than the client and trigger a hydration mismatch),
-  // so this deliberately runs once, client-only, right after mount. Deferred via
+  // Picks a fresh 3 on every mount (i.e. every page load), skipping whatever's already
+  // been shown this cycle. Math.random() can't run during the server-rendered pass (it
+  // would produce different output than the client and trigger a hydration mismatch), so
+  // this deliberately runs once, client-only, right after mount. Deferred via
   // queueMicrotask rather than called directly so the update isn't synchronous within the
   // effect body itself.
   useEffect(() => {
-    queueMicrotask(() => setSampleQuestions(pickRandomQuestions(3)));
+    queueMicrotask(() => {
+      const { picked, shown } = pickNextQuestions(readShownQuestions(), 3);
+      setSampleQuestions(picked);
+      localStorage.setItem(STORAGE_SHOWN_QUESTIONS_KEY, JSON.stringify(shown));
+    });
   }, []);
+
+  const refreshSampleQuestions = () => {
+    const { picked, shown } = pickNextQuestions(readShownQuestions(), 3);
+    setSampleQuestions(picked);
+    localStorage.setItem(STORAGE_SHOWN_QUESTIONS_KEY, JSON.stringify(shown));
+  };
 
   // Loads provider config/balance once on mount and applies the admin's saved
   // provider/effort choice (falling back to whichever provider is actually configured if
@@ -213,6 +239,7 @@ export default function ExecutiveCopilotCard() {
     const question = (questionOverride ?? input).trim();
     if (!question || !token) return;
     setInput("");
+    const turnIndex = turns.length; // index this new turn will land at after the push below
     setTurns((t) => [...t, { question, loading: true }]);
 
     const conversationHistory = turns
@@ -260,6 +287,34 @@ export default function ExecutiveCopilotCard() {
         fetchProviderStatuses(token).then((list) => {
           if (list) setProviders(list);
         });
+
+        // Fire-and-forget: a separate, cheap LLM call to suggest follow-ups, run only
+        // after the main answer is already back so it never adds to the wait for the
+        // actual answer. Best-effort — if it fails or comes back empty, the turn simply
+        // has no suggestions, not an error.
+        fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/api/executive-copilot/follow-ups`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            question,
+            answer: data.answer,
+            ...(selectedProvider ? { provider: selectedProvider } : {}),
+            ...(selectedEffort ? { effort: selectedEffort } : {}),
+          }),
+        })
+          .then((r) => r.json())
+          .then((d) => {
+            if (!Array.isArray(d.followUps) || d.followUps.length === 0) return;
+            setTurns((t) => {
+              if (!t[turnIndex]) return t;
+              const copy = [...t];
+              copy[turnIndex] = { ...copy[turnIndex], followUps: d.followUps };
+              return copy;
+            });
+          })
+          .catch(() => {
+            // best-effort -- no suggestions is a fine fallback, not worth surfacing
+          });
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
@@ -356,7 +411,15 @@ export default function ExecutiveCopilotCard() {
 
       {turns.length === 0 && (
         <div style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6 }}>Try asking:</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <div style={{ fontSize: 11, color: "#94a3b8" }}>Try asking:</div>
+            <button
+              onClick={refreshSampleQuestions}
+              style={{ fontSize: 11, color: "#699172", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}
+            >
+              More Ideas
+            </button>
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {sampleQuestions.map((q) => (
               <button
@@ -425,6 +488,27 @@ export default function ExecutiveCopilotCard() {
               {t.sources && t.sources.length > 0 && (
                 <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
                   Sources: {friendlySourceLabels(t.sources).join(", ")}
+                </div>
+              )}
+              {t.followUps && t.followUps.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                  {t.followUps.map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => ask(q)}
+                      style={{
+                        fontSize: 12,
+                        padding: "4px 10px",
+                        border: "1px solid #cde3d3",
+                        borderRadius: 14,
+                        background: "#f1f8f3",
+                        color: "#0e3416",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {q}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>

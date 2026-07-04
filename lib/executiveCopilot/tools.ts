@@ -112,6 +112,13 @@ Use list/get tools to narrow before fetching details on a large set. If a questi
 Formatting rule for tables: when a table lists individual applications, redemptions, investors, or other records the admin might want to open, give each record its own row and its own cell containing that record's name — never combine multiple records' names into one comma-separated cell (e.g. one date or one status having several applications), and never collapse repeat entries into a "(x2)"-style count. One row per record is what lets the UI turn each one into a clickable link back to that record.
 `.trim();
 
+// Short domain context for the tool-free follow-up-suggestion call (see
+// suggestFollowUps in lib/copilotEngine.ts) — deliberately NOT the full tool-by-tool
+// prompt above, since that call never invokes a tool and reciting all 14 tool
+// descriptions would just be wasted tokens on every question.
+export const EXECUTIVE_COPILOT_FOLLOWUP_CONTEXT =
+  "You help a fund administrator at the DPEG Real Estate Fund explore data on cash position, redemptions, distributions, DocuSign status, applications, pending approvals, the capital ledger, and investor accounts.";
+
 export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
   {
     definition: {

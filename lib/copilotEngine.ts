@@ -163,3 +163,57 @@ export async function runCopilotAgent(params: {
     citations: [...citationsByHref.values()],
   };
 }
+
+// Parses the follow-up suggestions out of a model's raw text response. Exported
+// separately from suggestFollowUps so the parsing/robustness logic (stripping an
+// unwanted code fence, filtering to non-empty strings, capping the count) can be unit
+// tested without a real or mocked provider call.
+export function parseFollowUps(text: string): string[] {
+  try {
+    // Models sometimes wrap JSON in a markdown code fence despite being told not to --
+    // strip that before parsing rather than fail outright.
+    const cleaned = text
+      .trim()
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/```\s*$/, "");
+    const parsed = JSON.parse(cleaned);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((q): q is string => typeof q === "string" && q.trim().length > 0).slice(0, 3);
+  } catch {
+    return [];
+  }
+}
+
+// A single, tool-free call asking the model to suggest natural follow-up questions given
+// the Q&A that just happened — deliberately separate from runCopilotAgent's tool-calling
+// loop (no backend data needed, no iteration loop, just one cheap round-trip) so it can
+// run as an independent, non-blocking request after the main answer is already back with
+// the user. Resilient by design: a failure here (rate limit, provider hiccup) just means
+// no suggestions are shown, not a broken question-answering experience.
+export async function suggestFollowUps(params: {
+  provider: CopilotProvider;
+  systemPromptPrefix: string;
+  question: string;
+  answer: string;
+  signal?: AbortSignal;
+}): Promise<string[]> {
+  const prompt = `The admin just asked: "${params.question}"
+
+And received this answer:
+${params.answer}
+
+Suggest exactly 3 short, natural follow-up questions this admin might reasonably ask next, given what they just learned. Respond with ONLY a JSON array of 3 strings and nothing else -- e.g. ["...", "...", "..."].`;
+
+  try {
+    const response = await params.provider.send({
+      systemPrompt: params.systemPromptPrefix,
+      tools: [],
+      turns: [{ kind: "user", text: prompt }],
+      signal: params.signal,
+    });
+    return parseFollowUps(response.text);
+  } catch (err) {
+    console.error("[executive-copilot] follow-up suggestion call failed:", err);
+    return [];
+  }
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { runCopilotAgent, withTimeout, type CopilotTool } from "./copilotEngine";
+import { runCopilotAgent, withTimeout, suggestFollowUps, parseFollowUps, type CopilotTool } from "./copilotEngine";
 import type { CopilotProvider, ProviderResponse } from "./copilotProviders/types";
 
 function usage(overrides: Partial<ProviderResponse["usage"]> = {}): ProviderResponse["usage"] {
@@ -163,5 +163,73 @@ describe("withTimeout", () => {
   it("rejects with the given message if the promise doesn't settle in time", async () => {
     const neverSettles = new Promise(() => {});
     await expect(withTimeout(neverSettles, 10, "too slow")).rejects.toThrow("too slow");
+  });
+});
+
+describe("parseFollowUps", () => {
+  it("parses a plain JSON array of strings", () => {
+    expect(parseFollowUps('["a", "b", "c"]')).toEqual(["a", "b", "c"]);
+  });
+
+  it("strips a markdown code fence the model added despite being told not to", () => {
+    expect(parseFollowUps('```json\n["a", "b"]\n```')).toEqual(["a", "b"]);
+    expect(parseFollowUps("```\n[\"a\", \"b\"]\n```")).toEqual(["a", "b"]);
+  });
+
+  it("caps the result at 3 even if the model returns more", () => {
+    expect(parseFollowUps('["a", "b", "c", "d", "e"]')).toEqual(["a", "b", "c"]);
+  });
+
+  it("drops non-string and empty-string entries", () => {
+    expect(parseFollowUps('["a", "", "  ", 42, null, "b"]')).toEqual(["a", "b"]);
+  });
+
+  it("returns an empty array for invalid JSON instead of throwing", () => {
+    expect(parseFollowUps("not json at all")).toEqual([]);
+  });
+
+  it("returns an empty array when the JSON parses but isn't an array", () => {
+    expect(parseFollowUps('{"a": 1}')).toEqual([]);
+    expect(parseFollowUps('"just a string"')).toEqual([]);
+  });
+});
+
+describe("suggestFollowUps", () => {
+  it("returns the parsed follow-ups from the provider's response", async () => {
+    const provider = makeProvider({
+      text: '["Question A?", "Question B?", "Question C?"]',
+      toolCalls: [],
+      finished: true,
+      usage: usage(),
+    });
+
+    const result = await suggestFollowUps({
+      provider,
+      systemPromptPrefix: "context",
+      question: "How much cash do we have?",
+      answer: "We have $1M.",
+    });
+
+    expect(result).toEqual(["Question A?", "Question B?", "Question C?"]);
+    // No tools should ever be offered to this call -- it's not meant to invoke backend
+    // data lookups, just suggest questions from the Q&A already in hand.
+    expect(provider.send.mock.calls[0][0].tools).toEqual([]);
+  });
+
+  it("returns an empty array (not a throw) if the provider call fails", async () => {
+    const provider: CopilotProvider = { send: vi.fn().mockRejectedValue(new Error("provider down")) };
+    const result = await suggestFollowUps({
+      provider,
+      systemPromptPrefix: "context",
+      question: "q",
+      answer: "a",
+    });
+    expect(result).toEqual([]);
+  });
+
+  it("returns an empty array if the model's response isn't valid JSON", async () => {
+    const provider = makeProvider({ text: "Sure! Here are some ideas...", toolCalls: [], finished: true, usage: usage() });
+    const result = await suggestFollowUps({ provider, systemPromptPrefix: "context", question: "q", answer: "a" });
+    expect(result).toEqual([]);
   });
 });
