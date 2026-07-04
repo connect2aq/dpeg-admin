@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import ExecutiveCopilotMemoryPanel from "@/components/ExecutiveCopilotMemoryPanel";
+import CopilotMarkdownAnswer from "@/components/CopilotMarkdownAnswer";
 import { friendlySourceLabels } from "@/lib/executiveCopilot/toolLabels";
 
 interface Turn {
@@ -108,7 +109,9 @@ export default function ExecutiveCopilotCard() {
               <div style={{ fontWeight: 600, color: "#0e3416", fontSize: 14 }}>{t.question}</div>
               {t.loading && <div style={{ color: "#94a3b8", fontSize: 13, marginTop: 4 }}>Thinking…</div>}
               {t.answer && (
-                <div style={{ color: "#334155", fontSize: 14, marginTop: 4, whiteSpace: "pre-wrap" }}>{t.answer}</div>
+                <div style={{ marginTop: 4 }}>
+                  <CopilotMarkdownAnswer text={t.answer} />
+                </div>
               )}
               {t.error && <div style={{ color: "#b91c1c", fontSize: 13, marginTop: 4 }}>{t.error}</div>}
               {t.sources && t.sources.length > 0 && (
