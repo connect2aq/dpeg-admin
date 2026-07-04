@@ -5,6 +5,15 @@
 // ...) is configured, without touching this file.
 import type { CopilotProvider, CopilotTurn, JSONSchema, ProviderToolCall } from "./copilotProviders/types";
 
+// A linkable record a tool's result referenced (e.g. a specific redemption or
+// application). Optional — most tools return aggregates with nothing to link to.
+export interface CopilotCitation {
+  type: string;
+  id: number | string;
+  label?: string;
+  href: string;
+}
+
 export interface CopilotTool {
   definition: {
     name: string;
@@ -12,6 +21,9 @@ export interface CopilotTool {
     input_schema: JSONSchema;
   };
   execute: (input: unknown, token: string) => Promise<unknown>;
+  // Given a tool's own raw result, pull out any linkable records it contains. Optional —
+  // only implemented by tools whose results reference something with a real detail page.
+  extractCitations?: (result: unknown) => CopilotCitation[];
 }
 
 export interface CopilotConversationTurn {
@@ -22,6 +34,7 @@ export interface CopilotConversationTurn {
 export interface CopilotAgentResult {
   answer: string;
   sources: string[];
+  citations: CopilotCitation[];
 }
 
 const MAX_TOOL_ITERATIONS = 6; // tunable — bounds worst-case latency/cost per question
@@ -43,6 +56,18 @@ When comparing periods, cohorts, or entities, be explicit about what data you pu
 Once you have the information needed to answer the question, stop calling tools and respond directly. Do not make additional or repeat tool calls out of caution once you already have what you need.
 `.trim();
 
+// Standard "give up waiting" wrapper — does not cancel the underlying work (JS has no
+// true cross-cutting cancellation without threading an AbortSignal through every layer),
+// it only stops the caller from waiting past `ms`. Paired with backendGet's own per-call
+// timeout in lib/executiveCopilot/tools.ts, which bounds the actual work too.
+export function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer)) as Promise<T>;
+}
+
 export async function runCopilotAgent(params: {
   provider: CopilotProvider;
   tools: CopilotTool[];
@@ -50,8 +75,13 @@ export async function runCopilotAgent(params: {
   token: string;
   conversationHistory: CopilotConversationTurn[];
   question: string;
+  // When the caller (the route, driven by the client disconnecting via its own Stop
+  // button, or a last-resort safety-net timeout) aborts this, the loop stops making
+  // further LLM calls at the next check point instead of running to completion on an
+  // abandoned question.
+  signal?: AbortSignal;
 }): Promise<CopilotAgentResult> {
-  const { provider, tools, systemPromptPrefix, token, conversationHistory, question } = params;
+  const { provider, tools, systemPromptPrefix, token, conversationHistory, question, signal } = params;
 
   const trimmedHistory = conversationHistory.slice(-MAX_HISTORY_MESSAGES);
   const turns: CopilotTurn[] = [
@@ -68,9 +98,14 @@ export async function runCopilotAgent(params: {
   const systemPrompt = `${systemPromptPrefix}\n\n${CORE_SYSTEM_PROMPT}`;
   const toolsUsed = new Set<string>();
   const usageTotals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+  const citationsByHref = new Map<string, CopilotCitation>();
 
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-    const response = await provider.send({ systemPrompt, tools: toolSchemas, turns });
+    if (signal?.aborted) {
+      console.log(`[executive-copilot] cancelled before iteration ${iteration + 1} — question was abandoned`);
+      throw new Error("Cancelled");
+    }
+    const response = await provider.send({ systemPrompt, tools: toolSchemas, turns, signal });
 
     usageTotals.input += response.usage.inputTokens;
     usageTotals.output += response.usage.outputTokens;
@@ -81,7 +116,7 @@ export async function runCopilotAgent(params: {
       console.log(
         `[executive-copilot] answered in ${iteration + 1} call(s) — input:${usageTotals.input} output:${usageTotals.output} cacheRead:${usageTotals.cacheRead} cacheWrite:${usageTotals.cacheWrite} tools:[${[...toolsUsed].join(",")}]`,
       );
-      return { answer: response.text, sources: [...toolsUsed] };
+      return { answer: response.text, sources: [...toolsUsed], citations: [...citationsByHref.values()] };
     }
 
     turns.push({ kind: "assistantToolCalls", calls: response.toolCalls, providerData: response.providerData });
@@ -96,6 +131,9 @@ export async function runCopilotAgent(params: {
         toolsUsed.add(call.name);
         try {
           const result = tool ? await tool.execute(call.input, token) : { error: `Unknown tool ${call.name}` };
+          if (tool?.extractCitations) {
+            for (const c of tool.extractCitations(result)) citationsByHref.set(c.href, c);
+          }
           const output = JSON.stringify(result);
           console.log(
             `[executive-copilot]   → ${call.name} returned ${output.length} chars${output.length < 500 ? `: ${output}` : ""}`,
@@ -122,5 +160,6 @@ export async function runCopilotAgent(params: {
     answer:
       "I wasn't able to fully answer within the allotted number of data lookups. Try narrowing the question.",
     sources: [...toolsUsed],
+    citations: [...citationsByHref.values()],
   };
 }

@@ -18,6 +18,7 @@ export class AnthropicProvider implements CopilotProvider {
     systemPrompt: string;
     tools: ProviderToolSchema[];
     turns: CopilotTurn[];
+    signal?: AbortSignal;
   }): Promise<ProviderResponse> {
     const messages: Anthropic.MessageParam[] = [];
     for (const turn of params.turns) {
@@ -61,18 +62,22 @@ export class AnthropicProvider implements CopilotProvider {
 
     let response: Anthropic.Message;
     try {
-      response = await this.client.messages.create({
-        model: this.model,
-        max_tokens: 4096,
-        thinking: { type: "adaptive" },
-        output_config: this.effort ? { effort: this.effort } : undefined,
-        system: [
-          { type: "text", text: params.systemPrompt, cache_control: { type: "ephemeral" } },
-        ],
-        tools: toolDefinitions,
-        messages,
-      });
+      response = await this.client.messages.create(
+        {
+          model: this.model,
+          max_tokens: 4096,
+          thinking: { type: "adaptive" },
+          output_config: this.effort ? { effort: this.effort } : undefined,
+          system: [
+            { type: "text", text: params.systemPrompt, cache_control: { type: "ephemeral" } },
+          ],
+          tools: toolDefinitions,
+          messages,
+        },
+        { signal: params.signal },
+      );
     } catch (err) {
+      if (params.signal?.aborted) throw err; // caller cancelled — let the abort propagate as-is, not a generic error
       console.error("[executive-copilot] Anthropic API call failed:", err);
       if (
         err instanceof Anthropic.RateLimitError ||

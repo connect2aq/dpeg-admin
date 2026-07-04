@@ -60,5 +60,9 @@ export interface CopilotProvider {
     systemPrompt: string;
     tools: ProviderToolSchema[];
     turns: CopilotTurn[];
+    // Lets a caller (the engine, driven by the client disconnecting or the route's own
+    // safety-net timeout) actually cancel an in-flight LLM call, not just stop waiting on
+    // it — so an abandoned question doesn't keep burning tokens after the user gave up.
+    signal?: AbortSignal;
   }): Promise<ProviderResponse>;
 }

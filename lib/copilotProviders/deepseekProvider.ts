@@ -44,6 +44,7 @@ export class DeepSeekProvider implements CopilotProvider {
     systemPrompt: string;
     tools: ProviderToolSchema[];
     turns: CopilotTurn[];
+    signal?: AbortSignal;
   }): Promise<ProviderResponse> {
     const messages: ChatCompletionMessageParam[] = [{ role: "system", content: params.systemPrompt }];
 
@@ -103,8 +104,9 @@ export class DeepSeekProvider implements CopilotProvider {
 
     let response: OpenAI.Chat.Completions.ChatCompletion;
     try {
-      response = await this.client.chat.completions.create(requestParams);
+      response = await this.client.chat.completions.create(requestParams, { signal: params.signal });
     } catch (err) {
+      if (params.signal?.aborted) throw err; // caller cancelled — let the abort propagate as-is, not a generic error
       console.error("[executive-copilot] DeepSeek API call failed:", err);
       if (err instanceof RateLimitError || err instanceof InternalServerError || err instanceof APIConnectionError) {
         throw new Error("The assistant is temporarily busy. Please try again in a moment.");

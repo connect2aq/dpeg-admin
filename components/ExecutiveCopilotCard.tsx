@@ -1,16 +1,104 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import ExecutiveCopilotMemoryPanel from "@/components/ExecutiveCopilotMemoryPanel";
 import CopilotMarkdownAnswer from "@/components/CopilotMarkdownAnswer";
 import { friendlySourceLabels } from "@/lib/executiveCopilot/toolLabels";
+import type { CopilotCitation } from "@/lib/copilotEngine";
 
 interface Turn {
   question: string;
   answer?: string;
   sources?: string[];
+  citations?: CopilotCitation[];
   loading: boolean;
   error?: string;
+  stopped?: boolean;
+}
+
+// The Web Speech API isn't part of TypeScript's standard DOM lib (it's a non-standard,
+// Chromium-led API), so these are minimal ambient shapes for just what's used here rather
+// than a full type-definitions dependency for one small feature.
+interface SpeechRecognitionResultLike {
+  transcript: string;
+}
+interface SpeechRecognitionEventLike {
+  results: { [index: number]: { [index: number]: SpeechRecognitionResultLike } };
+}
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onstart: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+const THINKING_PHRASES = [
+  "Thinking…",
+  "Checking the data…",
+  "Cross-referencing records…",
+  "Still working — this one needs a few lookups…",
+];
+
+// Persisted in localStorage (not sessionStorage, not keyed to the auth token) so the
+// admin's model/effort choice survives logout/login and page reloads.
+const STORAGE_PROVIDER_KEY = "executiveCopilotProvider";
+const STORAGE_EFFORT_KEY = "executiveCopilotEffort";
+
+interface ProviderStatus {
+  id: string;
+  label: string;
+  configured: boolean;
+  effortOptions: { value: string; label: string }[];
+  defaultEffort: string;
+  balanceText?: string;
+  balanceLow?: boolean;
+  balanceNote?: string;
+}
+
+async function fetchProviderStatuses(token: string): Promise<ProviderStatus[] | null> {
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/api/executive-copilot/providers`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.providers ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// A handful of curated example questions spanning the domains the copilot can actually
+// answer (cash, redemptions, DocuSign, distributions, pending approvals) — shown before
+// the admin's first question to demonstrate the kind of open-ended question the tool
+// handles, rather than leaving a blank input box to stare at. Rotated by day (not
+// Math.random) so the initial render is deterministic across server and client.
+const SAMPLE_QUESTION_SETS: string[][] = [
+  [
+    "How much cash do we have available today?",
+    "Which redemptions are due this week but don't have a signed DocuSign yet?",
+    "How does this month's distribution obligation compare to last month?",
+  ],
+  [
+    "What changed today across pending approvals?",
+    "Which investor type has the highest redemption rate?",
+    "How much interest did we pay on redemptions last month?",
+  ],
+  [
+    "Show me investors still waiting on DocuSign.",
+    "Why did our cash position drop this month?",
+    "What's pending approval right now, and how old is the oldest item?",
+  ],
+];
+
+function pickSampleQuestions(): string[] {
+  const dayIndex = Math.floor(Date.now() / 86_400_000);
+  return SAMPLE_QUESTION_SETS[dayIndex % SAMPLE_QUESTION_SETS.length];
 }
 
 export default function ExecutiveCopilotCard() {
@@ -18,9 +106,125 @@ export default function ExecutiveCopilotCard() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [notConfigured, setNotConfigured] = useState(false);
+  const [thinkingPhraseIndex, setThinkingPhraseIndex] = useState(0);
+  // "preparing" covers the real gap between calling start() and the browser actually
+  // being ready to capture audio — without this, the UI said "listening" immediately on
+  // click and the first word or two spoken during that gap got dropped. "listening" only
+  // begins once the browser's own onstart event fires, confirming it's truly ready,
+  // rather than guessing at a fixed delay.
+  const [voiceState, setVoiceState] = useState<"idle" | "preparing" | "listening">("idle");
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const ask = async () => {
-    const question = input.trim();
+  const [providers, setProviders] = useState<ProviderStatus[] | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState("");
+  const [selectedEffort, setSelectedEffort] = useState("");
+  const [sampleQuestions] = useState(() => pickSampleQuestions());
+
+  const isLoading = turns.some((t) => t.loading);
+
+  const stopAsking = () => {
+    abortControllerRef.current?.abort();
+  };
+
+  // Loads provider config/balance once on mount and applies the admin's saved
+  // provider/effort choice (falling back to whichever provider is actually configured if
+  // the saved one no longer is). All setState calls here happen inside the .then()
+  // callback, after the fetch has resolved — nothing is set synchronously in the effect
+  // body itself.
+  useEffect(() => {
+    if (!token) return;
+    let ignore = false;
+    fetchProviderStatuses(token).then((list) => {
+      if (ignore || !list) return;
+      setProviders(list);
+
+      const savedProvider = localStorage.getItem(STORAGE_PROVIDER_KEY);
+      const savedEffort = localStorage.getItem(STORAGE_EFFORT_KEY);
+      const savedProviderStillValid = savedProvider && list.some((p) => p.id === savedProvider && p.configured);
+      const initialProvider = savedProviderStillValid ? savedProvider! : (list.find((p) => p.configured)?.id ?? "");
+      const meta = list.find((p) => p.id === initialProvider);
+      const savedEffortStillValid = savedEffort && meta?.effortOptions.some((o) => o.value === savedEffort);
+      const initialEffort = savedEffortStillValid ? savedEffort! : (meta?.defaultEffort ?? "");
+
+      setSelectedProvider(initialProvider);
+      setSelectedEffort(initialEffort);
+    });
+    return () => {
+      ignore = true;
+    };
+  }, [token]);
+
+  const handleProviderChange = (value: string) => {
+    setSelectedProvider(value);
+    localStorage.setItem(STORAGE_PROVIDER_KEY, value);
+    const meta = providers?.find((p) => p.id === value);
+    const newEffort = meta?.defaultEffort ?? "";
+    setSelectedEffort(newEffort);
+    localStorage.setItem(STORAGE_EFFORT_KEY, newEffort);
+  };
+
+  const handleEffortChange = (value: string) => {
+    setSelectedEffort(value);
+    localStorage.setItem(STORAGE_EFFORT_KEY, value);
+  };
+
+  // Fills the input box with the transcription rather than auto-submitting — voice
+  // recognition can mishear domain-specific names/terms, so the admin gets a chance to
+  // see and correct the text before it's actually sent as a question. Checked at click
+  // time (not pre-detected via an effect) so unsupported browsers just get a message
+  // instead of needing client-only feature-detection state.
+  const startListening = () => {
+    type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+    const windowWithSpeech = window as unknown as {
+      SpeechRecognition?: SpeechRecognitionCtor;
+      webkitSpeechRecognition?: SpeechRecognitionCtor;
+    };
+    const Ctor = windowWithSpeech.SpeechRecognition ?? windowWithSpeech.webkitSpeechRecognition;
+    if (!Ctor) {
+      setVoiceError("Voice input isn't supported in this browser — try Chrome or Edge.");
+      return;
+    }
+    setVoiceError(null);
+    const recognition = new Ctor();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = () => setVoiceState("listening");
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript;
+      if (transcript) setInput(transcript);
+    };
+    recognition.onerror = () => {
+      setVoiceError("Couldn't hear that — please try again.");
+      setVoiceState("idle");
+    };
+    recognition.onend = () => setVoiceState("idle");
+
+    recognitionRef.current = recognition;
+    setVoiceState("preparing");
+    recognition.start();
+  };
+
+  const stopListening = () => {
+    recognitionRef.current?.stop();
+    setVoiceState("idle");
+  };
+
+  // Cycles the "Thinking…" message so a multi-tool-call question (which can take a while)
+  // doesn't look stuck. The interval callback is the only thing that calls setState here —
+  // nothing is set synchronously in the effect body itself.
+  useEffect(() => {
+    if (!isLoading) return;
+    const interval = setInterval(() => {
+      setThinkingPhraseIndex((i) => (i + 1) % THINKING_PHRASES.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
+  const ask = async (questionOverride?: string) => {
+    const question = (questionOverride ?? input).trim();
     if (!question || !token) return;
     setInput("");
     setTurns((t) => [...t, { question, loading: true }]);
@@ -32,11 +236,20 @@ export default function ExecutiveCopilotCard() {
         { role: "assistant" as const, content: t.answer! },
       ]);
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/api/executive-copilot/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ question, conversationHistory }),
+        body: JSON.stringify({
+          question,
+          conversationHistory,
+          ...(selectedProvider ? { provider: selectedProvider } : {}),
+          ...(selectedEffort ? { effort: selectedEffort } : {}),
+        }),
+        signal: controller.signal,
       });
       const data = await res.json();
 
@@ -50,16 +263,34 @@ export default function ExecutiveCopilotCard() {
         const copy = [...t];
         const last = copy[copy.length - 1];
         copy[copy.length - 1] = res.ok
-          ? { ...last, answer: data.answer, sources: data.sources, loading: false }
+          ? { ...last, answer: data.answer, sources: data.sources, citations: data.citations, loading: false }
           : { ...last, error: data.error || "Something went wrong.", loading: false };
         return copy;
       });
-    } catch {
+
+      // The question just consumed API balance — refresh the figure shown in the
+      // selector rather than leaving a stale number until the next page load.
+      if (res.ok) {
+        fetchProviderStatuses(token).then((list) => {
+          if (list) setProviders(list);
+        });
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setTurns((t) => {
+          const copy = [...t];
+          copy[copy.length - 1] = { ...copy[copy.length - 1], stopped: true, loading: false };
+          return copy;
+        });
+        return;
+      }
       setTurns((t) => {
         const copy = [...t];
         copy[copy.length - 1] = { ...copy[copy.length - 1], error: "Network error — please try again.", loading: false };
         return copy;
       });
+    } finally {
+      abortControllerRef.current = null;
     }
   };
 
@@ -92,6 +323,77 @@ export default function ExecutiveCopilotCard() {
         )}
       </div>
 
+      {providers && providers.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
+          <select
+            value={selectedProvider}
+            onChange={(e) => handleProviderChange(e.target.value)}
+            style={{ fontSize: 12, padding: "4px 6px", border: "1px solid #cbd5e1", borderRadius: 5, color: "#0e3416" }}
+          >
+            {providers.map((p) => (
+              <option key={p.id} value={p.id} disabled={!p.configured}>
+                {p.label}
+                {!p.configured ? " (not configured)" : ""}
+              </option>
+            ))}
+          </select>
+          <select
+            value={selectedEffort}
+            onChange={(e) => handleEffortChange(e.target.value)}
+            style={{ fontSize: 12, padding: "4px 6px", border: "1px solid #cbd5e1", borderRadius: 5, color: "#0e3416" }}
+          >
+            {providers
+              .find((p) => p.id === selectedProvider)
+              ?.effortOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label} effort
+                </option>
+              ))}
+          </select>
+          {(() => {
+            const current = providers.find((p) => p.id === selectedProvider);
+            if (!current) return null;
+            if (current.balanceText) {
+              return (
+                <span style={{ fontSize: 11, color: current.balanceLow ? "#b91c1c" : "#94a3b8" }}>
+                  Balance: {current.balanceText}
+                </span>
+              );
+            }
+            if (current.balanceNote) {
+              return <span style={{ fontSize: 11, color: "#94a3b8" }}>{current.balanceNote}</span>;
+            }
+            return null;
+          })()}
+        </div>
+      )}
+
+      {turns.length === 0 && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6 }}>Try asking:</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {sampleQuestions.map((q) => (
+              <button
+                key={q}
+                onClick={() => ask(q)}
+                style={{
+                  textAlign: "left",
+                  fontSize: 13,
+                  padding: "6px 10px",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 6,
+                  background: "#f8fafc",
+                  color: "#0e3416",
+                  cursor: "pointer",
+                }}
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {turns.length > 0 && (
         <div
           style={{
@@ -107,13 +409,18 @@ export default function ExecutiveCopilotCard() {
           {turns.map((t, i) => (
             <div key={i}>
               <div style={{ fontWeight: 600, color: "#0e3416", fontSize: 14 }}>{t.question}</div>
-              {t.loading && <div style={{ color: "#94a3b8", fontSize: 13, marginTop: 4 }}>Thinking…</div>}
+              {t.loading && (
+                <div style={{ color: "#94a3b8", fontSize: 13, marginTop: 4 }}>
+                  {THINKING_PHRASES[thinkingPhraseIndex]}
+                </div>
+              )}
               {t.answer && (
                 <div style={{ marginTop: 4 }}>
-                  <CopilotMarkdownAnswer text={t.answer} />
+                  <CopilotMarkdownAnswer text={t.answer} citations={t.citations} />
                 </div>
               )}
               {t.error && <div style={{ color: "#b91c1c", fontSize: 13, marginTop: 4 }}>{t.error}</div>}
+              {t.stopped && <div style={{ color: "#94a3b8", fontSize: 13, marginTop: 4 }}>Stopped.</div>}
               {t.sources && t.sources.length > 0 && (
                 <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
                   Sources: {friendlySourceLabels(t.sources).join(", ")}
@@ -129,26 +436,48 @@ export default function ExecutiveCopilotCard() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && ask()}
-          placeholder="e.g. Why did our cash position drop this month?"
+          placeholder={
+            voiceState === "listening"
+              ? "Listening — speak now…"
+              : voiceState === "preparing"
+                ? "Preparing microphone…"
+                : "e.g. Why did our cash position drop this month?"
+          }
           style={{ flex: 1, fontSize: 14, padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: 6, color: "#0e3416" }}
         />
         <button
-          onClick={ask}
-          disabled={!input.trim()}
+          onClick={voiceState === "idle" ? startListening : stopListening}
+          title={voiceState === "idle" ? "Ask by voice" : "Stop listening"}
+          style={{
+            fontSize: 15,
+            padding: "8px 12px",
+            border: "1px solid #cbd5e1",
+            borderRadius: 6,
+            background: voiceState === "listening" ? "#fee2e2" : voiceState === "preparing" ? "#fef3c7" : "#fff",
+            color: voiceState === "listening" ? "#b91c1c" : voiceState === "preparing" ? "#92400e" : "#64748b",
+            cursor: "pointer",
+          }}
+        >
+          {voiceState === "idle" ? "🎤" : voiceState === "preparing" ? "…" : "⏹"}
+        </button>
+        <button
+          onClick={() => (isLoading ? stopAsking() : ask())}
+          disabled={!isLoading && !input.trim()}
           style={{
             fontSize: 13,
             padding: "8px 16px",
             border: "none",
             borderRadius: 6,
-            background: input.trim() ? "#0e3416" : "#e2e8f0",
-            color: input.trim() ? "#fff" : "#94a3b8",
-            cursor: input.trim() ? "pointer" : "default",
+            background: isLoading ? "#b91c1c" : input.trim() ? "#0e3416" : "#e2e8f0",
+            color: isLoading || input.trim() ? "#fff" : "#94a3b8",
+            cursor: isLoading || input.trim() ? "pointer" : "default",
             fontWeight: 600,
           }}
         >
-          Ask
+          {isLoading ? "Stop" : "Ask"}
         </button>
       </div>
+      {voiceError && <div style={{ fontSize: 12, color: "#b91c1c", marginTop: 6 }}>{voiceError}</div>}
 
       <ExecutiveCopilotMemoryPanel />
     </div>

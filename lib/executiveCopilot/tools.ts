@@ -2,7 +2,7 @@
 // the read-only guarantee: it only ever imports GET-style path builders from
 // lib/apiContracts.ts and never any mutation function from lib/api.ts. If this file is
 // ever touched again, re-verify that no mutation-wrapping tool has been added.
-import type { CopilotTool } from "@/lib/copilotEngine";
+import type { CopilotCitation, CopilotTool } from "@/lib/copilotEngine";
 import {
   dashboardPath,
   dashboardTrendsPath,
@@ -26,16 +26,61 @@ const MAX_REDEMPTION_DETAIL_IDS = 20;
 // and reason over before it can answer, which is the dominant cost in a multi-tool-call
 // turn. The model can always ask again with a larger pageSize if it genuinely needs more.
 const DEFAULT_PAGE_SIZE = 20;
+const BACKEND_FETCH_TIMEOUT_MS = 15_000; // bounds a single hung backend call
 
 async function backendGet<T>(path: string, token: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`Backend request to ${path} failed with HTTP ${res.status}`);
-  const json = (await res.json()) as { success: boolean; data: T; message: string };
-  if (!json.success) throw new Error(json.message || `Backend call to ${path} was unsuccessful`);
-  return json.data;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), BACKEND_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`Backend request to ${path} failed with HTTP ${res.status}`);
+    const json = (await res.json()) as { success: boolean; data: T; message: string };
+    if (!json.success) throw new Error(json.message || `Backend call to ${path} was unsuccessful`);
+    return json.data;
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(`Backend request to ${path} timed out after ${BACKEND_FETCH_TIMEOUT_MS / 1000}s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Pulls linkable records (id + label + href) out of a tool result for the "referenced
+// records" UI — only meaningful for entities with a real admin detail page (redemptions,
+// applications, users). Loosely typed on purpose: this file deliberately doesn't import
+// lib/api.ts's types (see the isolation note at the top of this file), so extraction is a
+// safe runtime shape check rather than a static type dependency. idFor is a function, not
+// a fixed "id" field name, because some records (e.g. capital ledger entries) reference
+// the linkable ID under a different field (applicationId), not their own id.
+function citationsFromRecords(
+  records: unknown,
+  type: string,
+  idFor: (item: Record<string, unknown>) => number | undefined,
+  hrefFor: (id: number) => string,
+  labelFor: (item: Record<string, unknown>) => string | undefined,
+): CopilotCitation[] {
+  if (!Array.isArray(records)) return [];
+  return records
+    .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+    .map((item) => ({ item, id: idFor(item) }))
+    .filter((x): x is { item: Record<string, unknown>; id: number } => typeof x.id === "number")
+    .map(({ item, id }) => ({
+      type,
+      id,
+      label: labelFor(item),
+      href: hrefFor(id),
+    }));
+}
+
+// The common case: the record's own "id" field is the linkable ID.
+function byIdField(item: Record<string, unknown>): number | undefined {
+  return typeof item.id === "number" ? item.id : undefined;
 }
 
 function withPageDefaults(params: Record<string, unknown> = {}): Record<string, string | number> {
@@ -111,6 +156,14 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
       const p = withPageDefaults(input as Record<string, unknown>);
       return backendGet(redemptionsPath(p), token);
     },
+    extractCitations: (result) =>
+      citationsFromRecords(
+        (result as { items?: unknown[] })?.items,
+        "redemption",
+        byIdField,
+        (id) => `/redemptions/${id}`,
+        (r) => (r.sellingPartnerName as string) || (r.email as string),
+      ),
   },
   {
     definition: {
@@ -134,6 +187,14 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
         truncated: (ids ?? []).length > MAX_REDEMPTION_DETAIL_IDS,
       };
     },
+    extractCitations: (result) =>
+      citationsFromRecords(
+        (result as { results?: unknown[] })?.results,
+        "redemption",
+        byIdField,
+        (id) => `/redemptions/${id}`,
+        (r) => (r.sellingPartnerName as string) || (r.email as string),
+      ),
   },
   {
     definition: {
@@ -164,6 +225,17 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
       const p = withPageDefaults(input as Record<string, unknown>);
       return backendGet(applicationsPath(p), token);
     },
+    extractCitations: (result) =>
+      citationsFromRecords(
+        (result as { items?: unknown[] })?.items,
+        "application",
+        byIdField,
+        (id) => `/applications/${id}`,
+        (r) =>
+          (r.investorName as string) ||
+          `${(r.userFirstName as string) ?? ""} ${(r.userLastName as string) ?? ""}`.trim() ||
+          undefined,
+      ),
   },
   {
     definition: {
@@ -255,6 +327,17 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
       const p = (input ?? {}) as { from?: string; to?: string };
       return backendGet(capitalLedgerPath(p), token);
     },
+    extractCitations: (result) =>
+      citationsFromRecords(
+        (result as { entries?: unknown[] })?.entries,
+        "application",
+        // Each ledger entry references its investment via applicationId, not its own id
+        // (entries don't have a detail page of their own) — this is what makes two
+        // entries for the same investor correctly resolve to two different applications.
+        (item) => (typeof item.applicationId === "number" ? item.applicationId : undefined),
+        (id) => `/applications/${id}`,
+        (r) => (r.investorName as string) || (r.email as string),
+      ),
   },
   {
     definition: {
@@ -274,6 +357,14 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
       const p = withPageDefaults(input as Record<string, unknown>);
       return backendGet(usersPath(p), token);
     },
+    extractCitations: (result) =>
+      citationsFromRecords(
+        (result as { items?: unknown[] })?.items,
+        "user",
+        byIdField,
+        (id) => `/users/${id}`,
+        (r) => `${(r.firstName as string) ?? ""} ${(r.lastName as string) ?? ""}`.trim() || (r.email as string),
+      ),
   },
   {
     definition: {
