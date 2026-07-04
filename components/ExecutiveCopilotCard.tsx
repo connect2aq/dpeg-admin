@@ -492,7 +492,7 @@ export default function ExecutiveCopilotCard() {
             More Ideas
           </button>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {sampleQuestions.map((q) => (
             <button
               key={q}
