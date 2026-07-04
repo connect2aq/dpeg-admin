@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { runCopilotAgent, type CopilotConversationTurn } from "@/lib/copilotEngine";
 import { EXECUTIVE_COPILOT_TOOLS, EXECUTIVE_COPILOT_SYSTEM_PROMPT_PREFIX } from "@/lib/executiveCopilot/tools";
 import { formatMemoryForPrompt } from "@/lib/executiveCopilot/memoryStore";
+import { buildExecutiveCopilotProvider } from "@/lib/executiveCopilot/provider";
 
-export const runtime = "nodejs"; // @anthropic-ai/sdk requires Node, not Edge
+export const runtime = "nodejs"; // provider SDKs (Anthropic, OpenAI) require Node, not Edge
 export const dynamic = "force-dynamic"; // authenticated, per-user — never cache
 
 interface AskRequestBody {
@@ -17,10 +18,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing auth token" }, { status: 401 });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    // Fails safe: no secret configured yet in this environment. The client renders
-    // a quiet "not yet configured" state rather than a broken chat box.
+  const provider = buildExecutiveCopilotProvider();
+  if (!provider) {
+    // Fails safe: no secret configured yet for the selected provider in this
+    // environment. The client renders a quiet "not yet configured" state rather than a
+    // broken chat box.
     return NextResponse.json({ configured: false }, { status: 200 });
   }
 
@@ -42,14 +44,9 @@ export async function POST(req: NextRequest) {
       : EXECUTIVE_COPILOT_SYSTEM_PROMPT_PREFIX;
 
     const result = await runCopilotAgent({
+      provider,
       tools: EXECUTIVE_COPILOT_TOOLS,
       systemPromptPrefix,
-      apiKey,
-      model: process.env.EXECUTIVE_COPILOT_MODEL || "claude-sonnet-5",
-      // "medium" trades some depth for latency — this is an interactive chat where every
-      // tool call already adds a network round-trip, so the API default of "high" was
-      // noticeably slower for not much benefit on these mostly lookup-and-summarize questions.
-      effort: (process.env.EXECUTIVE_COPILOT_EFFORT as "low" | "medium" | "high" | "xhigh" | "max") || "medium",
       token,
       conversationHistory: body.conversationHistory ?? [],
       question: body.question,

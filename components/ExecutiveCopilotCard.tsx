@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import ExecutiveCopilotMemoryPanel from "@/components/ExecutiveCopilotMemoryPanel";
+import { friendlySourceLabels } from "@/lib/executiveCopilot/toolLabels";
 
 interface Turn {
   question: string;
@@ -111,7 +112,9 @@ export default function ExecutiveCopilotCard() {
               )}
               {t.error && <div style={{ color: "#b91c1c", fontSize: 13, marginTop: 4 }}>{t.error}</div>}
               {t.sources && t.sources.length > 0 && (
-                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>Sources: {t.sources.join(", ")}</div>
+                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+                  Sources: {friendlySourceLabels(t.sources).join(", ")}
+                </div>
               )}
             </div>
           ))}
