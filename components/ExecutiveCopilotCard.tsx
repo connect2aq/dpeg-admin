@@ -109,6 +109,10 @@ export default function ExecutiveCopilotCard() {
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnsContainerRef = useRef<HTMLDivElement | null>(null);
+  // Rendered answer DOM nodes, keyed by turn index -- read at copy time so the clipboard
+  // gets the actual formatted HTML (tables, bold, links) rather than raw markdown syntax,
+  // which pastes as literal "**text**"/"| a | b |" into Word, Google Docs, etc.
+  const answerNodesRef = useRef<Map<number, HTMLDivElement>>(new Map());
 
   const [providers, setProviders] = useState<ProviderStatus[] | null>(null);
   const [selectedProvider, setSelectedProvider] = useState("");
@@ -124,9 +128,24 @@ export default function ExecutiveCopilotCard() {
     abortControllerRef.current?.abort();
   };
 
-  const copyAnswer = async (index: number, text: string) => {
+  const copyAnswer = async (index: number, plainText: string) => {
     try {
-      await navigator.clipboard.writeText(text);
+      const node = answerNodesRef.current.get(index);
+      if (node && typeof ClipboardItem !== "undefined" && navigator.clipboard.write) {
+        // Copies the already-rendered HTML (real <table>/<b>/<a> tags, same as shown on
+        // screen) as text/html, with the raw markdown as a text/plain fallback for
+        // paste targets that don't accept HTML. Word/Google Docs/Outlook/etc. all prefer
+        // the HTML entry, so this is what makes a paste keep the table/bold formatting
+        // instead of literal "**text**"/"| a | b |" markdown syntax.
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": new Blob([node.innerHTML], { type: "text/html" }),
+            "text/plain": new Blob([plainText], { type: "text/plain" }),
+          }),
+        ]);
+      } else {
+        await navigator.clipboard.writeText(plainText);
+      }
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex((current) => (current === index ? null : current)), 1500);
     } catch {
@@ -474,7 +493,14 @@ export default function ExecutiveCopilotCard() {
               )}
               {t.answer && (
                 <div style={{ marginTop: 4 }}>
-                  <CopilotMarkdownAnswer text={t.answer} citations={t.citations} />
+                  <div
+                    ref={(el) => {
+                      if (el) answerNodesRef.current.set(i, el);
+                      else answerNodesRef.current.delete(i);
+                    }}
+                  >
+                    <CopilotMarkdownAnswer text={t.answer} citations={t.citations} />
+                  </div>
                   <button
                     onClick={() => copyAnswer(i, t.answer!)}
                     title="Copy response"
