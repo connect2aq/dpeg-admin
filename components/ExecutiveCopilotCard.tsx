@@ -236,14 +236,17 @@ export default function ExecutiveCopilotCard() {
     return () => clearInterval(interval);
   }, [isLoading]);
 
-  // Keeps the newest turn in view — otherwise clicking a sample/follow-up question (or
-  // just asking another one) appends it below the fold of the scrollable turns list, so
-  // the admin has to manually scroll down to see the question was actually submitted and
-  // is being worked on. This is a plain DOM scroll, not a setState call, so it's unrelated
-  // to the set-state-in-effect rule other effects here have to work around.
+  // Scrolls to the newest turn only when a NEW question is submitted (turns.length
+  // growing) — otherwise clicking a sample/follow-up question appends it below the fold
+  // of the scrollable list, so the admin has to manually scroll down just to confirm it
+  // was submitted. Deliberately does NOT depend on the full `turns` array — re-scrolling
+  // to the bottom every time the answer/follow-ups arrive would yank the view away from
+  // the start of a long answer the admin is already reading. This is a plain DOM scroll,
+  // not a setState call, so it's unrelated to the set-state-in-effect rule other effects
+  // here have to work around.
   useEffect(() => {
     turnsContainerRef.current?.scrollTo({ top: turnsContainerRef.current.scrollHeight, behavior: "smooth" });
-  }, [turns]);
+  }, [turns.length]);
 
   const ask = async (questionOverride?: string) => {
     const question = (questionOverride ?? input).trim();
