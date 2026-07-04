@@ -33,41 +33,99 @@ function idFromCellText(text: string): number | null {
   return /^\d+$/.test(stripped) ? parseInt(stripped, 10) : null;
 }
 
-// Strips a trailing disambiguating suffix the model adds when the same investor has
-// multiple records in one table — "(2nd application)", "(id 104)", "(LongTerm)", etc. —
-// so the remaining text can still match that investor's label.
-function stripDisambiguatingSuffix(text: string): string {
-  return text.replace(/\s*\([^)]*\)\s*$/, "").trim();
+interface LabelMatch {
+  start: number;
+  end: number;
+  citation: CopilotCitation;
+}
+
+// Finds every occurrence of a known citation's label inside a cell's text — not just a
+// whole-cell match — so a cell listing several records ("Alice ($50K), Bob ($100K)")
+// still links each name individually instead of only linking when a cell is nothing but
+// one record's name. Longest labels are matched first so a shorter label ("Akash Patel")
+// can't pre-empt a match that should belong to a longer, more specific one. Overlapping
+// matches are dropped in favor of whichever was found first (i.e. the longer label, given
+// the sort order).
+function findLabelMatches(text: string, citations: CopilotCitation[], labelUseCount: Map<string, number>): LabelMatch[] {
+  const lowerText = text.toLowerCase();
+  const byLabelLengthDesc = citations
+    .filter((c): c is CopilotCitation & { label: string } => Boolean(c.label))
+    .sort((a, b) => b.label.length - a.label.length);
+
+  const seenLabels = new Set<string>();
+  const matches: LabelMatch[] = [];
+
+  for (const { label } of byLabelLengthDesc) {
+    const lowerLabel = label.toLowerCase();
+    if (seenLabels.has(lowerLabel)) continue; // already scanned all occurrences of this label
+    seenLabels.add(lowerLabel);
+
+    const sameLabelCitations = citations.filter((c) => c.label && c.label.toLowerCase() === lowerLabel);
+    let searchFrom = 0;
+    for (;;) {
+      const idx = lowerText.indexOf(lowerLabel, searchFrom);
+      if (idx === -1) break;
+      const end = idx + lowerLabel.length;
+      searchFrom = idx + 1;
+
+      const overlaps = matches.some((m) => idx < m.end && end > m.start);
+      if (overlaps) continue;
+
+      // Two records for the same investor (e.g. two applications) share an identical
+      // label — consume citations for that label in order, so the second occurrence in
+      // the table links to the second citation, not always the first.
+      const used = labelUseCount.get(lowerLabel) ?? 0;
+      labelUseCount.set(lowerLabel, used + 1);
+      matches.push({ start: idx, end, citation: sameLabelCitations[Math.min(used, sameLabelCitations.length - 1)] });
+    }
+  }
+
+  return matches.sort((a, b) => a.start - b.start);
 }
 
 function buildComponents(citations: CopilotCitation[]): Components {
-  // Tracks how many cells have already matched a given label. Two records for the same
-  // investor (e.g. two applications) produce two citations with an IDENTICAL label — a
-  // plain find-by-label would always return the first one. Consuming citations in order
-  // per label means the second occurrence of "Nazim Bandeali" in a table links to the
-  // second citation, not the first, as long as the table lists them in the same order
-  // extractCitations did (the order the backend returned them in) — true in practice,
-  // not guaranteed, but far better than always picking the first.
   const labelUseCount = new Map<string, number>();
 
-  function findCitationForCell(text: string): CopilotCitation | undefined {
-    const trimmed = text.trim();
-    if (!trimmed) return undefined;
+  // Renders a cell's plain text as-is, unless it contains one or more known records —
+  // then each matched span becomes its own link, with everything else left as plain text.
+  function renderCellContent(text: string, fallback: ReactNode): ReactNode {
+    if (citations.length === 0 || !text.trim()) return fallback;
 
+    const trimmed = text.trim();
     const id = idFromCellText(trimmed);
     if (id !== null) {
       const byId = citations.find((c) => Number(c.id) === id);
-      if (byId) return byId;
+      if (byId) {
+        return (
+          <Link href={byId.href} target="_blank" rel="noopener noreferrer" style={{ color: "#699172", fontWeight: 600, textDecoration: "none" }}>
+            {fallback} ↗
+          </Link>
+        );
+      }
     }
 
-    const key = stripDisambiguatingSuffix(trimmed).toLowerCase();
-    if (!key) return undefined;
-    const candidates = citations.filter((c) => c.label && c.label.toLowerCase() === key);
-    if (candidates.length === 0) return undefined;
+    const matches = findLabelMatches(text, citations, labelUseCount);
+    if (matches.length === 0) return fallback;
 
-    const used = labelUseCount.get(key) ?? 0;
-    labelUseCount.set(key, used + 1);
-    return candidates[Math.min(used, candidates.length - 1)];
+    const nodes: ReactNode[] = [];
+    let cursor = 0;
+    matches.forEach((m, i) => {
+      if (m.start > cursor) nodes.push(text.slice(cursor, m.start));
+      nodes.push(
+        <Link
+          key={`${m.citation.href}-${i}`}
+          href={m.citation.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: "#699172", fontWeight: 600, textDecoration: "none" }}
+        >
+          {text.slice(m.start, m.end)} ↗
+        </Link>,
+      );
+      cursor = m.end;
+    });
+    if (cursor < text.length) nodes.push(text.slice(cursor));
+    return nodes;
   }
 
   return {
@@ -90,25 +148,11 @@ function buildComponents(citations: CopilotCitation[]): Components {
         {...props}
       />
     ),
-    td: ({ children, ...props }) => {
-      const match = citations.length > 0 ? findCitationForCell(cellText(children)) : undefined;
-      return (
-        <td style={{ padding: "6px 10px", borderBottom: "1px solid #e2e8f0", color: "#334155" }} {...props}>
-          {match ? (
-            <Link
-              href={match.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: "#699172", fontWeight: 600, textDecoration: "none" }}
-            >
-              {children} ↗
-            </Link>
-          ) : (
-            children
-          )}
-        </td>
-      );
-    },
+    td: ({ children, ...props }) => (
+      <td style={{ padding: "6px 10px", borderBottom: "1px solid #e2e8f0", color: "#334155" }} {...props}>
+        {renderCellContent(cellText(children), children)}
+      </td>
+    ),
     h1: ({ ...props }) => <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0e3416", margin: "10px 0 4px" }} {...props} />,
     h2: ({ ...props }) => <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0e3416", margin: "10px 0 4px" }} {...props} />,
     h3: ({ ...props }) => <h3 style={{ fontSize: 13, fontWeight: 700, color: "#0e3416", margin: "10px 0 4px" }} {...props} />,

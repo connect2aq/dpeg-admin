@@ -73,32 +73,37 @@ async function fetchProviderStatuses(token: string): Promise<ProviderStatus[] | 
   }
 }
 
-// A handful of curated example questions spanning the domains the copilot can actually
-// answer (cash, redemptions, DocuSign, distributions, pending approvals) — shown before
-// the admin's first question to demonstrate the kind of open-ended question the tool
-// handles, rather than leaving a blank input box to stare at. Rotated by day (not
-// Math.random) so the initial render is deterministic across server and client.
-const SAMPLE_QUESTION_SETS: string[][] = [
-  [
-    "How much cash do we have available today?",
-    "Which redemptions are due this week but don't have a signed DocuSign yet?",
-    "How does this month's distribution obligation compare to last month?",
-  ],
-  [
-    "What changed today across pending approvals?",
-    "Which investor type has the highest redemption rate?",
-    "How much interest did we pay on redemptions last month?",
-  ],
-  [
-    "Show me investors still waiting on DocuSign.",
-    "Why did our cash position drop this month?",
-    "What's pending approval right now, and how old is the oldest item?",
-  ],
+// A pool of curated example questions spanning the domains the copilot can actually
+// answer (cash, redemptions, DocuSign, distributions, pending approvals, audit trail,
+// trends, capital ledger) — shown before the admin's first question to demonstrate the
+// kind of open-ended question the tool handles, rather than leaving a blank input box to
+// stare at.
+const SAMPLE_QUESTION_POOL: string[] = [
+  "How much cash do we have available today?",
+  "Which redemptions are due this week but don't have a signed DocuSign yet?",
+  "How does this month's distribution obligation compare to last month?",
+  "What changed today across pending approvals?",
+  "Which investor type has the highest redemption rate?",
+  "How much interest did we pay on redemptions last month?",
+  "Show me investors still waiting on DocuSign.",
+  "Why did our cash position drop this month?",
+  "What's pending approval right now, and how old is the oldest item?",
+  "How many new investment applications came in this week?",
+  "Which distributions are still unpaid this month?",
+  "What does the audit log show for today?",
+  "How does this month's capital raised compare to last month's?",
+  "Which applications are still under review, and for how long?",
+  "What's our total capital deployed versus redeemed so far?",
 ];
 
-function pickSampleQuestions(): string[] {
-  const dayIndex = Math.floor(Date.now() / 86_400_000);
-  return SAMPLE_QUESTION_SETS[dayIndex % SAMPLE_QUESTION_SETS.length];
+function pickRandomQuestions(count: number): string[] {
+  const pool = [...SAMPLE_QUESTION_POOL];
+  const picked: string[] = [];
+  for (let i = 0; i < count && pool.length > 0; i++) {
+    const idx = Math.floor(Math.random() * pool.length);
+    picked.push(pool.splice(idx, 1)[0]);
+  }
+  return picked;
 }
 
 export default function ExecutiveCopilotCard() {
@@ -120,13 +125,26 @@ export default function ExecutiveCopilotCard() {
   const [providers, setProviders] = useState<ProviderStatus[] | null>(null);
   const [selectedProvider, setSelectedProvider] = useState("");
   const [selectedEffort, setSelectedEffort] = useState("");
-  const [sampleQuestions] = useState(() => pickSampleQuestions());
+  // Deterministic placeholder on first render (matches server-rendered HTML, no hydration
+  // mismatch); swapped for a genuinely random 3 once mounted client-side, in the same
+  // mount effect below.
+  const [sampleQuestions, setSampleQuestions] = useState<string[]>(() => SAMPLE_QUESTION_POOL.slice(0, 3));
 
   const isLoading = turns.some((t) => t.loading);
 
   const stopAsking = () => {
     abortControllerRef.current?.abort();
   };
+
+  // Picks a fresh random 3 on every mount (i.e. every page load) so the suggestions
+  // aren't the same each time — Math.random() can't run during the server-rendered pass
+  // (it would produce different output than the client and trigger a hydration mismatch),
+  // so this deliberately runs once, client-only, right after mount. Deferred via
+  // queueMicrotask rather than called directly so the update isn't synchronous within the
+  // effect body itself.
+  useEffect(() => {
+    queueMicrotask(() => setSampleQuestions(pickRandomQuestions(3)));
+  }, []);
 
   // Loads provider config/balance once on mount and applies the admin's saved
   // provider/effort choice (falling back to whichever provider is actually configured if

@@ -107,6 +107,8 @@ Available tools and what they cover:
 - get_bank_details / get_daily_balances: bank account reference details and the manually-entered daily balance log.
 
 Use list/get tools to narrow before fetching details on a large set. If a question needs data no tool here provides (e.g. something not in this list), say so rather than guessing.
+
+Formatting rule for tables: when a table lists individual applications, redemptions, investors, or other records the admin might want to open, give each record its own row and its own cell containing that record's name — never combine multiple records' names into one comma-separated cell (e.g. one date or one status having several applications), and never collapse repeat entries into a "(x2)"-style count. One row per record is what lets the UI turn each one into a clickable link back to that record.
 `.trim();
 
 export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
