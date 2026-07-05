@@ -768,8 +768,10 @@ export const adminApi = {
     api.put<ApiResponse<string>>(`/users/${userId}/reset-password`, { newPassword }),
   capitalLedger: (params: { from?: string; to?: string } = {}) =>
     api.get<ApiResponse<CapitalLedger>>(capitalLedgerPath(params)),
-  investorStatement: (userId: number) =>
-    api.get<ApiResponse<InvestorCapitalAccount>>(`/investor-statement/${userId}`),
+  investorStatement: (userId: number, applicationId?: number) =>
+    api.get<ApiResponse<InvestorCapitalAccount>>(
+      `/investor-statement/${userId}${applicationId ? `?applicationId=${applicationId}` : ""}`,
+    ),
 };
 
 export interface NotificationEmail {

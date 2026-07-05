@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AdminLayout from "@/components/AdminLayout";
-import { adminApi, type UserListItem, type InvestorCapitalAccount, type InvestorCapitalAccountEntry } from "@/lib/api";
+import { adminApi, type UserListItem, type ApplicationSummary, type InvestorCapitalAccount, type InvestorCapitalAccountEntry } from "@/lib/api";
+
+const ACTIVE_STATUSES = new Set(["Active", "Redeemed"]);
 
 const TYPE_COLORS: Record<string, { badge: string; text: string }> = {
   Contribution: { badge: "bg-green-100 text-green-700",   text: "text-green-700"  },
@@ -149,6 +151,13 @@ function InvestorStatementsContent() {
     const parsed = raw ? Number(raw) : NaN;
     return Number.isFinite(parsed) ? parsed : null;
   });
+  // null = whole account (all investments); a number scopes the statement to one application.
+  const [selectedApplicationId, setSelectedApplicationId] = useState<number | null>(() => {
+    const raw = searchParams.get("applicationId");
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed) ? parsed : null;
+  });
+  const [investments, setInvestments] = useState<ApplicationSummary[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<InvestorCapitalAccount | null>(null);
@@ -157,6 +166,10 @@ function InvestorStatementsContent() {
   const [loading, setLoading] = useState(false);
   const [investorsLoading, setInvestorsLoading] = useState(true);
   const [error, setError] = useState("");
+  // Captures the search text at the moment an investor is picked, so once that user's
+  // investments load we can tell whether the match was a specific investor/entity name
+  // (vs. the account holder's own name or email) and auto-scope to that one investment.
+  const scopeQueryRef = useRef("");
 
   useEffect(() => {
     adminApi.users({ page: 1, pageSize: 500 })
@@ -166,11 +179,33 @@ function InvestorStatementsContent() {
   }, []);
 
   useEffect(() => {
+    if (!selectedUserId) { setInvestments([]); return; }
+    adminApi.user(selectedUserId)
+      .then(r => {
+        if (!r.success || !r.data) { setInvestments([]); return; }
+        const active = r.data.applications.filter(a => ACTIVE_STATUSES.has(a.status));
+        setInvestments(active);
+
+        const q = scopeQueryRef.current.trim().toLowerCase();
+        scopeQueryRef.current = "";
+        if (!q) return;
+        const accountName = `${r.data.firstName} ${r.data.lastName}`.trim().toLowerCase();
+        const matches = active.filter(a =>
+          a.investorName && a.investorName.trim().toLowerCase() !== accountName
+          && a.investorName.toLowerCase().includes(q));
+        // Only auto-scope when the query uniquely identifies one investment — an
+        // ambiguous match (e.g. the account holder's own name) falls back to "all".
+        setSelectedApplicationId(matches.length === 1 ? matches[0].id : null);
+      })
+      .catch(() => setInvestments([]));
+  }, [selectedUserId]);
+
+  useEffect(() => {
     if (!selectedUserId) { setData(null); setAccrued(0); return; }
     setLoading(true);
     setError("");
     setData(null);
-    adminApi.investorStatement(selectedUserId)
+    adminApi.investorStatement(selectedUserId, selectedApplicationId ?? undefined)
       .then(r => {
         if (r.success && r.data) {
           setData(r.data);
@@ -181,7 +216,7 @@ function InvestorStatementsContent() {
       })
       .catch(() => setError("Failed to load statement."))
       .finally(() => setLoading(false));
-  }, [selectedUserId]);
+  }, [selectedUserId, selectedApplicationId]);
 
   const suggestions = investors.filter(u => {
     if (!inputValue || selectedUserId) return false;
@@ -192,8 +227,13 @@ function InvestorStatementsContent() {
 
   const selectedInvestor = investors.find(u => u.id === selectedUserId);
   const investorName = selectedInvestor ? `${selectedInvestor.firstName} ${selectedInvestor.lastName}` : "";
+  const scopedInvestment = investments.find(a => a.id === selectedApplicationId);
+  // Label used for export filenames/titles — the specific investor/entity name when
+  // scoped to one investment, otherwise the account holder's name.
+  const exportLabel = scopedInvestment?.investorName || investorName;
 
   function selectInvestor(u: UserListItem) {
+    scopeQueryRef.current = inputValue;
     setSelectedUserId(u.id);
     setInputValue(`${u.firstName} ${u.lastName}`);
     setOpen(false);
@@ -201,6 +241,8 @@ function InvestorStatementsContent() {
 
   function clearSelection() {
     setSelectedUserId(null);
+    setSelectedApplicationId(null);
+    setInvestments([]);
     setInputValue("");
     setData(null);
     setOpen(false);
@@ -303,7 +345,47 @@ function InvestorStatementsContent() {
             <div style={{ marginBottom: 16 }}>
               <span style={{ fontSize: 16, fontWeight: 700, color: "var(--forest)" }}>{investorName}</span>
               <span style={{ fontSize: 12, color: "var(--muted)", marginLeft: 10 }}>{selectedInvestor?.email}</span>
+              {scopedInvestment && (
+                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
+                  Viewing investment: <strong style={{ color: "var(--text-primary)" }}>{scopedInvestment.investorName || investorName}</strong>
+                  {" "}(App #{scopedInvestment.id}{scopedInvestment.ppmRefNO ? `, PPM #${scopedInvestment.ppmRefNO}` : ""})
+                </div>
+              )}
             </div>
+
+            {/* Investment scope selector — only meaningful when this account has more than one investment */}
+            {investments.length > 1 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+                <button
+                  onClick={() => setSelectedApplicationId(null)}
+                  style={{
+                    padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 999, cursor: "pointer",
+                    border: `1.5px solid ${selectedApplicationId === null ? "var(--forest)" : "var(--border)"}`,
+                    background: selectedApplicationId === null ? "var(--forest)" : "var(--bg-card)",
+                    color: selectedApplicationId === null ? "#fff" : "var(--text-primary)",
+                  }}
+                >
+                  All Investments
+                </button>
+                {investments.map(inv => {
+                  const active = selectedApplicationId === inv.id;
+                  return (
+                    <button
+                      key={inv.id}
+                      onClick={() => setSelectedApplicationId(inv.id)}
+                      style={{
+                        padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 999, cursor: "pointer",
+                        border: `1.5px solid ${active ? "var(--forest)" : "var(--border)"}`,
+                        background: active ? "var(--forest)" : "var(--bg-card)",
+                        color: active ? "#fff" : "var(--text-primary)",
+                      }}
+                    >
+                      {inv.investorName || investorName} · #{inv.id}{inv.ppmRefNO ? ` · PPM #${inv.ppmRefNO}` : ""}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Summary cards */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
@@ -337,13 +419,13 @@ function InvestorStatementsContent() {
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button
-                  onClick={() => exportCSV(data, investorName)}
+                  onClick={() => exportCSV(data, exportLabel)}
                   style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", fontSize: 12, border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", color: "var(--muted)", cursor: "pointer" }}
                 >
                   ↓ CSV
                 </button>
                 <button
-                  onClick={() => exportPDF(data, investorName, accrued)}
+                  onClick={() => exportPDF(data, exportLabel, accrued)}
                   style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", fontSize: 12, border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", color: "var(--muted)", cursor: "pointer" }}
                 >
                   ↓ PDF
