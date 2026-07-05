@@ -387,10 +387,10 @@ function InvestorStatementsContent() {
                               </span>
                             ) : <span style={{ color: "var(--muted)", fontSize: 12 }}>—</span>}
                           </td>
-                          <td style={{ padding: "9px 14px", fontWeight: 600, color: "var(--text-primary)", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={e.investorName || undefined}>
+                          <td style={{ padding: "9px 14px", fontWeight: 600, color: "var(--text-primary)", maxWidth: 140, whiteSpace: "normal", wordBreak: "break-word" }}>
                             {e.investorName || "—"}
                           </td>
-                          <td style={{ padding: "9px 14px", fontWeight: 600, color: "var(--text-primary)", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={e.accountUserName || undefined}>
+                          <td style={{ padding: "9px 14px", fontWeight: 600, color: "var(--text-primary)", maxWidth: 140, whiteSpace: "normal", wordBreak: "break-word" }}>
                             {e.accountUserName || "—"}
                           </td>
                           <td style={{ padding: "9px 14px", color: "var(--muted)", fontSize: 12 }}>
