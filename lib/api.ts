@@ -327,7 +327,8 @@ export interface CapitalLedgerEntry {
   entryType: 'Contribution' | 'Redemption' | 'Dividend';
   investmentType?: string; // 'ShortTerm' | 'LongTerm'
   investorName: string;
-  email: string;
+  accountUserName: string;
+  accountUserEmail: string;
   entryId?: number;
   applicationId?: number;
   ppmRefNo?: string;

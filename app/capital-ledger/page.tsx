@@ -33,6 +33,8 @@ const fmt = (n: number) =>
 const fmtFull = (n: number) =>
   `${n < 0 ? '−$' : '$'}${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+const PAGE_SIZE = 50;
+
 const TYPE_LABELS: Record<string, string> = {
   'Contribution':        'Contributions',
   'Redemption':          'Redemptions',
@@ -50,6 +52,7 @@ function CapitalLedgerContent() {
   const [search, setSearch] = useState('');
   const [appIdFilter, setAppIdFilter] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [page, setPage] = useState(1);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -65,7 +68,9 @@ function CapitalLedgerContent() {
     if (activeTypes.length > 0 && !activeTypes.includes(e.entryType)) return false;
     if (search) {
       const q = search.toLowerCase();
-      if (!e.investorName.toLowerCase().includes(q) && !e.email.toLowerCase().includes(q)) return false;
+      if (!e.investorName.toLowerCase().includes(q)
+        && !e.accountUserName.toLowerCase().includes(q)
+        && !e.accountUserEmail.toLowerCase().includes(q)) return false;
     }
     if (appIdFilter) {
       const id = appIdFilter.replace('#', '').trim();
@@ -73,6 +78,11 @@ function CapitalLedgerContent() {
     }
     return true;
   });
+
+  useEffect(() => { setPage(1); }, [data, typeFilter, search, appIdFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(visibleEntries.length / PAGE_SIZE));
+  const pageEntries = visibleEntries.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const exportToExcel = async () => {
     setExporting(true);
@@ -87,7 +97,8 @@ function CapitalLedgerContent() {
           e.entryType,
           e.investmentType === 'ShortTerm' ? 'Short Term' : e.investmentType === 'LongTerm' ? 'Long Term' : '',
           e.investorName,
-          e.email,
+          e.accountUserName,
+          e.accountUserEmail,
           e.ppmRefNo ?? '',
           e.units ?? '',
           e.entryType !== 'Dividend' && e.amount !== 0 ? e.amount : '',
@@ -95,7 +106,7 @@ function CapitalLedgerContent() {
           e.runningBalance,
         ]);
       downloadCsv(
-        [['ID', 'App ID', 'Date', 'Type', 'Inv. Type', 'Investor', 'Email', 'PPM Ref', 'Units', 'Amount', 'Dividend Paid', 'Running Balance'], ...rows],
+        [['ID', 'App ID', 'Date', 'Type', 'Inv. Type', 'Investor', 'Account User', 'Account User Email', 'PPM Ref', 'Units', 'Amount', 'Dividend Paid', 'Running Balance'], ...rows],
         'capital-ledger.csv',
       );
     }
@@ -156,7 +167,7 @@ function CapitalLedgerContent() {
             <option value="Dividend">Dividends</option>
             <option value="Redemption,Dividend">Redemptions + Dividends</option>
           </select>
-          <input type="text" placeholder="Search investor…" value={search} onChange={e => setSearch(e.target.value)}
+          <input type="text" placeholder="Search Account User or Investor…" value={search} onChange={e => setSearch(e.target.value)}
             style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, flex: '1 1 180px' }} />
           <input type="text" placeholder="App ID e.g. 29" value={appIdFilter} onChange={e => setAppIdFilter(e.target.value)}
             style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, width: 140 }} />
@@ -196,6 +207,7 @@ function CapitalLedgerContent() {
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Type</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Inv. Type</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Investor</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Account User</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>Units</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>Amount</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#b45309' }}>Dividend Paid</th>
@@ -204,9 +216,9 @@ function CapitalLedgerContent() {
               </thead>
               <tbody>
                 {visibleEntries.length === 0 && (
-                  <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>No entries found.</td></tr>
+                  <tr><td colSpan={11} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>No entries found.</td></tr>
                 )}
-                {visibleEntries.map((e, i) => {
+                {pageEntries.map((e, i) => {
                   const colors = TYPE_COLORS[e.entryType] ?? TYPE_COLORS.Contribution;
                   const showAmount = e.entryType !== 'Dividend';
                   const isCredit = e.amount > 0;
@@ -219,7 +231,7 @@ function CapitalLedgerContent() {
                       </td>
                       <td style={{ padding: '11px 16px', whiteSpace: 'nowrap' }}>
                         {e.applicationId
-                          ? <Link href={`/applications/${e.applicationId}`} style={{ color: '#374151', textDecoration: 'none', fontWeight: 600, fontSize: 12 }}>#{e.applicationId}</Link>
+                          ? <Link href={`/applications/${e.applicationId}`} style={{ color: '#b8923a', textDecoration: 'underline', fontWeight: 600, fontSize: 12 }}>#{e.applicationId}</Link>
                           : <span style={{ color: '#cbd5e1', fontSize: 12 }}>—</span>}
                       </td>
                       <td style={{ padding: '11px 16px', color: '#374151', whiteSpace: 'nowrap' }}>
@@ -239,7 +251,10 @@ function CapitalLedgerContent() {
                       </td>
                       <td style={{ padding: '11px 16px' }}>
                         <div style={{ fontWeight: 600, color: '#1e293b' }}>{e.investorName || '—'}</div>
-                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{e.email}</div>
+                      </td>
+                      <td style={{ padding: '11px 16px' }}>
+                        <div style={{ fontWeight: 600, color: '#1e293b' }}>{e.accountUserName || '—'}</div>
+                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{e.accountUserEmail}</div>
                       </td>
                       <td style={{ padding: '11px 16px', textAlign: 'right', color: '#374151' }}>
                         {e.units != null ? e.units : '—'}
@@ -265,8 +280,8 @@ function CapitalLedgerContent() {
               {visibleEntries.length > 0 && (
                 <tfoot>
                   <tr style={{ background: '#f8fafc', borderTop: '2px solid #e2e8f0' }}>
-                    <td colSpan={7} style={{ padding: '12px 16px', fontWeight: 700, color: '#374151', fontSize: 13 }}>
-                      {visibleEntries.length} entries
+                    <td colSpan={8} style={{ padding: '12px 16px', fontWeight: 700, color: '#374151', fontSize: 13 }}>
+                      Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, visibleEntries.length)} of {visibleEntries.length} entries
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0f2342', fontSize: 13 }}>
                       Net: {fmtFull(visibleEntries.reduce((s, e) => s + e.amount, 0))}
@@ -283,6 +298,18 @@ function CapitalLedgerContent() {
             </table>
           )}
         </div>
+
+        {!loading && visibleEntries.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 4px', flexWrap: 'wrap', gap: 8 }}>
+            <span style={{ fontSize: 13, color: '#64748b' }}>
+              Page {page} of {totalPages}
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ padding: '8px 16px', fontSize: 13 }}>← Prev</button>
+              <button className="btn-secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} style={{ padding: '8px 16px', fontSize: 13 }}>Next →</button>
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   );
