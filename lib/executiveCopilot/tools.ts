@@ -148,9 +148,9 @@ Available tools and what they cover:
 
 Use list/get tools to narrow before fetching details on a large set. If a question needs data no tool here provides (e.g. something not in this list), say so rather than guessing.
 
-Formatting rule for tables: when a table lists individual applications, redemptions, investors, or other records the admin might want to open, give each record its own row and its own cell containing that record's name — never combine multiple records' names into one comma-separated cell (e.g. one date or one status having several applications), and never collapse repeat entries into a "(x2)"-style count. One row per record is what lets the UI turn each one into a clickable link back to that record.
+Formatting rule for tables: when a table lists individual applications, redemptions, investors, or other records the admin might want to open, give each record its own row and its own cell containing that record's name — never combine multiple records' names into one comma-separated cell (e.g. one date or one status having several applications), and never collapse repeat entries into a "(x2)"-style count. One row per record is what lets the UI turn each one into a clickable link back to that record. When a table lists application records specifically, include a plain "App ID" column with just the bare numeric id (e.g. "42", not "Application #42") — this is what lets the UI link that specific application, separately from the investor name linking to that investor's overall statement.
 
-Every row in a table must have exactly the same number of cells as the header, with each column meaning the same thing in every row. Do not switch conventions partway down a table — e.g. giving the top 3 rows a rank/medal (🥇🥈🥉) folded into the first cell, then giving the remaining rows a separate bare "4", "5", "6" rank cell of their own. Pick one convention (a rank column for every row, or no rank column at all) and use it consistently for the whole table, or the columns will visibly misalign for a reader.
+When presenting more than one row of parallel data (a ranked list, several records, a comparison), do not hand-write a markdown pipe table. Instead, emit a fenced code block labeled exactly "table" containing JSON shaped like {"columns": ["Rank", "Investor", "Total Invested"], "rows": [{"Rank": "1", "Investor": "3DXB LLC", "Total Invested": "$3,200,000"}, {"Rank": "2", "Investor": "Nathani Family Investments, LLC", "Total Invested": "$1,800,000"}]} — every row object must use the exact same column-header strings as its keys, and every row must include a value for every column (use "" if something genuinely doesn't apply, e.g. no rank medal for a row). This is rendered into a real table automatically. Naming each row's values by column, rather than writing them positionally, is what prevents a column silently drifting out of alignment partway down a long table (e.g. folding a rank medal into the name cell for the top 3 rows, then switching to a separate bare rank cell for the rest).
 `.trim();
 
 // Short domain context for the tool-free follow-up-suggestion call (see
@@ -305,23 +305,30 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
       const p = withPageDefaults(input as Record<string, unknown>);
       return backendGet(applicationsPath(p), token);
     },
-    // Links to the investor's own statement page (all their applications/redemptions/
-    // dividends combined) rather than this one application record -- an admin clicking an
-    // investor's name from a cohort/ranking answer (e.g. "largest share of capital
-    // raised") wants that investor's full position, not one of possibly several
-    // applications they hold. Uses userId (present on every application record), which is
-    // what app/investor-statements/page.tsx is keyed by.
-    extractCitations: (result) =>
-      citationsFromRecords(
-        (result as { items?: unknown[] })?.items,
-        "investor",
-        (item) => (typeof item.userId === "number" ? item.userId : undefined),
-        (id) => `/investor-statements?userId=${id}`,
-        (r) =>
-          (r.investorName as string) ||
-          `${(r.userFirstName as string) ?? ""} ${(r.userLastName as string) ?? ""}`.trim() ||
-          undefined,
-      ),
+    // Two separate citations per row, on purpose: an investor's NAME should link to their
+    // full statement page (all applications/redemptions/dividends combined) since one
+    // investor can hold several applications, but the specific APPLICATION ID they came
+    // from is still often what an admin wants to open directly (e.g. "which applications
+    // are pending review" -- one row per application, not a rollup). No overlap risk: the
+    // id-only citation below has no label, so it only ever matches a bare numeric App ID
+    // cell (idFromCellText), never the name text findLabelMatches scans for.
+    extractCitations: (result) => {
+      const items = (result as { items?: unknown[] })?.items;
+      const investorLabelFor = (r: Record<string, unknown>) =>
+        (r.investorName as string) ||
+        `${(r.userFirstName as string) ?? ""} ${(r.userLastName as string) ?? ""}`.trim() ||
+        undefined;
+      return [
+        ...citationsFromRecords(items, "application", byIdField, (id) => `/applications/${id}`, () => undefined),
+        ...citationsFromRecords(
+          items,
+          "investor",
+          (item) => (typeof item.userId === "number" ? item.userId : undefined),
+          (id) => `/investor-statements?userId=${id}`,
+          investorLabelFor,
+        ),
+      ];
+    },
   },
   {
     definition: {

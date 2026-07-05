@@ -116,7 +116,11 @@ export async function runCopilotAgent(params: {
       console.log(
         `[executive-copilot] answered in ${iteration + 1} call(s) — input:${usageTotals.input} output:${usageTotals.output} cacheRead:${usageTotals.cacheRead} cacheWrite:${usageTotals.cacheWrite} tools:[${[...toolsUsed].join(",")}]`,
       );
-      return { answer: response.text, sources: [...toolsUsed], citations: [...citationsByHref.values()] };
+      return {
+        answer: normalizeMarkdownTables(renderStructuredTables(response.text)),
+        sources: [...toolsUsed],
+        citations: [...citationsByHref.values()],
+      };
     }
 
     turns.push({ kind: "assistantToolCalls", calls: response.toolCalls, providerData: response.providerData });
@@ -216,4 +220,120 @@ Suggest exactly 3 short, natural follow-up questions this admin might reasonably
     console.error("[executive-copilot] follow-up suggestion call failed:", err);
     return [];
   }
+}
+
+interface StructuredTableSpec {
+  columns: string[];
+  rows: Array<Record<string, unknown>>;
+}
+
+// Matches a ```table fenced block containing JSON — the model's alternative to
+// hand-writing markdown pipe syntax for tabular data (see the prompt rule in
+// lib/executiveCopilot/tools.ts that asks for this format).
+const STRUCTURED_TABLE_BLOCK_PATTERN = /```table\s*\n([\s\S]*?)\n```/g;
+
+function escapeTableCell(value: unknown): string {
+  return String(value ?? "")
+    .replace(/\|/g, "\\|")
+    .replace(/\r?\n/g, " ")
+    .trim();
+}
+
+function renderTableRow(cells: string[]): string {
+  return `| ${cells.join(" | ")} |`;
+}
+
+function renderStructuredTable(spec: StructuredTableSpec): string {
+  const header = renderTableRow(spec.columns.map(escapeTableCell));
+  const divider = renderTableRow(spec.columns.map(() => "---"));
+  const body = spec.rows.map((row) => renderTableRow(spec.columns.map((col) => escapeTableCell(row[col]))));
+  return [header, divider, ...body].join("\n");
+}
+
+// Converts the model's ```table JSON blocks into real markdown tables, keyed by the exact
+// column header string per row rather than positional array order. Named fields are the
+// actual fix for column drift (e.g. the model folding a rank into the name cell for the
+// top 3 rows, then giving the rest their own separate rank cell): every row must
+// explicitly say which value belongs to which named column, so there's no implicit,
+// easy-to-drift positional convention to maintain across many rows. A row missing a key
+// just renders an empty cell for that column -- the header's column count always wins.
+// Malformed JSON is left as the original fenced block (visible, reportable) rather than
+// silently dropped.
+export function renderStructuredTables(text: string): string {
+  return text.replace(STRUCTURED_TABLE_BLOCK_PATTERN, (match, jsonText: string) => {
+    try {
+      const parsed = JSON.parse(jsonText) as StructuredTableSpec;
+      if (!Array.isArray(parsed.columns) || !Array.isArray(parsed.rows)) return match;
+      return renderStructuredTable(parsed);
+    } catch {
+      return match;
+    }
+  });
+}
+
+// A markdown table row: a line starting and ending with "|" (allowing trailing
+// whitespace). The model's raw table markup is trusted for everything except cell count.
+const TABLE_ROW_PATTERN = /^\|(.*)\|\s*$/;
+// The GFM header/body divider row: cells made up only of dashes/colons (alignment
+// markers), e.g. "|---|---|" or "| :--- | ---: |".
+const TABLE_DIVIDER_PATTERN = /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+
+function splitTableRowCells(line: string): string[] {
+  const inner = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  // Split on unescaped pipes only, so a literal "\|" inside a cell's own text survives.
+  return inner.split(/(?<!\\)\|/).map((cell) => cell.trim());
+}
+
+function joinTableRowCells(cells: string[]): string {
+  return `| ${cells.join(" | ")} |`;
+}
+
+// Forces every markdown table in the model's answer to have exactly as many cells per
+// row as its header — deterministically, in code, regardless of what the model actually
+// produced. This is the real fix for column misalignment (e.g. the model giving early
+// rows a rank folded into the name cell, then switching to a separate bare-number rank
+// cell partway down a table): a prompt instruction can reduce how often that happens, but
+// only code running after generation can guarantee it never reaches the rendered UI.
+// Short rows are padded with empty cells; long rows are truncated — both silent, since
+// there's no way to know which of the model's cells was misplaced, only that the count
+// doesn't match. Skips content inside fenced code blocks, so a ``` block that happens to
+// contain "|" characters is never mistaken for a table.
+export function normalizeMarkdownTables(text: string): string {
+  const lines = text.split("\n");
+  const output: string[] = [];
+  let inFence = false;
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (/^\s*```/.test(line)) {
+      inFence = !inFence;
+      output.push(line);
+      i += 1;
+      continue;
+    }
+
+    const nextLine = lines[i + 1] ?? "";
+    const isTableStart = !inFence && TABLE_ROW_PATTERN.test(line) && TABLE_DIVIDER_PATTERN.test(nextLine.trim());
+
+    if (isTableStart) {
+      const headerCells = splitTableRowCells(line);
+      output.push(joinTableRowCells(headerCells));
+      output.push(nextLine);
+      i += 2;
+      while (i < lines.length && TABLE_ROW_PATTERN.test(lines[i])) {
+        const rowCells = splitTableRowCells(lines[i]);
+        const normalized = headerCells.map((_, idx) => rowCells[idx] ?? "");
+        output.push(joinTableRowCells(normalized));
+        i += 1;
+      }
+      continue;
+    }
+
+    output.push(line);
+    i += 1;
+  }
+
+  return output.join("\n");
 }

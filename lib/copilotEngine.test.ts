@@ -1,5 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
-import { runCopilotAgent, withTimeout, suggestFollowUps, parseFollowUps, type CopilotTool } from "./copilotEngine";
+import {
+  runCopilotAgent,
+  withTimeout,
+  suggestFollowUps,
+  parseFollowUps,
+  normalizeMarkdownTables,
+  renderStructuredTables,
+  type CopilotTool,
+} from "./copilotEngine";
 import type { CopilotProvider, ProviderResponse } from "./copilotProviders/types";
 
 function usage(overrides: Partial<ProviderResponse["usage"]> = {}): ProviderResponse["usage"] {
@@ -231,5 +239,143 @@ describe("suggestFollowUps", () => {
     const provider = makeProvider({ text: "Sure! Here are some ideas...", toolCalls: [], finished: true, usage: usage() });
     const result = await suggestFollowUps({ provider, systemPromptPrefix: "context", question: "q", answer: "a" });
     expect(result).toEqual([]);
+  });
+});
+
+function tableRows(text: string): string[][] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("|") && !/^\|?\s*:?-{2,}/.test(line)) // real rows only, no divider/blank/prose lines
+    .map((line) =>
+      line
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
+        .split("|")
+        .map((cell) => cell.trim()),
+    );
+}
+
+describe("normalizeMarkdownTables", () => {
+  it("leaves a well-formed table unchanged in content", () => {
+    const text = "| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |";
+    expect(tableRows(normalizeMarkdownTables(text))).toEqual([
+      ["A", "B"],
+      ["1", "2"],
+      ["3", "4"],
+    ]);
+  });
+
+  it("pads a row with too few cells", () => {
+    const text = "| A | B | C |\n|---|---|---|\n| 1 | 2 | 3 |\n| 4 | 5 |";
+    expect(tableRows(normalizeMarkdownTables(text))).toEqual([
+      ["A", "B", "C"],
+      ["1", "2", "3"],
+      ["4", "5", ""],
+    ]);
+  });
+
+  it("truncates a row with too many cells", () => {
+    // This is the exact shape of the originally reported bug: a 4-column header, and a
+    // row that has picked up a 5th leading cell (e.g. a rank number that should have been
+    // folded into the name cell like the earlier rows did).
+    const text =
+      "| Investor | Total Investment | Total Units | Applications |\n" +
+      "|---|---|---|---|\n" +
+      "| 🥇 3DXB LLC | $3,200,000 | 64 units | 3 applications |\n" +
+      "| 4 | Farzana Hirani | $1,450,000 | 29 units | 4 applications |";
+    const rows = tableRows(normalizeMarkdownTables(text));
+    expect(rows[0]).toEqual(["Investor", "Total Investment", "Total Units", "Applications"]);
+    expect(rows[1]).toEqual(["🥇 3DXB LLC", "$3,200,000", "64 units", "3 applications"]);
+    // Truncated to 4 cells -- still visually "wrong" (rank in the Investor column), but
+    // the count guarantee is a separate, narrower promise than semantic correctness (see
+    // renderStructuredTables for the actual fix to this exact failure mode).
+    expect(rows[2]).toEqual(["4", "Farzana Hirani", "$1,450,000", "29 units"]);
+  });
+
+  it("does not treat pipe characters inside a fenced code block as a table", () => {
+    const text = "```\n| this | looks | like | a | table |\n|---|---|\n```";
+    expect(normalizeMarkdownTables(text)).toBe(text);
+  });
+
+  it("leaves non-table text unchanged", () => {
+    const text = "Just a plain paragraph with no tables at all.";
+    expect(normalizeMarkdownTables(text)).toBe(text);
+  });
+
+  it("normalizes multiple independent tables in one answer", () => {
+    const text =
+      "| A | B |\n|---|---|\n| 1 | 2 | 3 |\n\nSome prose in between.\n\n| X |\n|---|\n| y | z |";
+    const [first, second] = normalizeMarkdownTables(text).split("Some prose in between.");
+    expect(tableRows(first)).toEqual([
+      ["A", "B"],
+      ["1", "2"], // truncated from 3 cells
+    ]);
+    expect(tableRows(second)).toEqual([["X"], ["y"]]); // truncated from 2 cells
+  });
+});
+
+describe("renderStructuredTables", () => {
+  it("converts a ```table JSON block into a real markdown table", () => {
+    const text =
+      '```table\n{"columns": ["Rank", "Investor"], "rows": [{"Rank": "1", "Investor": "Alice"}, {"Rank": "2", "Investor": "Bob"}]}\n```';
+    expect(tableRows(renderStructuredTables(text))).toEqual([
+      ["Rank", "Investor"],
+      ["1", "Alice"],
+      ["2", "Bob"],
+    ]);
+  });
+
+  it("fixes the exact reported bug: rank stays in its own column even when its value style changes per row", () => {
+    // Top 3 rows use a medal emoji for Rank, the rest use a plain number -- because every
+    // row is keyed by the named "Rank"/"Investor" columns rather than written
+    // positionally, the values can never drift into the wrong column.
+    const text =
+      '```table\n{"columns": ["Rank", "Investor", "Total Invested"], "rows": [' +
+      '{"Rank": "🥇", "Investor": "3DXB LLC", "Total Invested": "$3,200,000"},' +
+      '{"Rank": "🥈", "Investor": "Nathani Family Investments, LLC", "Total Invested": "$1,800,000"},' +
+      '{"Rank": "4", "Investor": "Farzana Hirani", "Total Invested": "$1,450,000"}' +
+      "]}\n```";
+    const rows = tableRows(renderStructuredTables(text));
+    expect(rows[0]).toEqual(["Rank", "Investor", "Total Invested"]);
+    expect(rows[3]).toEqual(["4", "Farzana Hirani", "$1,450,000"]); // Investor still in the Investor column
+  });
+
+  it("renders an empty cell for a row missing one of the declared columns, without shifting the rest", () => {
+    const text = '```table\n{"columns": ["A", "B", "C"], "rows": [{"A": "1", "C": "3"}]}\n```';
+    expect(tableRows(renderStructuredTables(text))).toEqual([
+      ["A", "B", "C"],
+      ["1", "", "3"],
+    ]);
+  });
+
+  it("escapes pipe characters and newlines inside cell values", () => {
+    const text = '```table\n{"columns": ["Name"], "rows": [{"Name": "A | B\\nC"}]}\n```';
+    expect(renderStructuredTables(text)).toContain("A \\| B C");
+  });
+
+  it("leaves the original fenced block untouched if the JSON is malformed", () => {
+    const text = "```table\nnot valid json\n```";
+    expect(renderStructuredTables(text)).toBe(text);
+  });
+
+  it("leaves the original fenced block untouched if columns or rows aren't arrays", () => {
+    const text = '```table\n{"columns": "not an array", "rows": []}\n```';
+    expect(renderStructuredTables(text)).toBe(text);
+  });
+
+  it("converts multiple ```table blocks in one answer", () => {
+    const text =
+      '```table\n{"columns": ["A"], "rows": [{"A": "1"}]}\n```\n\nSome prose.\n\n' +
+      '```table\n{"columns": ["B"], "rows": [{"B": "2"}]}\n```';
+    const result = renderStructuredTables(text);
+    expect(result).not.toContain("```table");
+    expect(tableRows(result.split("Some prose.")[0])).toEqual([["A"], ["1"]]);
+    expect(tableRows(result.split("Some prose.")[1])).toEqual([["B"], ["2"]]);
+  });
+
+  it("leaves text with no ```table block unchanged", () => {
+    const text = "Just a plain answer with no tables.";
+    expect(renderStructuredTables(text)).toBe(text);
   });
 });
