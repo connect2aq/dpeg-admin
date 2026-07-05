@@ -503,7 +503,7 @@ function InvestorStatementsContent() {
                           </td>
                           <td style={{ padding: "9px 14px", fontSize: 12 }}>
                             {e.applicationId ? (
-                              <Link href={`/applications/${e.applicationId}`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--forest)", textDecoration: "underline", fontWeight: 600 }}>
+                              <Link href={`/applications/${e.applicationId}`} style={{ color: "var(--forest)", textDecoration: "underline", fontWeight: 600 }}>
                                 #{e.applicationId}
                               </Link>
                             ) : <span style={{ color: "var(--muted)" }}>—</span>}
