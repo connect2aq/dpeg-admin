@@ -456,17 +456,30 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
         stripSensitiveFieldsFromItems(result, DISTRIBUTION_BANK_DETAIL_FIELDS),
       );
     },
-    // Distributions have no detail page of their own in the admin app (no
-    // app/distributions/[id] route) -- link back to the investor's application instead,
-    // which is where distribution history is actually reviewed from.
-    extractCitations: (result) =>
-      citationsFromRecords(
-        (result as { items?: unknown[] })?.items,
-        "application",
-        (item) => (typeof item.applicationId === "number" ? item.applicationId : undefined),
-        (id) => `/applications/${id}`,
-        (r) => r.investorName as string,
-      ),
+    // Same dual-citation split as list_applications, and for the same reason: a
+    // distribution's investor NAME should open that investor's full statement page (where
+    // distribution history actually lives), while the App ID column still opens the
+    // specific application it was paid against. No overlap risk: the id-only citation has
+    // no label, so it only matches a bare App ID cell (idFromCellText), never the name text.
+    extractCitations: (result) => {
+      const items = (result as { items?: unknown[] })?.items;
+      return [
+        ...citationsFromRecords(
+          items,
+          "application",
+          (item) => (typeof item.applicationId === "number" ? item.applicationId : undefined),
+          (id) => `/applications/${id}`,
+          () => undefined,
+        ),
+        ...citationsFromRecords(
+          items,
+          "investor",
+          (item) => (typeof item.userId === "number" ? item.userId : undefined),
+          (id) => `/investor-statements?userId=${id}`,
+          (r) => r.investorName as string,
+        ),
+      ];
+    },
   },
   {
     definition: {

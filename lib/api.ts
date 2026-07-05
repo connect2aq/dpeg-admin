@@ -804,6 +804,7 @@ export interface DailyBalanceLog {
 export interface DistributionListItem {
   id: number;
   applicationId: number;
+  userId: number;
   investorName: string;
   investorEmail?: string;
   distributionMonth: string;
