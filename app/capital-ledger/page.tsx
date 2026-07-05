@@ -250,10 +250,22 @@ function CapitalLedgerContent() {
                         ) : <span style={{ color: '#cbd5e1', fontSize: 12 }}>—</span>}
                       </td>
                       <td style={{ padding: '11px 16px' }}>
-                        <div style={{ fontWeight: 600, color: '#1e293b' }}>{e.investorName || '—'}</div>
+                        {e.accountUserId ? (
+                          <Link href={`/investor-statements?userId=${e.accountUserId}`} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 600, color: '#1e293b', textDecoration: 'underline' }}>
+                            {e.investorName || '—'}
+                          </Link>
+                        ) : (
+                          <div style={{ fontWeight: 600, color: '#1e293b' }}>{e.investorName || '—'}</div>
+                        )}
                       </td>
                       <td style={{ padding: '11px 16px' }}>
-                        <div style={{ fontWeight: 600, color: '#1e293b' }}>{e.accountUserName || '—'}</div>
+                        {e.accountUserId ? (
+                          <Link href={`/investor-statements?userId=${e.accountUserId}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', fontWeight: 600, color: '#1e293b', textDecoration: 'underline' }}>
+                            {e.accountUserName || '—'}
+                          </Link>
+                        ) : (
+                          <div style={{ fontWeight: 600, color: '#1e293b' }}>{e.accountUserName || '—'}</div>
+                        )}
                         <div style={{ fontSize: 11, color: '#94a3b8' }}>{e.accountUserEmail}</div>
                       </td>
                       <td style={{ padding: '11px 16px', textAlign: 'right', color: '#374151' }}>
