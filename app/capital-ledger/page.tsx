@@ -250,13 +250,7 @@ function CapitalLedgerContent() {
                         ) : <span style={{ color: '#cbd5e1', fontSize: 12 }}>—</span>}
                       </td>
                       <td style={{ padding: '11px 16px' }}>
-                        {e.accountUserId ? (
-                          <Link href={`/investor-statements?userId=${e.accountUserId}`} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 600, color: '#1e293b', textDecoration: 'underline' }}>
-                            {e.investorName || '—'}
-                          </Link>
-                        ) : (
-                          <div style={{ fontWeight: 600, color: '#1e293b' }}>{e.investorName || '—'}</div>
-                        )}
+                        <div style={{ fontWeight: 600, color: '#1e293b' }}>{e.investorName || '—'}</div>
                       </td>
                       <td style={{ padding: '11px 16px' }}>
                         {e.accountUserId ? (
