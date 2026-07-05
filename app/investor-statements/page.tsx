@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import AdminLayout from "@/components/AdminLayout";
 import { adminApi, type UserListItem, type InvestorCapitalAccount, type InvestorCapitalAccountEntry } from "@/lib/api";
 
@@ -124,8 +125,25 @@ function exportPDF(data: InvestorCapitalAccount, investorName: string, ytdIncome
 }
 
 export default function InvestorStatementsPage() {
+  return (
+    <Suspense fallback={<AdminLayout><div style={{ padding: 32, color: "var(--muted)" }}>Loading...</div></AdminLayout>}>
+      <InvestorStatementsContent />
+    </Suspense>
+  );
+}
+
+function InvestorStatementsContent() {
+  const searchParams = useSearchParams();
   const [investors, setInvestors] = useState<UserListItem[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  // Deep-link support (e.g. from the Executive Copilot's investor citations): reading the
+  // URL directly into the initial state, same pattern already used by
+  // app/applications/page.tsx, rather than an effect -- the investorStatement fetch
+  // effect below only needs the id itself, not the investors list to have loaded first.
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(() => {
+    const raw = searchParams.get("userId");
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed) ? parsed : null;
+  });
   const [inputValue, setInputValue] = useState("");
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<InvestorCapitalAccount | null>(null);
@@ -213,7 +231,7 @@ export default function InvestorStatementsPage() {
             <input
               type="text"
               placeholder={investorsLoading ? "Loading investors…" : "Type name or email to search…"}
-              value={inputValue}
+              value={inputValue || investorName}
               disabled={investorsLoading}
               onChange={e => { setInputValue(e.target.value); setOpen(true); if (selectedUserId) clearSelection(); }}
               onFocus={() => { if (!selectedUserId && inputValue) setOpen(true); }}

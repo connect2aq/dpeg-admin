@@ -303,12 +303,18 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
       const p = withPageDefaults(input as Record<string, unknown>);
       return backendGet(applicationsPath(p), token);
     },
+    // Links to the investor's own statement page (all their applications/redemptions/
+    // dividends combined) rather than this one application record -- an admin clicking an
+    // investor's name from a cohort/ranking answer (e.g. "largest share of capital
+    // raised") wants that investor's full position, not one of possibly several
+    // applications they hold. Uses userId (present on every application record), which is
+    // what app/investor-statements/page.tsx is keyed by.
     extractCitations: (result) =>
       citationsFromRecords(
         (result as { items?: unknown[] })?.items,
-        "application",
-        byIdField,
-        (id) => `/applications/${id}`,
+        "investor",
+        (item) => (typeof item.userId === "number" ? item.userId : undefined),
+        (id) => `/investor-statements?userId=${id}`,
         (r) =>
           (r.investorName as string) ||
           `${(r.userFirstName as string) ?? ""} ${(r.userLastName as string) ?? ""}`.trim() ||
