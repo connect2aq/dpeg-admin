@@ -254,7 +254,7 @@ function CapitalLedgerContent() {
                       </td>
                       <td style={{ padding: '11px 16px' }}>
                         {e.accountUserId ? (
-                          <Link href={`/investor-statements?userId=${e.accountUserId}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', fontWeight: 600, color: '#1e293b', textDecoration: 'underline' }}>
+                          <Link href={`/investor-statements?userId=${e.accountUserId}`} style={{ display: 'inline-block', fontWeight: 600, color: '#1e293b', textDecoration: 'underline' }}>
                             {e.accountUserName || '—'}
                           </Link>
                         ) : (
