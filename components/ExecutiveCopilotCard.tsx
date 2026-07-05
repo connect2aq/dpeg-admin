@@ -630,6 +630,9 @@ export default function ExecutiveCopilotCard() {
         </button>
       </div>
       {voiceError && <div style={{ fontSize: 12, color: "#b91c1c", marginTop: 6 }}>{voiceError}</div>}
+      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6 }}>
+        AI can make mistakes. Please verify important figures before relying on them.
+      </div>
 
       <ExecutiveCopilotMemoryPanel />
     </div>
