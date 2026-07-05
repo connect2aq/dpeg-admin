@@ -7,8 +7,13 @@ function citation(id: number, label: string, href = `/applications/${id}`): Copi
 }
 
 describe("idFromCellText", () => {
-  it("matches a bare number", () => {
-    expect(idFromCellText("36")).toBe(36);
+  it("does NOT match a bare, unmarked number", () => {
+    // Regression guard for a real reported bug: a table cell showing "56" as a plain
+    // count ("Number of distributions: 56") linked to an unrelated application #56,
+    // because a bare number used to be treated as a valid id reference. A count/quantity
+    // is indistinguishable from a real id by digits alone, so bare numbers must never match.
+    expect(idFromCellText("56")).toBeNull();
+    expect(idFromCellText("36")).toBeNull();
   });
 
   it("matches with a recognized prefix word", () => {
@@ -16,15 +21,19 @@ describe("idFromCellText", () => {
     expect(idFromCellText("Application #36")).toBe(36);
     expect(idFromCellText("Redemption 36")).toBe(36);
     expect(idFromCellText("User 36")).toBe(36);
+  });
+
+  it("matches a leading # with no word prefix", () => {
     expect(idFromCellText("#36")).toBe(36);
   });
 
   it("does not match a cell that isn't purely an ID reference", () => {
-    // Regression guard: a loose match here would risk linking a dollar figure or date
-    // instead of a real record ID.
+    // Regression guard: a loose match here would risk linking a dollar figure, a plain
+    // count, or a date instead of a real record ID.
     expect(idFromCellText("$50,000")).toBeNull();
     expect(idFromCellText("36 investors")).toBeNull();
     expect(idFromCellText("Akash Patel")).toBeNull();
+    expect(idFromCellText("56 distributions")).toBeNull();
     expect(idFromCellText("")).toBeNull();
   });
 });

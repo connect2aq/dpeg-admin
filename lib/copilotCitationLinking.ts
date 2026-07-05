@@ -3,12 +3,22 @@
 // Reusable by any future copilot's markdown renderer, same as lib/copilotEngine.ts.
 import type { CopilotCitation } from "./copilotEngine";
 
-// Only matches a cell whose ENTIRE trimmed text is an ID reference (optionally prefixed
-// with a word like "ID"/"Redemption"/"#") — deliberately strict. A loose substring match
-// against bare numbers would risk linking a dollar amount or date instead of a record ID.
+// Only matches a cell whose ENTIRE trimmed text is an ID reference, and ONLY when it
+// carries an explicit marker (a recognized word like "ID"/"Redemption"/"Application"/
+// "User", or a leading "#") — a bare, unqualified number is NEVER treated as an ID
+// reference, no matter how it's formatted. This is deliberate: a table can easily contain
+// an unrelated bare number in the same shape as a real id (a count, a quantity, "56
+// distributions this month") that happens to numerically collide with some other
+// record's real id elsewhere in the same answer's citations — matching it would silently
+// link to the wrong record. Requiring an explicit marker is what tells apart "this cell
+// IS an id" from "this cell just happens to contain a number."
 export function idFromCellText(text: string): number | null {
-  const stripped = text.replace(/^(id|redemption|application|user)\s*#?\s*/i, "").replace(/^#/, "").trim();
-  return /^\d+$/.test(stripped) ? parseInt(stripped, 10) : null;
+  const trimmed = text.trim();
+  const wordPrefixed = trimmed.match(/^(?:id|redemption|application|user)\s*#?\s*(\d+)$/i);
+  if (wordPrefixed) return parseInt(wordPrefixed[1], 10);
+  const hashPrefixed = trimmed.match(/^#(\d+)$/);
+  if (hashPrefixed) return parseInt(hashPrefixed[1], 10);
+  return null;
 }
 
 export interface LabelMatch {
