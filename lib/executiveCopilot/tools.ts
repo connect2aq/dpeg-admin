@@ -149,6 +149,8 @@ Available tools and what they cover:
 Use list/get tools to narrow before fetching details on a large set. If a question needs data no tool here provides (e.g. something not in this list), say so rather than guessing.
 
 Formatting rule for tables: when a table lists individual applications, redemptions, investors, or other records the admin might want to open, give each record its own row and its own cell containing that record's name — never combine multiple records' names into one comma-separated cell (e.g. one date or one status having several applications), and never collapse repeat entries into a "(x2)"-style count. One row per record is what lets the UI turn each one into a clickable link back to that record.
+
+Every row in a table must have exactly the same number of cells as the header, with each column meaning the same thing in every row. Do not switch conventions partway down a table — e.g. giving the top 3 rows a rank/medal (🥇🥈🥉) folded into the first cell, then giving the remaining rows a separate bare "4", "5", "6" rank cell of their own. Pick one convention (a rank column for every row, or no rank column at all) and use it consistently for the whole table, or the columns will visibly misalign for a reader.
 `.trim();
 
 // Short domain context for the tool-free follow-up-suggestion call (see
