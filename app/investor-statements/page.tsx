@@ -216,7 +216,7 @@ function InvestorStatementsContent() {
 
   return (
     <AdminLayout>
-      <div style={{ padding: "28px 32px", maxWidth: 1100 }}>
+      <div style={{ padding: "28px 32px", maxWidth: 1500 }}>
         {/* Header */}
         <div style={{ marginBottom: 24 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--forest)", margin: 0 }}>
@@ -387,12 +387,11 @@ function InvestorStatementsContent() {
                               </span>
                             ) : <span style={{ color: "var(--muted)", fontSize: 12 }}>—</span>}
                           </td>
-                          <td style={{ padding: "9px 14px", fontWeight: 600, color: "var(--text-primary)" }}>
+                          <td style={{ padding: "9px 14px", fontWeight: 600, color: "var(--text-primary)", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={e.investorName || undefined}>
                             {e.investorName || "—"}
                           </td>
-                          <td style={{ padding: "9px 14px" }}>
-                            <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{e.accountUserName || "—"}</div>
-                            {e.accountUserEmail && <div style={{ fontSize: 11, color: "var(--muted)" }}>{e.accountUserEmail}</div>}
+                          <td style={{ padding: "9px 14px", fontWeight: 600, color: "var(--text-primary)", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={e.accountUserName || undefined}>
+                            {e.accountUserName || "—"}
                           </td>
                           <td style={{ padding: "9px 14px", color: "var(--muted)", fontSize: 12 }}>
                             {e.applicationId ? `#${e.applicationId}` : "—"}
