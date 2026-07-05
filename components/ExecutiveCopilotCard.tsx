@@ -109,6 +109,10 @@ export default function ExecutiveCopilotCard() {
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnsContainerRef = useRef<HTMLDivElement | null>(null);
+  // Question bubble DOM nodes, keyed by turn index -- scrolled to at the START of each
+  // new question (see the auto-scroll effect below), not the container's bottom, so the
+  // question stays visible instead of being pushed off the top by a long answer.
+  const questionNodesRef = useRef<Map<number, HTMLDivElement>>(new Map());
   // Rendered answer DOM nodes, keyed by turn index -- read at copy time so the clipboard
   // gets the actual formatted HTML (tables, bold, links) rather than raw markdown syntax,
   // which pastes as literal "**text**"/"| a | b |" into Word, Google Docs, etc.
@@ -269,16 +273,20 @@ export default function ExecutiveCopilotCard() {
     return () => clearInterval(interval);
   }, [isLoading]);
 
-  // Scrolls to the newest turn only when a NEW question is submitted (turns.length
-  // growing) — otherwise clicking a sample/follow-up question appends it below the fold
-  // of the scrollable list, so the admin has to manually scroll down just to confirm it
-  // was submitted. Deliberately does NOT depend on the full `turns` array — re-scrolling
-  // to the bottom every time the answer/follow-ups arrive would yank the view away from
-  // the start of a long answer the admin is already reading. This is a plain DOM scroll,
-  // not a setState call, so it's unrelated to the set-state-in-effect rule other effects
-  // here have to work around.
+  // Scrolls the newest question to the TOP of the scrollable area (not the container's
+  // bottom) when a NEW question is submitted (turns.length growing). Scrolling to the
+  // bottom instead would bury the question above the visible area the moment a long
+  // answer renders under it, and there'd be no way to tell an answer had already arrived.
+  // Only depends on turns.length, not the full `turns` array, so this fires once per
+  // question and then stops -- it does NOT re-fire as the answer/follow-ups render in
+  // afterward, which would otherwise keep yanking the view around. The scroll itself is
+  // smooth (an animated glide, not an instant jump), and settles once the question
+  // reaches the top edge. This is a plain DOM scroll, not a setState call, so it's
+  // unrelated to the set-state-in-effect rule other effects here have to work around.
   useEffect(() => {
-    turnsContainerRef.current?.scrollTo({ top: turnsContainerRef.current.scrollHeight, behavior: "smooth" });
+    const latestIndex = turns.length - 1;
+    if (latestIndex < 0) return;
+    questionNodesRef.current.get(latestIndex)?.scrollIntoView({ block: "start", behavior: "smooth" });
   }, [turns.length]);
 
   const ask = async (questionOverride?: string) => {
@@ -470,7 +478,13 @@ export default function ExecutiveCopilotCard() {
         >
           {turns.map((t, i) => (
             <div key={i}>
-              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <div
+                ref={(el) => {
+                  if (el) questionNodesRef.current.set(i, el);
+                  else questionNodesRef.current.delete(i);
+                }}
+                style={{ display: "flex", justifyContent: "flex-end" }}
+              >
                 <div
                   style={{
                     fontWeight: 600,
