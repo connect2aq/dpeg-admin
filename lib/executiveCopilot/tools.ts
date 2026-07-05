@@ -22,10 +22,16 @@ import {
 
 const BASE = process.env.NEXT_PUBLIC_API_URL;
 const MAX_REDEMPTION_DETAIL_IDS = 20;
-// Kept small deliberately: every extra record here is more JSON the model has to read
-// and reason over before it can answer, which is the dominant cost in a multi-tool-call
-// turn. The model can always ask again with a larger pageSize if it genuinely needs more.
-const DEFAULT_PAGE_SIZE = 20;
+// This used to be 20 -- the admin portal UI's own page size -- which silently truncated
+// analytical answers: a real reported bug asked "which distributions are unpaid", got
+// back page 1 (20 of ~114 records for the month, all coincidentally Paid), and concluded
+// "none are unpaid" without ever looking at the other 5 pages where the actual unpaid
+// ones were. A UI pagination default has nothing to do with what the model needs to see
+// to answer completely, so this is now large enough to capture a full month/dataset for
+// this fund's current size in one call for most tools. This is a mitigation, not a
+// guarantee for a much larger fund later -- see the "check totalPages" rule in
+// EXECUTIVE_COPILOT_SYSTEM_PROMPT_PREFIX, which is the actual backstop.
+const DEFAULT_PAGE_SIZE = 150;
 const BACKEND_FETCH_TIMEOUT_MS = 15_000; // bounds a single hung backend call
 const CAPITAL_LEDGER_DEFAULT_WINDOW_DAYS = 90; // see get_capital_ledger below -- this endpoint has no pagination
 
@@ -148,6 +154,8 @@ Available tools and what they cover:
 
 Use list/get tools to narrow before fetching details on a large set. If a question needs data no tool here provides (e.g. something not in this list), say so rather than guessing.
 
+Pagination rule — every list_* tool result includes totalCount, page, pageSize, and totalPages. Before stating or implying a complete/exhaustive answer ("all X are paid", "there are no unpaid Y", "here are all N records", any count or "none of them..." claim), check totalPages. If totalPages is more than 1, you have NOT seen the whole dataset yet — you MUST either fetch the remaining pages (same filters, page incremented) or re-call with a larger pageSize, and only make the exhaustive claim once every page has actually been read. Never conclude an exhaustive claim from page 1 alone just because it happened to look consistent (e.g. every record on page 1 being Paid does NOT mean none elsewhere are unpaid).
+
 Formatting rule for tables: when a table lists individual applications, redemptions, investors, or other records the admin might want to open, give each record its own row and its own cell containing that record's name — never combine multiple records' names into one comma-separated cell (e.g. one date or one status having several applications), and never collapse repeat entries into a "(x2)"-style count. One row per record is what lets the UI turn each one into a clickable link back to that record. When a table lists application records specifically, include an "App ID" column with the id written as "#42" (a leading # followed by the number, nothing else in that cell) — this is what lets the UI link that specific application, separately from the investor name linking to that investor's overall statement. Never write a bare, unmarked number like "42" alone in a cell for this purpose — the UI only treats "#42"-style (or "ID 42"-style) references as a linkable id; an unmarked number is assumed to be a plain count or quantity, not a record reference.
 
 When presenting more than one row of parallel data (a ranked list, several records, a comparison), do not hand-write a markdown pipe table. Instead, emit a fenced code block labeled exactly "table" containing JSON shaped like {"columns": ["Rank", "Investor", "Total Invested"], "rows": [{"Rank": "1", "Investor": "3DXB LLC", "Total Invested": "$3,200,000"}, {"Rank": "2", "Investor": "Nathani Family Investments, LLC", "Total Invested": "$1,800,000"}]} — every row object must use the exact same column-header strings as its keys, and every row must include a value for every column (use "" if something genuinely doesn't apply, e.g. no rank medal for a row). This is rendered into a real table automatically. Naming each row's values by column, rather than writing them positionally, is what prevents a column silently drifting out of alignment partway down a long table (e.g. folding a rank medal into the name cell for the top 3 rows, then switching to a separate bare rank cell for the rest).
@@ -192,12 +200,11 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
     definition: {
       name: "list_redemptions",
       description:
-        "List redemption records, optionally filtered by status ('UnderReview'|'Active'|'Rejected'|'Redeemed') and investor type. Does NOT include DocuSign signature status — use get_redemption_details for that. Call this for questions about redemptions due, pending, or by status.",
+        "List redemption records, optionally filtered by status ('UnderReview'|'Active'|'Rejected'|'Redeemed'). Does NOT include DocuSign signature status — use get_redemption_details for that. Call this for questions about redemptions due, pending, or by status. There is no server-side filter for investor type -- each returned record has its own investorType field, so filter for that yourself after fetching, not via a request parameter.",
       input_schema: {
         type: "object",
         properties: {
           status: { type: "string", description: "UnderReview | Active | Rejected | Redeemed" },
-          investorType: { type: "string" },
           page: { type: "number" },
           pageSize: { type: "number" },
         },
@@ -289,13 +296,12 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
     definition: {
       name: "list_applications",
       description:
-        "List investment application records, optionally filtered by status ('UnderReview'|'Active'|'Rejected'|'Inactive') and investor type. Call this for questions about applications awaiting review, active investments, or investor cohorts.",
+        "List investment application records, optionally filtered by status ('UnderReview'|'Active'|'Rejected'|'Inactive') and investorType. Call this for questions about applications awaiting review, active investments, or investor cohorts. There is no server-side filter for investment type (ShortTerm/LongTerm) -- each returned record has its own investmentType field, so filter for that yourself after fetching, not via a request parameter.",
       input_schema: {
         type: "object",
         properties: {
           status: { type: "string" },
           investorType: { type: "string" },
-          investmentType: { type: "string" },
           page: { type: "number" },
           pageSize: { type: "number" },
         },
@@ -432,12 +438,13 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
     definition: {
       name: "list_distributions",
       description:
-        "List monthly distribution records, optionally filtered by paymentStatus and distributionMonth. Call this for questions about distributions paid, unpaid, or upcoming.",
+        "List monthly distribution records, optionally filtered by status ('Pending'|'Sent'|'Failed'|'Paid'), month (1-12), and year. Call this for questions about distributions paid, unpaid, or upcoming. To reliably find unpaid ones, pass status='Pending' rather than fetching everything and scanning -- it's a real backend filter, not a client-side guess.",
       input_schema: {
         type: "object",
         properties: {
-          paymentStatus: { type: "string" },
-          distributionMonth: { type: "string" },
+          status: { type: "string", description: "Pending | Sent | Failed | Paid" },
+          month: { type: "number", description: "1-12" },
+          year: { type: "number" },
           page: { type: "number" },
           pageSize: { type: "number" },
         },
