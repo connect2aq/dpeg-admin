@@ -364,6 +364,34 @@ describe("renderStructuredTables", () => {
     expect(renderStructuredTables(text)).toBe(text);
   });
 
+  it("recovers the valid rows and drops just the one with a syntax error, instead of discarding the whole table", () => {
+    // Regression guard for a real reported bug: the model dropped a key partway through
+    // one row ({"Rank":"5",...,"% of Fund":"7.3%","✅ Easily"} -- a bare value with no
+    // key before it), which made the whole JSON blob fail to parse and fall back to
+    // showing raw, unrendered JSON to the user. The other 9 rows were perfectly valid.
+    const text =
+      '```table\n{"columns":["Rank","Investor","% of Fund"],"rows":[\n' +
+      '{"Rank":"1","Investor":"3DXB LLC","% of Fund":"16.8%"},\n' +
+      '{"Rank":"2","Investor":"Nathani Family Investments, LLC","% of Fund":"9.4%"},\n' +
+      '{"Rank":"5","Investor":"Lirani Investments LLC","% of Fund":"7.3%","✅ Easily"},\n' +
+      '{"Rank":"6","Investor":"Tayaba, LP","% of Fund":"5.2%"}\n' +
+      ']}\n```';
+    const rows = tableRows(renderStructuredTables(text));
+    expect(rows).toEqual([
+      ["Rank", "Investor", "% of Fund"],
+      ["1", "3DXB LLC", "16.8%"],
+      ["2", "Nathani Family Investments, LLC", "9.4%"],
+      // Row "5" (the malformed one) is dropped entirely, not shown with a blank cell --
+      // there's no way to know which column its stray value belonged to.
+      ["6", "Tayaba, LP", "5.2%"],
+    ]);
+  });
+
+  it("falls back to the original block if not even one row can be recovered", () => {
+    const text = '```table\nnot json at all, no columns or rows here\n```';
+    expect(renderStructuredTables(text)).toBe(text);
+  });
+
   it("converts multiple ```table blocks in one answer", () => {
     const text =
       '```table\n{"columns": ["A"], "rows": [{"A": "1"}]}\n```\n\nSome prose.\n\n' +

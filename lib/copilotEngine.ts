@@ -250,6 +250,55 @@ function renderStructuredTable(spec: StructuredTableSpec): string {
   return [header, divider, ...body].join("\n");
 }
 
+// Recovers what it can from a ```table block whose JSON doesn't parse as a whole --
+// e.g. one row is missing a key ({"A": "1", "3.7%", "✅ Easily"} instead of
+// {"A": "1", "B": "3.7%", "C": "✅ Easily"}), which is a real failure mode the model has
+// produced. A single bad row shouldn't sink the other nine that parsed fine: this pulls
+// the "columns" array out with a targeted regex, then walks the "rows" array tracking
+// brace depth to find each individual {...} object's exact boundaries and parses them one
+// at a time, silently dropping only the ones that fail rather than the whole table.
+function recoverPartialTable(jsonText: string): StructuredTableSpec | null {
+  const columnsMatch = jsonText.match(/"columns"\s*:\s*(\[[^\]]*\])/);
+  if (!columnsMatch) return null;
+  let columns: unknown;
+  try {
+    columns = JSON.parse(columnsMatch[1]);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(columns)) return null;
+
+  const rowsKeyIndex = jsonText.indexOf('"rows"');
+  const arrayStart = rowsKeyIndex === -1 ? -1 : jsonText.indexOf("[", rowsKeyIndex);
+  if (arrayStart === -1) return null;
+
+  const rows: Record<string, unknown>[] = [];
+  let depth = 0;
+  let objectStart = -1;
+  for (let i = arrayStart; i < jsonText.length; i++) {
+    const char = jsonText[i];
+    if (char === "{") {
+      if (depth === 0) objectStart = i;
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0 && objectStart !== -1) {
+        try {
+          const row = JSON.parse(jsonText.slice(objectStart, i + 1));
+          if (row && typeof row === "object" && !Array.isArray(row)) rows.push(row);
+        } catch {
+          // this one row didn't parse -- skip it, keep going with the rest
+        }
+        objectStart = -1;
+      }
+    } else if (char === "]" && depth === 0) {
+      break; // end of the rows array
+    }
+  }
+
+  return rows.length > 0 ? { columns, rows } : null;
+}
+
 // Converts the model's ```table JSON blocks into real markdown tables, keyed by the exact
 // column header string per row rather than positional array order. Named fields are the
 // actual fix for column drift (e.g. the model folding a rank into the name cell for the
@@ -257,8 +306,9 @@ function renderStructuredTable(spec: StructuredTableSpec): string {
 // explicitly say which value belongs to which named column, so there's no implicit,
 // easy-to-drift positional convention to maintain across many rows. A row missing a key
 // just renders an empty cell for that column -- the header's column count always wins.
-// Malformed JSON is left as the original fenced block (visible, reportable) rather than
-// silently dropped.
+// If the JSON doesn't parse as a whole, falls back to recovering whichever individual
+// rows DO parse (see recoverPartialTable) before giving up and leaving the original
+// fenced block untouched (visible, reportable) as a last resort.
 export function renderStructuredTables(text: string): string {
   return text.replace(STRUCTURED_TABLE_BLOCK_PATTERN, (match, jsonText: string) => {
     try {
@@ -266,7 +316,8 @@ export function renderStructuredTables(text: string): string {
       if (!Array.isArray(parsed.columns) || !Array.isArray(parsed.rows)) return match;
       return renderStructuredTable(parsed);
     } catch {
-      return match;
+      const recovered = recoverPartialTable(jsonText);
+      return recovered ? renderStructuredTable(recovered) : match;
     }
   });
 }

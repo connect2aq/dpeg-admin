@@ -279,14 +279,28 @@ export default function ExecutiveCopilotCard() {
   // answer renders under it, and there'd be no way to tell an answer had already arrived.
   // Only depends on turns.length, not the full `turns` array, so this fires once per
   // question and then stops -- it does NOT re-fire as the answer/follow-ups render in
-  // afterward, which would otherwise keep yanking the view around. The scroll itself is
-  // smooth (an animated glide, not an instant jump), and settles once the question
-  // reaches the top edge. This is a plain DOM scroll, not a setState call, so it's
+  // afterward, which would otherwise keep yanking the view around.
+  //
+  // Deliberately NOT using Element.scrollIntoView() here -- it walks up the DOM scrolling
+  // whichever ancestor(s) it decides are scrollable, which is ambiguous once the card
+  // itself sits on a normally-scrolling page: it can end up scrolling the wrong thing (or
+  // nothing) instead of this card's own small scrollable turns list. Measuring both
+  // elements with getBoundingClientRect() and scrolling turnsContainerRef directly is
+  // unambiguous -- there's only one element being told to scroll, and only one target
+  // offset. requestAnimationFrame ensures the new turn's layout has actually been painted
+  // before measuring it. This is a plain DOM read/scroll, not a setState call, so it's
   // unrelated to the set-state-in-effect rule other effects here have to work around.
   useEffect(() => {
     const latestIndex = turns.length - 1;
     if (latestIndex < 0) return;
-    questionNodesRef.current.get(latestIndex)?.scrollIntoView({ block: "start", behavior: "smooth" });
+    const raf = requestAnimationFrame(() => {
+      const container = turnsContainerRef.current;
+      const questionNode = questionNodesRef.current.get(latestIndex);
+      if (!container || !questionNode) return;
+      const delta = questionNode.getBoundingClientRect().top - container.getBoundingClientRect().top;
+      container.scrollTo({ top: container.scrollTop + delta, behavior: "smooth" });
+    });
+    return () => cancelAnimationFrame(raf);
   }, [turns.length]);
 
   const ask = async (questionOverride?: string) => {
