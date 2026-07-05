@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import AdminLayout from "@/components/AdminLayout";
 import { adminApi, type UserListItem, type InvestorCapitalAccount, type InvestorCapitalAccountEntry } from "@/lib/api";
 
@@ -47,7 +48,7 @@ function exportCSV(data: InvestorCapitalAccount, investorName: string) {
   URL.revokeObjectURL(url);
 }
 
-function exportPDF(data: InvestorCapitalAccount, investorName: string, ytdIncome: number, accrued: number) {
+function exportPDF(data: InvestorCapitalAccount, investorName: string, accrued: number) {
   const rows = data.entries.map(e => `
     <tr>
       <td>${new Date(e.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</td>
@@ -101,7 +102,7 @@ function exportPDF(data: InvestorCapitalAccount, investorName: string, ytdIncome
   <div class="cards">
     <div class="card"><label>Total Contributed</label><div class="val green">${fmt(data.totalContributions)}</div></div>
     <div class="card"><label>Capital Deployed</label><div class="val">${fmt(data.netPosition)}</div></div>
-    <div class="card"><label>Total Income</label><div class="val amber">${fmt(data.totalIncome)}</div><div class="sub">${fmt(ytdIncome)} YTD</div></div>
+    <div class="card"><label>Total Income</label><div class="val amber">${fmt(data.totalIncome)}</div></div>
     <div class="card"><label>Accrued (Unpaid)</label><div class="val amber">${fmt(accrued)}</div></div>
   </div>
   <table>
@@ -209,11 +210,6 @@ function InvestorStatementsContent() {
     e => !typeFilter || e.entryType === typeFilter,
   );
 
-  const currentYear = new Date().getFullYear();
-  const ytdIncome = (data?.entries ?? [])
-    .filter(e => new Date(e.date).getFullYear() === currentYear)
-    .reduce((s, e) => s + e.income, 0);
-
   return (
     <AdminLayout>
       <div style={{ padding: "28px 32px", maxWidth: 1500 }}>
@@ -314,13 +310,12 @@ function InvestorStatementsContent() {
               {[
                 { label: "Total Contributed", value: fmt(data.totalContributions), color: "#15803d" },
                 { label: "Capital Deployed",  value: fmt(data.netPosition),        color: "var(--forest)" },
-                { label: "Total Income",      value: fmt(data.totalIncome),        color: "#b45309", sub: `${fmt(ytdIncome)} YTD` },
+                { label: "Total Income",      value: fmt(data.totalIncome),        color: "#b45309" },
                 { label: "Accrued (Unpaid)",  value: fmt(accrued),                 color: "#b45309" },
               ].map(c => (
                 <div key={c.label} style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 16px", minWidth: 140 }}>
                   <p style={{ margin: 0, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)", marginBottom: 4 }}>{c.label}</p>
                   <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: c.color }}>{c.value}</p>
-                  {c.sub && <p style={{ margin: "2px 0 0", fontSize: 10, color: "var(--muted)" }}>{c.sub}</p>}
                 </div>
               ))}
             </div>
@@ -348,7 +343,7 @@ function InvestorStatementsContent() {
                   ↓ CSV
                 </button>
                 <button
-                  onClick={() => exportPDF(data, investorName, ytdIncome, accrued)}
+                  onClick={() => exportPDF(data, investorName, accrued)}
                   style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", fontSize: 12, border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", color: "var(--muted)", cursor: "pointer" }}
                 >
                   ↓ PDF
@@ -393,8 +388,12 @@ function InvestorStatementsContent() {
                           <td style={{ padding: "9px 14px", fontWeight: 600, color: "var(--text-primary)", maxWidth: 140, whiteSpace: "normal", wordBreak: "break-word" }}>
                             {e.accountUserName || "—"}
                           </td>
-                          <td style={{ padding: "9px 14px", color: "var(--muted)", fontSize: 12 }}>
-                            {e.applicationId ? `#${e.applicationId}` : "—"}
+                          <td style={{ padding: "9px 14px", fontSize: 12 }}>
+                            {e.applicationId ? (
+                              <Link href={`/applications/${e.applicationId}`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--forest)", textDecoration: "underline", fontWeight: 600 }}>
+                                #{e.applicationId}
+                              </Link>
+                            ) : <span style={{ color: "var(--muted)" }}>—</span>}
                           </td>
                           <td style={{ padding: "9px 14px", color: "var(--muted)", fontSize: 12 }}>
                             {e.ppmRefNo ? `#${e.ppmRefNo}` : "—"}
