@@ -23,11 +23,13 @@ function fmtInvType(t?: string) {
 }
 
 function exportCSV(data: InvestorCapitalAccount, investorName: string) {
-  const headers = ["Date", "Type", "Inv. Type", "App ID", "PPM Ref", "Units", "Capital", "Income", "Capital Balance"];
+  const headers = ["Date", "Type", "Inv. Type", "Investor", "Account User", "App ID", "PPM Ref", "Units", "Capital", "Income", "Capital Balance"];
   const rows = data.entries.map(e => [
     new Date(e.date).toLocaleDateString("en-US"),
     e.entryType,
     fmtInvType(e.investmentType),
+    e.investorName ?? "",
+    e.accountUserName ?? "",
     e.applicationId ? `#${e.applicationId}` : "",
     e.ppmRefNo ? `#${e.ppmRefNo}` : "",
     e.units ?? "",
@@ -51,6 +53,8 @@ function exportPDF(data: InvestorCapitalAccount, investorName: string, ytdIncome
       <td>${new Date(e.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</td>
       <td>${e.entryType}</td>
       <td>${fmtInvType(e.investmentType) || "—"}</td>
+      <td>${e.investorName || "—"}</td>
+      <td>${e.accountUserName || "—"}</td>
       <td>${e.applicationId ? "#" + e.applicationId : "—"}</td>
       <td>${e.ppmRefNo ? "#" + e.ppmRefNo : "—"}</td>
       <td class="r">${e.units ?? "—"}</td>
@@ -101,10 +105,10 @@ function exportPDF(data: InvestorCapitalAccount, investorName: string, ytdIncome
     <div class="card"><label>Accrued (Unpaid)</label><div class="val amber">${fmt(accrued)}</div></div>
   </div>
   <table>
-    <thead><tr><th>Date</th><th>Type</th><th>Inv. Type</th><th>App ID</th><th>PPM Ref</th><th class="r">Units</th><th class="r">Capital</th><th class="r">Income</th><th class="r">Capital Balance</th></tr></thead>
+    <thead><tr><th>Date</th><th>Type</th><th>Inv. Type</th><th>Investor</th><th>Account User</th><th>App ID</th><th>PPM Ref</th><th class="r">Units</th><th class="r">Capital</th><th class="r">Income</th><th class="r">Capital Balance</th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr>
-      <td colspan="6">${data.entries.length} entries</td>
+      <td colspan="8">${data.entries.length} entries</td>
       <td class="r">${fmtSigned(data.entries.reduce((s, e) => s + e.amount, 0))}</td>
       <td class="r amber">+${fmt(data.totalIncome)}</td>
       <td class="r">${fmt(data.netPosition)}</td>
@@ -181,7 +185,8 @@ function InvestorStatementsContent() {
   const suggestions = investors.filter(u => {
     if (!inputValue || selectedUserId) return false;
     const q = inputValue.toLowerCase();
-    return `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(q);
+    const haystack = `${u.firstName} ${u.lastName} ${u.email} ${u.investorNames.join(" ")}`;
+    return haystack.toLowerCase().includes(q);
   }).slice(0, 8);
 
   const selectedInvestor = investors.find(u => u.id === selectedUserId);
@@ -225,12 +230,12 @@ function InvestorStatementsContent() {
         {/* Investor combobox */}
         <div style={{ marginBottom: 28, maxWidth: 480, position: "relative" }}>
           <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
-            Search Investor
+            Search Account User or Investor
           </label>
           <div style={{ position: "relative" }}>
             <input
               type="text"
-              placeholder={investorsLoading ? "Loading investors…" : "Type name or email to search…"}
+              placeholder={investorsLoading ? "Loading investors…" : "Search Account User or Investor…"}
               value={inputValue || investorName}
               disabled={investorsLoading}
               onChange={e => { setInputValue(e.target.value); setOpen(true); if (selectedUserId) clearSelection(); }}
@@ -257,6 +262,13 @@ function InvestorStatementsContent() {
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{u.firstName} {u.lastName}</div>
                     <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 1 }}>{u.email}</div>
+                    {(() => {
+                      const accountName = `${u.firstName} ${u.lastName}`.trim().toLowerCase();
+                      const otherInvestorNames = u.investorNames.filter(n => n.trim().toLowerCase() !== accountName);
+                      return otherInvestorNames.length > 0 ? (
+                        <div style={{ fontSize: 11, color: "var(--forest)", marginTop: 1 }}>Investor: {otherInvestorNames.join(", ")}</div>
+                      ) : null;
+                    })()}
                   </div>
                   <span style={{ fontSize: 10, color: "var(--muted)", background: "var(--bg-section)", borderRadius: 4, padding: "2px 6px" }}>{u.status}</span>
                 </button>
@@ -350,8 +362,8 @@ function InvestorStatementsContent() {
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: "var(--bg-section)", borderBottom: "1px solid var(--border)" }}>
-                      {["Date", "Type", "Inv. Type", "App ID", "PPM Ref", "Units", "Capital", "Income", "Capital Balance"].map((h, i) => (
-                        <th key={h} style={{ padding: "10px 14px", textAlign: i >= 5 ? "right" : "left", fontWeight: 600, fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap" }}>{h}</th>
+                      {["Date", "Type", "Inv. Type", "Investor", "Account User", "App ID", "PPM Ref", "Units", "Capital", "Income", "Capital Balance"].map((h, i) => (
+                        <th key={h} style={{ padding: "10px 14px", textAlign: i >= 7 ? "right" : "left", fontWeight: 600, fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -374,6 +386,13 @@ function InvestorStatementsContent() {
                                 {e.investmentType === "ShortTerm" ? "Short Term" : "Long Term"}
                               </span>
                             ) : <span style={{ color: "var(--muted)", fontSize: 12 }}>—</span>}
+                          </td>
+                          <td style={{ padding: "9px 14px", fontWeight: 600, color: "var(--text-primary)" }}>
+                            {e.investorName || "—"}
+                          </td>
+                          <td style={{ padding: "9px 14px" }}>
+                            <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{e.accountUserName || "—"}</div>
+                            {e.accountUserEmail && <div style={{ fontSize: 11, color: "var(--muted)" }}>{e.accountUserEmail}</div>}
                           </td>
                           <td style={{ padding: "9px 14px", color: "var(--muted)", fontSize: 12 }}>
                             {e.applicationId ? `#${e.applicationId}` : "—"}
@@ -399,7 +418,7 @@ function InvestorStatementsContent() {
                   </tbody>
                   <tfoot>
                     <tr style={{ borderTop: "2px solid var(--border)", background: "var(--bg-section)" }}>
-                      <td colSpan={6} style={{ padding: "9px 14px", fontWeight: 600, color: "var(--muted)", fontSize: 12 }}>
+                      <td colSpan={8} style={{ padding: "9px 14px", fontWeight: 600, color: "var(--muted)", fontSize: 12 }}>
                         {visible.length} entries
                       </td>
                       <td style={{ padding: "9px 14px", textAlign: "right", fontWeight: 700, color: "var(--text-primary)", fontSize: 13 }}>

@@ -134,6 +134,7 @@ export interface UserListItem {
   isTestUser: boolean;
   isAdmin: boolean;
   adminRole?: string;
+  investorNames: string[];
 }
 
 export interface UserDetail extends UserListItem {
@@ -302,6 +303,9 @@ export interface InvestorCapitalAccountEntry {
   date: string;
   entryType: 'Contribution' | 'Redemption' | 'Dividend' | 'Clawback';
   investmentType?: string; // 'ShortTerm' | 'LongTerm'
+  investorName?: string;
+  accountUserName?: string;
+  accountUserEmail?: string;
   applicationId?: number;
   ppmRefNo?: string;
   units?: number;
