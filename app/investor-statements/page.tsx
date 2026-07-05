@@ -163,6 +163,8 @@ function InvestorStatementsContent() {
   const [data, setData] = useState<InvestorCapitalAccount | null>(null);
   const [accrued, setAccrued] = useState(0);
   const [typeFilter, setTypeFilter] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [investorsLoading, setInvestorsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -248,9 +250,13 @@ function InvestorStatementsContent() {
     setOpen(false);
   }
 
-  const visible: InvestorCapitalAccountEntry[] = (data?.entries ?? []).filter(
-    e => !typeFilter || e.entryType === typeFilter,
-  );
+  const visible: InvestorCapitalAccountEntry[] = (data?.entries ?? []).filter(e => {
+    if (typeFilter && e.entryType !== typeFilter) return false;
+    const entryDate = e.date.slice(0, 10); // "YYYY-MM-DD", comparable lexicographically
+    if (fromDate && entryDate < fromDate) return false;
+    if (toDate && entryDate > toDate) return false;
+    return true;
+  });
 
   return (
     <AdminLayout>
@@ -415,6 +421,31 @@ function InvestorStatementsContent() {
                   <option value="Redemption">Redemptions</option>
                   <option value="Dividend">Dividends</option>
                 </select>
+                <input
+                  type="date"
+                  value={fromDate}
+                  max={toDate || undefined}
+                  onChange={e => setFromDate(e.target.value)}
+                  title="From date"
+                  style={{ padding: "7px 10px", fontSize: 12, border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", color: "var(--text-primary)" }}
+                />
+                <span style={{ fontSize: 12, color: "var(--muted)" }}>–</span>
+                <input
+                  type="date"
+                  value={toDate}
+                  min={fromDate || undefined}
+                  onChange={e => setToDate(e.target.value)}
+                  title="To date"
+                  style={{ padding: "7px 10px", fontSize: 12, border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", color: "var(--text-primary)" }}
+                />
+                {(fromDate || toDate) && (
+                  <button
+                    onClick={() => { setFromDate(""); setToDate(""); }}
+                    style={{ fontSize: 12, color: "var(--muted)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+                  >
+                    Clear dates
+                  </button>
+                )}
                 <span style={{ fontSize: 12, color: "var(--muted)" }}>{visible.length} entries</span>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
