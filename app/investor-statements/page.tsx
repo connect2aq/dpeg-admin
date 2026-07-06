@@ -158,6 +158,7 @@ function InvestorStatementsContent() {
     return Number.isFinite(parsed) ? parsed : null;
   });
   const [investments, setInvestments] = useState<ApplicationSummary[]>([]);
+  const [excludedApplications, setExcludedApplications] = useState<ApplicationSummary[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<InvestorCapitalAccount | null>(null);
@@ -181,12 +182,13 @@ function InvestorStatementsContent() {
   }, []);
 
   useEffect(() => {
-    if (!selectedUserId) { setInvestments([]); return; }
+    if (!selectedUserId) { setInvestments([]); setExcludedApplications([]); return; }
     adminApi.user(selectedUserId)
       .then(r => {
-        if (!r.success || !r.data) { setInvestments([]); return; }
+        if (!r.success || !r.data) { setInvestments([]); setExcludedApplications([]); return; }
         const active = r.data.applications.filter(a => ACTIVE_STATUSES.has(a.status));
         setInvestments(active);
+        setExcludedApplications(r.data.applications.filter(a => !ACTIVE_STATUSES.has(a.status)));
 
         const q = scopeQueryRef.current.trim().toLowerCase();
         scopeQueryRef.current = "";
@@ -199,7 +201,7 @@ function InvestorStatementsContent() {
         // ambiguous match (e.g. the account holder's own name) falls back to "all".
         setSelectedApplicationId(matches.length === 1 ? matches[0].id : null);
       })
-      .catch(() => setInvestments([]));
+      .catch(() => { setInvestments([]); setExcludedApplications([]); });
   }, [selectedUserId]);
 
   useEffect(() => {
@@ -358,6 +360,32 @@ function InvestorStatementsContent() {
                 </div>
               )}
             </div>
+
+            {/* Excluded-applications notice — this statement only reflects funded (Active/Redeemed) capital */}
+            {excludedApplications.length > 0 && (
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 16, padding: "12px 18px", background: "#fffbeb", border: "1.5px solid #fbbf24", borderRadius: 10 }}>
+                <span style={{ fontSize: 16, lineHeight: "18px" }}>⚠️</span>
+                <span style={{ fontSize: 13, color: "#92400e", lineHeight: 1.5 }}>
+                  This statement only reflects <strong>funded capital</strong> (Active or Redeemed investments).{" "}
+                  <strong>
+                    {excludedApplications.length} application{excludedApplications.length !== 1 ? "s" : ""} for this investor
+                  </strong>{" "}
+                  {excludedApplications.length !== 1 ? "are" : "is"} not included below —{" "}
+                  {Object.entries(
+                    excludedApplications.reduce<Record<string, number>>((acc, a) => {
+                      acc[a.status] = (acc[a.status] ?? 0) + 1;
+                      return acc;
+                    }, {})
+                  ).map(([status, count], i, arr) => (
+                    <span key={status}>
+                      {count} {status === "UnderReview" ? "Under Review" : status}
+                      {i < arr.length - 1 ? ", " : ""}
+                    </span>
+                  ))}
+                  {" "}— since no capital has been deployed for them yet (or, if rejected, none ever will be).
+                </span>
+              </div>
+            )}
 
             {/* Investment scope selector — only meaningful when this account has more than one investment */}
             {investments.length > 1 && (
