@@ -237,13 +237,19 @@ function CapitalLedgerContent() {
         {runningBalanceUnreliable && (
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 16, padding: '12px 18px', background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 10 }}>
             <span style={{ fontSize: 16, lineHeight: '18px' }}>ℹ️</span>
-            <span style={{ fontSize: 13, color: '#1e40af', lineHeight: 1.5 }}>
+            <span style={{ fontSize: 13, color: '#1e40af', lineHeight: 1.5, flex: 1 }}>
               <strong>Running Balance</strong> is each row&rsquo;s true fund balance as of that date, but it only <em>builds up</em> correctly
               oldest → newest with every row shown. A search, App ID, or type filter hides rows, and any sort other than Date
               (oldest first) reorders them — either way, consecutive balances won&rsquo;t add up. Clear filters and sort by Date
               ascending to see it build up in order.
               (The From/To date range is fine on its own — the Opening Balance card above already accounts for it.)
             </span>
+            <button
+              onClick={() => { setTypeFilter(''); setSearch(''); setAppIdFilter(''); setSortField('date'); setSortDir('asc'); }}
+              style={{ flexShrink: 0, padding: '6px 14px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              Reset to Date order
+            </button>
           </div>
         )}
 
