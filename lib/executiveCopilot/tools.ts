@@ -513,17 +513,31 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
       }
       return backendGet(capitalLedgerPath(p), token);
     },
-    extractCitations: (result) =>
-      citationsFromRecords(
-        (result as { entries?: unknown[] })?.entries,
-        "application",
-        // Each ledger entry references its investment via applicationId, not its own id
-        // (entries don't have a detail page of their own) — this is what makes two
-        // entries for the same investor correctly resolve to two different applications.
-        (item) => (typeof item.applicationId === "number" ? item.applicationId : undefined),
-        (id) => `/applications/${id}`,
-        (r) => (r.investorName as string) || (r.email as string),
-      ),
+    // Same dual-citation split as list_applications/list_distributions: the Investor
+    // name always opens that investor's statement page, while a separate unlabeled
+    // "application" citation covers the App ID column each ledger entry also carries.
+    // Each ledger entry references its investment via applicationId, not its own id
+    // (entries don't have a detail page of their own) — this is what makes two entries
+    // for the same investor correctly resolve to two different applications.
+    extractCitations: (result) => {
+      const entries = (result as { entries?: unknown[] })?.entries;
+      return [
+        ...citationsFromRecords(
+          entries,
+          "application",
+          (item) => (typeof item.applicationId === "number" ? item.applicationId : undefined),
+          (id) => `/applications/${id}`,
+          () => undefined,
+        ),
+        ...citationsFromRecords(
+          entries,
+          "investor",
+          (item) => (typeof item.accountUserId === "number" ? item.accountUserId : undefined),
+          (id) => `/investor-statements?userId=${id}`,
+          (r) => (r.investorName as string) || (r.accountUserName as string) || (r.email as string),
+        ),
+      ];
+    },
   },
   {
     definition: {
