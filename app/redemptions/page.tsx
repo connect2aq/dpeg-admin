@@ -328,7 +328,7 @@ function RedemptionsContent() {
         <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
           <input
             type="text"
-            placeholder="Search by name or email…"
+            placeholder="Search by investor, account user, or email…"
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
             style={{ flex: '1 1 220px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}
@@ -390,7 +390,6 @@ function RedemptionsContent() {
                     <SortableTh label="Total Units Owned" sortKey="totalUnitsOwned" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Capital Redeemed" sortKey="capitalRedeemed" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Income" sortKey="proratedPreferredReturn" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
-                    <SortableTh label="Email" sortKey="email" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Status" sortKey="status" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Effective Date" sortKey="effectiveDate" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <th>Action</th>
@@ -398,7 +397,7 @@ function RedemptionsContent() {
                 </thead>
                 <tbody>
                   {result.items.length === 0 ? (
-                    <tr><td colSpan={14} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No redemption requests found</td></tr>
+                    <tr><td colSpan={13} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No redemption requests found</td></tr>
                   ) : result.items.map(r => (
                     <tr key={r.id} style={{ background: selected.has(r.id) ? '#fff7ed' : undefined }}>
                       <td style={{ padding: '12px 8px 12px 16px' }}>
@@ -416,13 +415,15 @@ function RedemptionsContent() {
                           : '—'}
                       </td>
                       <td style={{ fontWeight: 600 }}>{r.sellingPartnerName ?? '—'}</td>
-                      <td style={{ color: '#64748b' }}>{r.accountUserName ?? '—'}</td>
+                      <td>
+                        <div style={{ color: '#1e293b' }}>{r.accountUserName ?? '—'}</div>
+                        {r.email && <div style={{ fontSize: 12, color: '#94a3b8' }}>{r.email}</div>}
+                      </td>
                       <td>{r.investorType}</td>
                       <td style={{ fontWeight: 700, color: '#0e3416' }}>{r.unitsToRedeem ?? '—'}</td>
                       <td style={{ color: '#64748b' }}>{r.totalUnitsOwned ?? '—'}</td>
                       <td style={{ fontWeight: 600, color: '#0e3416' }}>{r.aggregatePurchasePrice ? fmtMoney(capitalRedeemed(r)) : '—'}</td>
                       <td style={{ fontWeight: 600, color: '#b45309' }}>{r.proratedPreferredReturn ? `+${fmtMoney(income(r))}` : '—'}</td>
-                      <td style={{ fontSize: 13, color: '#64748b' }}>{r.email ?? '—'}</td>
                       <td>
                         <StatusBadge status={r.status} />
                         {pendingMap[r.id] && <PendingBadge item={pendingMap[r.id]} />}
