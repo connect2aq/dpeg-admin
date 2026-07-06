@@ -7,6 +7,7 @@ import {
   normalizeMarkdownTables,
   renderStructuredTables,
   type CopilotTool,
+  type CopilotCitation,
 } from "./copilotEngine";
 import type { CopilotProvider, ProviderResponse } from "./copilotProviders/types";
 
@@ -405,5 +406,80 @@ describe("renderStructuredTables", () => {
   it("leaves text with no ```table block unchanged", () => {
     const text = "Just a plain answer with no tables.";
     expect(renderStructuredTables(text)).toBe(text);
+  });
+});
+
+// Regression coverage for the reported regression: after being told a blank cell is
+// worse than no column, the model started dropping the "App ID" column entirely instead
+// of reliably filling it in. These guarantee the column from trusted citation data
+// (secondaryId/secondaryColumnHeader/secondaryCellPrefix), independent of what the model
+// actually wrote.
+describe("renderStructuredTables — secondary id column (App ID)", () => {
+  function investorCitation(label: string, applicationId: number): CopilotCitation {
+    return {
+      type: "investor",
+      id: 1,
+      label,
+      href: "/investor-statements?userId=1",
+      secondaryId: applicationId,
+      secondaryColumnHeader: "App ID",
+      secondaryCellPrefix: "#",
+    };
+  }
+
+  it("inserts a missing App ID column right after the matching investor column", () => {
+    const text = '```table\n{"columns": ["Investor", "Amount"], "rows": [{"Investor": "Alice", "Amount": "$100"}]}\n```';
+    const rows = tableRows(renderStructuredTables(text, [investorCitation("Alice", 42)]));
+    expect(rows).toEqual([
+      ["Investor", "App ID", "Amount"],
+      ["Alice", "#42", "$100"],
+    ]);
+  });
+
+  it("backfills a blank App ID cell without touching a column the model already got right", () => {
+    const text =
+      '```table\n{"columns": ["Investor", "App ID"], "rows": [' +
+      '{"Investor": "Alice", "App ID": ""}, {"Investor": "Bob", "App ID": "#99"}' +
+      "]}\n```";
+    const rows = tableRows(renderStructuredTables(text, [investorCitation("Alice", 42), investorCitation("Bob", 7)]));
+    expect(rows).toEqual([
+      ["Investor", "App ID"],
+      ["Alice", "#42"],
+      ["Bob", "#99"], // left alone even though it doesn't match Bob's citation -- only blanks are backfilled
+    ]);
+  });
+
+  it("resolves two rows for the same investor to two different application ids, in row order", () => {
+    const text =
+      '```table\n{"columns": ["Investor", "Amount"], "rows": [' +
+      '{"Investor": "Nazim Bandeali", "Amount": "$150,000"}, {"Investor": "Nazim Bandeali", "Amount": "$50,000"}' +
+      "]}\n```";
+    const rows = tableRows(
+      renderStructuredTables(text, [investorCitation("Nazim Bandeali", 104), investorCitation("Nazim Bandeali", 111)]),
+    );
+    expect(rows).toEqual([
+      ["Investor", "App ID", "Amount"],
+      ["Nazim Bandeali", "#104", "$150,000"],
+      ["Nazim Bandeali", "#111", "$50,000"],
+    ]);
+  });
+
+  it("leaves the table untouched when no citation carries a secondary id", () => {
+    const text = '```table\n{"columns": ["Investor", "Amount"], "rows": [{"Investor": "Alice", "Amount": "$100"}]}\n```';
+    const plainCitation: CopilotCitation = { type: "investor", id: 1, label: "Alice", href: "/investor-statements?userId=1" };
+    const rows = tableRows(renderStructuredTables(text, [plainCitation]));
+    expect(rows).toEqual([
+      ["Investor", "Amount"],
+      ["Alice", "$100"],
+    ]);
+  });
+
+  it("does nothing when no row's cells match any citation label", () => {
+    const text = '```table\n{"columns": ["Investor", "Amount"], "rows": [{"Investor": "Someone Else", "Amount": "$5"}]}\n```';
+    const rows = tableRows(renderStructuredTables(text, [investorCitation("Alice", 42)]));
+    expect(rows).toEqual([
+      ["Investor", "Amount"],
+      ["Someone Else", "$5"],
+    ]);
   });
 });

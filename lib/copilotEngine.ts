@@ -4,6 +4,7 @@
 // Copilot, ...), each of which can run on whichever CopilotProvider (Anthropic, DeepSeek,
 // ...) is configured, without touching this file.
 import type { CopilotProvider, CopilotTurn, JSONSchema, ProviderToolCall } from "./copilotProviders/types";
+import { findLabelMatches } from "./copilotCitationLinking";
 
 // A linkable record a tool's result referenced (e.g. a specific redemption or
 // application). Optional — most tools return aggregates with nothing to link to.
@@ -12,6 +13,15 @@ export interface CopilotCitation {
   id: number | string;
   label?: string;
   href: string;
+  // Optional: the same underlying record also has its own linkable id that belongs in a
+  // *different* table column than this citation's own (e.g. an "investor" citation whose
+  // record also has its own application detail page, so the table also needs an "App ID"
+  // column). columnHeader/cellPrefix are supplied by the tool that built the citation,
+  // not hardcoded here -- this engine stays domain-agnostic, reusable by any future
+  // copilot product that wants the same guarantee for its own kind of secondary id.
+  secondaryId?: number;
+  secondaryColumnHeader?: string;
+  secondaryCellPrefix?: string;
 }
 
 export interface CopilotTool {
@@ -99,6 +109,11 @@ export async function runCopilotAgent(params: {
   const toolsUsed = new Set<string>();
   const usageTotals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
   const citationsByHref = new Map<string, CopilotCitation>();
+  // Deliberately NOT deduped like citationsByHref above: two applications for the same
+  // investor share an identical href (both point at that investor's one statement page),
+  // so deduping by href would keep only the last one's secondaryId and silently lose the
+  // other application's id. ensureSecondaryIdColumn needs one entry per record.
+  const allCitations: CopilotCitation[] = [];
 
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
     if (signal?.aborted) {
@@ -117,7 +132,7 @@ export async function runCopilotAgent(params: {
         `[executive-copilot] answered in ${iteration + 1} call(s) — input:${usageTotals.input} output:${usageTotals.output} cacheRead:${usageTotals.cacheRead} cacheWrite:${usageTotals.cacheWrite} tools:[${[...toolsUsed].join(",")}]`,
       );
       return {
-        answer: normalizeMarkdownTables(renderStructuredTables(response.text)),
+        answer: normalizeMarkdownTables(renderStructuredTables(response.text, allCitations)),
         sources: [...toolsUsed],
         citations: [...citationsByHref.values()],
       };
@@ -136,7 +151,10 @@ export async function runCopilotAgent(params: {
         try {
           const result = tool ? await tool.execute(call.input, token) : { error: `Unknown tool ${call.name}` };
           if (tool?.extractCitations) {
-            for (const c of tool.extractCitations(result)) citationsByHref.set(c.href, c);
+            for (const c of tool.extractCitations(result)) {
+              citationsByHref.set(c.href, c);
+              allCitations.push(c);
+            }
           }
           const output = JSON.stringify(result);
           console.log(
@@ -299,6 +317,91 @@ function recoverPartialTable(jsonText: string): StructuredTableSpec | null {
   return rows.length > 0 ? { columns, rows } : null;
 }
 
+type SecondaryCitation = CopilotCitation & { secondaryId: number; secondaryColumnHeader: string; secondaryCellPrefix: string };
+
+// Guarantees a citation-declared secondary-id column (e.g. an "App ID" column alongside
+// an investor citation) is present and correct in a structured table -- driven entirely
+// by trusted tool-result data, never by asking the model to remember to include the
+// column, type its values correctly, or keep them straight across two data sources. This
+// exists because prompt wording alone proved not enough: after being told a blank cell
+// was worse than no column, the model started dropping the App ID column outright rather
+// than reliably filling it in. Runs after the model's own table JSON is parsed/recovered,
+// before rendering to markdown.
+function ensureSecondaryIdColumn(spec: StructuredTableSpec, citations: CopilotCitation[]): StructuredTableSpec {
+  const withSecondary = citations.filter(
+    (c): c is SecondaryCitation =>
+      typeof c.secondaryId === "number" &&
+      typeof c.secondaryColumnHeader === "string" &&
+      typeof c.secondaryCellPrefix === "string",
+  );
+  if (withSecondary.length === 0 || spec.rows.length === 0) return spec;
+
+  const byHeader = new Map<string, SecondaryCitation[]>();
+  for (const c of withSecondary) {
+    const list = byHeader.get(c.secondaryColumnHeader) ?? [];
+    list.push(c);
+    byHeader.set(c.secondaryColumnHeader, list);
+  }
+
+  let result = spec;
+  for (const [columnHeader, candidates] of byHeader) {
+    result = applySecondaryColumn(result, columnHeader, candidates);
+  }
+  return result;
+}
+
+// Tries each of the table's existing columns as the "name" column by checking how many
+// rows' cell text resolve to one of the candidate citations (via the same label-matching,
+// per-label-use-count logic CopilotMarkdownAnswer uses client-side, so a repeated name
+// like two applications for one investor still resolves to two different ids in row
+// order). Whichever column resolves the most rows wins. If the secondary column doesn't
+// exist yet, it's inserted right after that name column; if it exists but some rows are
+// blank, only those rows are backfilled -- a value the model already got right is left
+// alone.
+function applySecondaryColumn(spec: StructuredTableSpec, columnHeader: string, candidates: SecondaryCitation[]): StructuredTableSpec {
+  const normalizedHeader = columnHeader.trim().toLowerCase();
+  let bestColumn: string | null = null;
+  let bestResolved: Array<number | null> = [];
+  let bestScore = -1;
+
+  for (const col of spec.columns) {
+    if (col.trim().toLowerCase() === normalizedHeader) continue;
+    const labelUseCount = new Map<string, number>();
+    const resolved = spec.rows.map((row) => {
+      const cellText = String(row[col] ?? "").trim();
+      if (!cellText) return null;
+      const matches = findLabelMatches(cellText, candidates, labelUseCount);
+      return matches.length > 0 ? (matches[0].citation as SecondaryCitation).secondaryId : null;
+    });
+    const score = resolved.filter((v) => v !== null).length;
+    if (score > bestScore) {
+      bestScore = score;
+      bestColumn = col;
+      bestResolved = resolved;
+    }
+  }
+
+  if (!bestColumn || bestScore <= 0) return spec;
+
+  const existingIndex = spec.columns.findIndex((c) => c.trim().toLowerCase() === normalizedHeader);
+  const prefix = candidates[0].secondaryCellPrefix;
+  const rows = spec.rows.map((row, i) => {
+    const resolvedId = bestResolved[i];
+    if (resolvedId === null) return row;
+    // Only fill in a value the model left blank -- a value it already got right (even
+    // one that happens not to match the citation we resolved) is left alone rather than
+    // overridden, so this only ever fixes an omission, never second-guesses the model.
+    if (existingIndex !== -1 && String(row[columnHeader] ?? "").trim() !== "") return row;
+    return { ...row, [columnHeader]: `${prefix}${resolvedId}` };
+  });
+
+  if (existingIndex !== -1) return { columns: spec.columns, rows };
+
+  const insertAt = spec.columns.indexOf(bestColumn) + 1;
+  const columns = [...spec.columns.slice(0, insertAt), columnHeader, ...spec.columns.slice(insertAt)];
+  return { columns, rows };
+}
+
 // Converts the model's ```table JSON blocks into real markdown tables, keyed by the exact
 // column header string per row rather than positional array order. Named fields are the
 // actual fix for column drift (e.g. the model folding a rank into the name cell for the
@@ -308,16 +411,19 @@ function recoverPartialTable(jsonText: string): StructuredTableSpec | null {
 // just renders an empty cell for that column -- the header's column count always wins.
 // If the JSON doesn't parse as a whole, falls back to recovering whichever individual
 // rows DO parse (see recoverPartialTable) before giving up and leaving the original
-// fenced block untouched (visible, reportable) as a last resort.
-export function renderStructuredTables(text: string): string {
+// fenced block untouched (visible, reportable) as a last resort. citations is used only
+// to run ensureSecondaryIdColumn -- a table with no secondary-id citations available
+// (e.g. one built from a tool that has no App-ID-style companion) passes through
+// unaffected.
+export function renderStructuredTables(text: string, citations: CopilotCitation[] = []): string {
   return text.replace(STRUCTURED_TABLE_BLOCK_PATTERN, (match, jsonText: string) => {
     try {
       const parsed = JSON.parse(jsonText) as StructuredTableSpec;
       if (!Array.isArray(parsed.columns) || !Array.isArray(parsed.rows)) return match;
-      return renderStructuredTable(parsed);
+      return renderStructuredTable(ensureSecondaryIdColumn(parsed, citations));
     } catch {
       const recovered = recoverPartialTable(jsonText);
-      return recovered ? renderStructuredTable(recovered) : match;
+      return recovered ? renderStructuredTable(ensureSecondaryIdColumn(recovered, citations)) : match;
     }
   });
 }

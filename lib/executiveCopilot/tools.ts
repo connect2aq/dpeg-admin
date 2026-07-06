@@ -71,18 +71,30 @@ export function citationsFromRecords(
   idFor: (item: Record<string, unknown>) => number | undefined,
   hrefFor: (id: number) => string,
   labelFor: (item: Record<string, unknown>) => string | undefined,
+  // Optional: for an "investor" citation whose underlying record also has its own
+  // application detail page, resolves that application's id so ensureSecondaryIdColumn
+  // (copilotEngine.ts) can guarantee a correct "App ID" column from trusted tool data
+  // alone -- it never has to trust the model to type one out, get it right, or even
+  // remember to include the column at all.
+  applicationIdFor?: (item: Record<string, unknown>) => number | undefined,
 ): CopilotCitation[] {
   if (!Array.isArray(records)) return [];
   return records
     .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
     .map((item) => ({ item, id: idFor(item) }))
     .filter((x): x is { item: Record<string, unknown>; id: number } => typeof x.id === "number")
-    .map(({ item, id }) => ({
-      type,
-      id,
-      label: labelFor(item),
-      href: hrefFor(id),
-    }));
+    .map(({ item, id }) => {
+      const applicationId = applicationIdFor?.(item);
+      return {
+        type,
+        id,
+        label: labelFor(item),
+        href: hrefFor(id),
+        ...(typeof applicationId === "number"
+          ? { secondaryId: applicationId, secondaryColumnHeader: "App ID", secondaryCellPrefix: "#" }
+          : {}),
+      };
+    });
 }
 
 // The common case: the record's own "id" field is the linkable ID.
@@ -160,7 +172,7 @@ Formatting rule for tables: when a table lists individual applications, redempti
 
 When presenting more than one row of parallel data (a ranked list, several records, a comparison), do not hand-write a markdown pipe table. Instead, emit a fenced code block labeled exactly "table" containing JSON shaped like {"columns": ["Rank", "Investor", "Total Invested"], "rows": [{"Rank": "1", "Investor": "3DXB LLC", "Total Invested": "$3,200,000"}, {"Rank": "2", "Investor": "Nathani Family Investments, LLC", "Total Invested": "$1,800,000"}]} — every row object must use the exact same column-header strings as its keys, and every row must include a value for every column (use "" if something genuinely doesn't apply, e.g. no rank medal for a row). This is rendered into a real table automatically. Naming each row's values by column, rather than writing them positionally, is what prevents a column silently drifting out of alignment partway down a long table (e.g. folding a rank medal into the name cell for the top 3 rows, then switching to a separate bare rank cell for the rest).
 
-A blank table cell is never acceptable when the tool result actually contains that field for that record (e.g. effectiveDate, distributionMonth, submittedAt) — go back to the tool result and use the real value. If some rows in a table were sourced from a call that genuinely doesn't return a given field at all, don't include that column for those rows with blanks; either fetch the tool call that has it before answering, or drop the column from that table entirely. A column full of real values with a few silent blanks reads as a data bug to the admin, not an intentional omission.
+A blank table cell is never acceptable when the tool result actually contains that field for that record (e.g. effectiveDate, distributionMonth, submittedAt) — go back to the tool result and use the real value. If some rows in a table were sourced from a call that genuinely doesn't return a given field at all, don't include that column for those rows with blanks; either fetch the tool call that has it before answering, or drop the column from that table entirely. A column full of real values with a few silent blanks reads as a data bug to the admin, not an intentional omission. This drop-the-column allowance does NOT apply to "App ID" specifically — always include it for application-record tables per the rule above, even if you're unsure of the exact value, since the UI cross-checks and corrects that specific column from the underlying data regardless of what you write there.
 `.trim();
 
 // Short domain context for the tool-free follow-up-suggestion call (see
@@ -334,6 +346,7 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
           (item) => (typeof item.userId === "number" ? item.userId : undefined),
           (id) => `/investor-statements?userId=${id}`,
           investorLabelFor,
+          byIdField,
         ),
       ];
     },
@@ -479,6 +492,7 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
           (item) => (typeof item.userId === "number" ? item.userId : undefined),
           (id) => `/investor-statements?userId=${id}`,
           (r) => r.investorName as string,
+          (item) => (typeof item.applicationId === "number" ? item.applicationId : undefined),
         ),
       ];
     },
@@ -537,6 +551,7 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
           (item) => (typeof item.accountUserId === "number" ? item.accountUserId : undefined),
           (id) => `/investor-statements?userId=${id}`,
           (r) => (r.investorName as string) || (r.accountUserName as string) || (r.email as string),
+          (item) => (typeof item.applicationId === "number" ? item.applicationId : undefined),
         ),
       ];
     },
