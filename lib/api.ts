@@ -238,6 +238,7 @@ export interface RedemptionListItem {
   unitsToRedeem?: string;
   totalUnitsOwned?: string;
   aggregatePurchasePrice?: string;
+  proratedPreferredReturn?: string;
   netAggregatePrice?: string;
   email?: string;
   status: string;

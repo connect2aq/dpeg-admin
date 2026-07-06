@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
+import { SortableTh } from '@/components/SortableTh';
 import { adminApi, type PendingChangeItem, type PendingChangeDetail, type PagedResult, type ApplicationDetail, type RedemptionDetail } from '@/lib/api';
 
 const STATUSES = ['', 'Pending', 'Checked', 'Approved', 'Rejected', 'Cancelled'];
@@ -501,16 +502,23 @@ export default function PendingApprovalsPage() {
   const [entityType, setEntityType] = useState('');
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<PendingChangeDetail | null>(null);
+  const [sortOn, setSortOn] = useState('createdOn');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const toggleSort = (key: string) => {
+    if (sortOn === key) setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortOn(key); setSortDirection('asc'); }
+    setPage(1);
+  };
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE };
+    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
     if (status) params.status = status;
     if (entityType) params.entityType = entityType;
     adminApi.getPendingChanges(params)
       .then(r => { if (r.success) setResult(r.data); })
       .finally(() => setLoading(false));
-  }, [page, status, entityType]);
+  }, [page, status, entityType, sortOn, sortDirection]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -552,13 +560,13 @@ export default function PendingApprovalsPage() {
                 <table style={{ minWidth: 900 }}>
                   <thead>
                     <tr>
-                      <th>ID</th>
-                      <th>Type</th>
-                      <th>Description</th>
-                      <th>Maker</th>
-                      <th>Submitted</th>
-                      <th>Checker</th>
-                      <th>Status</th>
+                      <SortableTh label="ID" sortKey="id" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                      <SortableTh label="Type" sortKey="entityType" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                      <SortableTh label="Description" sortKey="description" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                      <SortableTh label="Maker" sortKey="makerName" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                      <SortableTh label="Submitted" sortKey="createdOn" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                      <SortableTh label="Checker" sortKey="checkerName" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                      <SortableTh label="Status" sortKey="status" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                       <th></th>
                     </tr>
                   </thead>
