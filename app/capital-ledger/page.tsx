@@ -279,7 +279,7 @@ function CapitalLedgerContent() {
                         title="Click to sort">
                         {label}
                         <span style={{ marginLeft: 4, opacity: active ? 1 : 0.25 }}>
-                          {active ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+                          {active ? (sortDir === 'asc' ? '▲' : '▼') : '↕'}
                         </span>
                       </th>
                     );

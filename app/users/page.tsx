@@ -295,9 +295,10 @@ function UsersContent() {
                     <SortableTh label="Status" sortKey="status" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     {viewMode === 'investors' ? (
                       <>
-                        <SortableTh label="Email Verified" sortKey="emailVerified" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                         <SortableTh label="Step" sortKey="step" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                         <SortableTh label="Applications" sortKey="applications" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                        <SortableTh label="Redemptions" sortKey="redemptions" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                        <SortableTh label="Distributions" sortKey="distributions" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                       </>
                     ) : (
                       <SortableTh label="Admin Role" sortKey="adminRole" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
@@ -308,7 +309,7 @@ function UsersContent() {
                 </thead>
                 <tbody>
                   {result.items.length === 0 ? (
-                    <tr><td colSpan={viewMode === 'investors' ? 9 : 6} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No users found</td></tr>
+                    <tr><td colSpan={viewMode === 'investors' ? 10 : 6} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No users found</td></tr>
                   ) : result.items.map(u => (
                     <tr key={u.id} style={{ background: selected.has(u.id) ? '#fef9ec' : undefined }}>
                       {viewMode === 'investors' && (
@@ -334,13 +335,10 @@ function UsersContent() {
                       <td><StatusBadge status={u.status} /></td>
                       {viewMode === 'investors' ? (
                         <>
-                          <td>
-                            <span style={{ color: u.emailVerified ? '#10b981' : '#94a3b8', fontWeight: 600, fontSize: 12 }}>
-                              {u.emailVerified ? '✓ Verified' : '✗ Pending'}
-                            </span>
-                          </td>
                           <td style={{ textAlign: 'center' }}>{u.currentOnboardingStep}/7</td>
                           <td style={{ textAlign: 'center' }}>{u.applicationCount}</td>
+                          <td style={{ textAlign: 'center' }}>{u.redemptionCount}</td>
+                          <td style={{ textAlign: 'center' }}>{u.distributionCount}</td>
                         </>
                       ) : (
                         <td>
@@ -375,6 +373,11 @@ function UsersContent() {
                           <Link href={`/users/${u.id}`} style={{ color: '#699172', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>
                             View →
                           </Link>
+                          {viewMode === 'investors' && (
+                            <Link href={`/investor-statements?userId=${u.id}`} title="Open Investor Statement" style={{ color: '#b8923a', fontSize: 15, textDecoration: 'none', lineHeight: 1 }}>
+                              📄
+                            </Link>
+                          )}
                         </div>
                       </td>
                     </tr>

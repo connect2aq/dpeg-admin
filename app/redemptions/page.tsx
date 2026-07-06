@@ -416,7 +416,13 @@ function RedemptionsContent() {
                       </td>
                       <td style={{ fontWeight: 600 }}>{r.sellingPartnerName ?? '—'}</td>
                       <td>
-                        <div style={{ color: '#1e293b' }}>{r.accountUserName ?? '—'}</div>
+                        {r.accountUserName && r.accountUserId ? (
+                          <Link href={`/investor-statements?userId=${r.accountUserId}`} style={{ color: '#1e293b', fontWeight: 600, textDecoration: 'none' }} title="Open Investor Statement">
+                            {r.accountUserName}
+                          </Link>
+                        ) : (
+                          <div style={{ color: '#1e293b' }}>{r.accountUserName ?? '—'}</div>
+                        )}
                         {r.email && <div style={{ fontSize: 12, color: '#94a3b8' }}>{r.email}</div>}
                       </td>
                       <td>{r.investorType}</td>

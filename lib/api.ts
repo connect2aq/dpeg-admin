@@ -131,6 +131,8 @@ export interface UserListItem {
   currentOnboardingStep: number;
   createdOn: string;
   applicationCount: number;
+  redemptionCount: number;
+  distributionCount: number;
   isTestUser: boolean;
   isAdmin: boolean;
   adminRole?: string;
@@ -233,6 +235,7 @@ export interface ApplicationDetail extends ApplicationListItem {
 export interface RedemptionListItem {
   id: number;
   sellingPartnerName?: string;
+  accountUserId?: number;
   accountUserName?: string;
   effectiveDate?: string;
   investorType: string;
