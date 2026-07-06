@@ -1,9 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   citationsFromRecords,
   byIdField,
   stripSensitiveFields,
   stripSensitiveFieldsFromItems,
+  isWithinWindow,
+  bucketByActivityWindow,
   EXECUTIVE_COPILOT_TOOLS,
 } from "./tools";
 
@@ -72,6 +74,118 @@ describe("citationsFromRecords", () => {
     const records = [{ id: 1, investorName: "Alice" }, null, "garbage", 42];
     const citations = citationsFromRecords(records, "application", byIdField, hrefFor, (r) => r.investorName as string);
     expect(citations).toHaveLength(1);
+  });
+});
+
+describe("isWithinWindow", () => {
+  const start = new Date("2026-06-23T00:00:00Z").getTime();
+  const end = new Date("2026-07-03T00:00:00Z").getTime();
+
+  it("is true for a date inside the window, including the endpoints", () => {
+    expect(isWithinWindow("2026-06-30T00:00:00Z", start, end)).toBe(true);
+    expect(isWithinWindow("2026-06-23T00:00:00Z", start, end)).toBe(true);
+    expect(isWithinWindow("2026-07-03T00:00:00Z", start, end)).toBe(true);
+  });
+
+  it("is false for a date outside the window", () => {
+    expect(isWithinWindow("2026-06-22T23:59:59Z", start, end)).toBe(false);
+    expect(isWithinWindow("2026-07-03T00:00:01Z", start, end)).toBe(false);
+  });
+
+  it("is false for null, undefined, empty string, or an unparseable value", () => {
+    expect(isWithinWindow(null, start, end)).toBe(false);
+    expect(isWithinWindow(undefined, start, end)).toBe(false);
+    expect(isWithinWindow("", start, end)).toBe(false);
+    expect(isWithinWindow("not a date", start, end)).toBe(false);
+  });
+});
+
+// Regression coverage for the exact feature this was built for: "what's new in the last N
+// days" answers must not double-count a record that was both submitted AND became
+// effective in the same window, and must not lose one that's effective now despite having
+// been submitted long before the window started.
+describe("bucketByActivityWindow", () => {
+  const start = new Date("2026-06-23T00:00:00Z").getTime();
+  const end = new Date("2026-07-03T00:00:00Z").getTime();
+
+  it("puts a record with both dates in-window only in the effective bucket, never both", () => {
+    const records = [{ id: 1, submittedAt: "2026-07-01T00:00:00Z", effectiveDate: "2026-07-01T00:00:00Z" }];
+    const { effective, submitted } = bucketByActivityWindow(records, "submittedAt", start, end);
+    expect(effective).toEqual(records);
+    expect(submitted).toEqual([]);
+  });
+
+  it("puts a record submitted long before the window, but effective within it, in the effective bucket", () => {
+    const records = [{ id: 2, submittedAt: "2026-01-01T00:00:00Z", effectiveDate: "2026-06-30T00:00:00Z" }];
+    const { effective, submitted } = bucketByActivityWindow(records, "submittedAt", start, end);
+    expect(effective).toEqual(records);
+    expect(submitted).toEqual([]);
+  });
+
+  it("puts a record submitted in-window with no effective date yet in the submitted bucket", () => {
+    const records = [{ id: 3, submittedAt: "2026-06-25T00:00:00Z", effectiveDate: null }];
+    const { effective, submitted } = bucketByActivityWindow(records, "submittedAt", start, end);
+    expect(effective).toEqual([]);
+    expect(submitted).toEqual(records);
+  });
+
+  it("excludes a record whose effective date is outside the window and whose submitted date is also outside it", () => {
+    const records = [{ id: 4, submittedAt: "2026-01-01T00:00:00Z", effectiveDate: "2026-01-05T00:00:00Z" }];
+    const { effective, submitted } = bucketByActivityWindow(records, "submittedAt", start, end);
+    expect(effective).toEqual([]);
+    expect(submitted).toEqual([]);
+  });
+
+  it("uses whichever field name is passed as the submitted-date field (e.g. createdOn for redemptions)", () => {
+    const records = [{ id: 5, createdOn: "2026-06-25T00:00:00Z", effectiveDate: null }];
+    const { submitted } = bucketByActivityWindow(records, "createdOn", start, end);
+    expect(submitted).toEqual(records);
+  });
+});
+
+// Verifies the actual pagination sweep this tool exists to guarantee: earlier this
+// session, a tool silently reading only page 1 (of several) caused a real reported bug
+// (missed unpaid distributions). get_new_activity_report must not repeat that -- it needs
+// to walk every page of both applications and redemptions before bucketing.
+describe("get_new_activity_report", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function pagedResponse(items: unknown[], page: number, totalPages: number) {
+    return { success: true, data: { items, page, pageSize: 1, totalCount: totalPages, totalPages }, message: "" };
+  }
+
+  it("fetches every page of applications and redemptions before bucketing, not just the first", async () => {
+    const tool = EXECUTIVE_COPILOT_TOOLS.find((t) => t.definition.name === "get_new_activity_report");
+    expect(tool).toBeDefined();
+
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    const applicationPages = [
+      [{ id: 1, submittedAt: twoDaysAgo, effectiveDate: null }],
+      [{ id: 2, submittedAt: threeDaysAgo, effectiveDate: null }],
+    ];
+    const redemptionPages = [[{ id: 9, createdOn: twoDaysAgo, effectiveDate: null }]];
+
+    const fetchMock = vi.fn((url: string) => {
+      const page = Number(new URL(url, "http://x").searchParams.get("page"));
+      const isApplications = url.includes("/applications");
+      const pages = isApplications ? applicationPages : redemptionPages;
+      const body = pagedResponse(pages[page - 1] ?? [], page, pages.length);
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(body) } as Response);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = (await tool!.execute({ days: 10 }, "token")) as {
+      investmentsSubmitted: unknown[];
+      investmentsEffective: unknown[];
+      redemptionsSubmitted: unknown[];
+    };
+
+    // Both application pages must show up, not just page 1's single record.
+    expect(result.investmentsSubmitted).toHaveLength(2);
+    expect(result.redemptionsSubmitted).toHaveLength(1);
   });
 });
 
@@ -253,6 +367,7 @@ describe("sensitive-field redaction coverage", () => {
     get_redemption_details: "redacts", // bankName/bankAccountHolderName/bankAccountNumber/bankRoutingNumber
     list_docusign_envelopes: "no-sensitive-fields",
     list_applications: "no-sensitive-fields",
+    get_new_activity_report: "no-sensitive-fields", // same DTOs as list_applications/list_redemptions -- no bank fields
     list_pending_changes: "no-sensitive-fields", // PendingChangeListDTO has no PayloadJson -- only the Detail subclass does
     get_pending_counts: "no-sensitive-fields",
     list_audit_logs: "redacts", // oldValuesJson/newValuesJson/metadataJson

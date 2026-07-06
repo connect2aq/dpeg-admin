@@ -58,6 +58,56 @@ async function backendGet<T>(path: string, token: string): Promise<T> {
   }
 }
 
+// Fetches every page of a paginated list endpoint and flattens the items -- used by
+// get_new_activity_report, which needs the FULL dataset to bucket correctly by date (a
+// record on page 6 is just as real as one on page 1). This is the same pagination gap
+// that caused the "unpaid distributions" bug earlier (a fixed page 1 fetch silently
+// missing later pages) -- here it's fixed by doing the full sweep in code, rather than
+// trusting the model to notice totalPages and re-call. MAX_ACTIVITY_REPORT_PAGES bounds
+// worst-case latency/cost if totalPages is ever unexpectedly huge.
+const MAX_ACTIVITY_REPORT_PAGES = 25;
+const ACTIVITY_REPORT_PAGE_SIZE = 200;
+
+async function fetchAllPages(pathFor: (page: number) => string, token: string): Promise<Record<string, unknown>[]> {
+  const items: Record<string, unknown>[] = [];
+  for (let page = 1; page <= MAX_ACTIVITY_REPORT_PAGES; page++) {
+    const result = await backendGet<{ items?: Record<string, unknown>[]; totalPages?: number }>(pathFor(page), token);
+    items.push(...(result.items ?? []));
+    if (!result.totalPages || page >= result.totalPages) break;
+  }
+  return items;
+}
+
+export function isWithinWindow(value: unknown, windowStartMs: number, windowEndMs: number): boolean {
+  if (typeof value !== "string" || !value) return false;
+  const t = new Date(value).getTime();
+  return Number.isFinite(t) && t >= windowStartMs && t <= windowEndMs;
+}
+
+// Splits records into two mutually-exclusive buckets for a "what's new in the last N
+// days" report: "effective" wins whenever a record's effectiveDate falls in the window,
+// regardless of when it was submitted; "submitted" only catches records submitted in the
+// window that AREN'T also effective within it (i.e. still pending/in the pipeline). This
+// is computed here in code rather than left for the model to reason about per-row date
+// overlaps -- see the conversation this was requested in for the full rationale.
+export function bucketByActivityWindow(
+  records: Record<string, unknown>[],
+  submittedField: string,
+  windowStartMs: number,
+  windowEndMs: number,
+): { effective: Record<string, unknown>[]; submitted: Record<string, unknown>[] } {
+  const effective: Record<string, unknown>[] = [];
+  const submitted: Record<string, unknown>[] = [];
+  for (const r of records) {
+    if (isWithinWindow(r.effectiveDate, windowStartMs, windowEndMs)) {
+      effective.push(r);
+    } else if (isWithinWindow(r[submittedField], windowStartMs, windowEndMs)) {
+      submitted.push(r);
+    }
+  }
+  return { effective, submitted };
+}
+
 // Pulls linkable records (id + label + href) out of a tool result for the "referenced
 // records" UI — only meaningful for entities with a real admin detail page (redemptions,
 // applications, users). Loosely typed on purpose: this file deliberately doesn't import
@@ -71,12 +121,16 @@ export function citationsFromRecords(
   idFor: (item: Record<string, unknown>) => number | undefined,
   hrefFor: (id: number) => string,
   labelFor: (item: Record<string, unknown>) => string | undefined,
-  // Optional: for an "investor" citation whose underlying record also has its own
-  // application detail page, resolves that application's id so ensureSecondaryIdColumn
-  // (copilotEngine.ts) can guarantee a correct "App ID" column from trusted tool data
-  // alone -- it never has to trust the model to type one out, get it right, or even
-  // remember to include the column at all.
-  applicationIdFor?: (item: Record<string, unknown>) => number | undefined,
+  // Optional: for a citation (typically "investor") whose underlying record also has its
+  // own detail page under a different column (e.g. an application's own "App ID", or a
+  // redemption's own id), resolves that second id so ensureSecondaryIdColumn
+  // (copilotEngine.ts) can guarantee the column from trusted tool data alone -- it never
+  // has to trust the model to type one out, get it right, or even remember to include the
+  // column at all. secondaryColumnHeader/secondaryCellPrefix let different tools label
+  // that column differently ("App ID" vs "Redemption ID") while sharing this one helper.
+  secondaryIdFor?: (item: Record<string, unknown>) => number | undefined,
+  secondaryColumnHeader = "App ID",
+  secondaryCellPrefix = "#",
 ): CopilotCitation[] {
   if (!Array.isArray(records)) return [];
   return records
@@ -84,15 +138,13 @@ export function citationsFromRecords(
     .map((item) => ({ item, id: idFor(item) }))
     .filter((x): x is { item: Record<string, unknown>; id: number } => typeof x.id === "number")
     .map(({ item, id }) => {
-      const applicationId = applicationIdFor?.(item);
+      const secondaryId = secondaryIdFor?.(item);
       return {
         type,
         id,
         label: labelFor(item),
         href: hrefFor(id),
-        ...(typeof applicationId === "number"
-          ? { secondaryId: applicationId, secondaryColumnHeader: "App ID", secondaryCellPrefix: "#" }
-          : {}),
+        ...(typeof secondaryId === "number" ? { secondaryId, secondaryColumnHeader, secondaryCellPrefix } : {}),
       };
     });
 }
@@ -157,6 +209,7 @@ Available tools and what they cover:
 - list_redemptions / get_redemption_details: redemption records. list_redemptions does NOT include DocuSign status — for questions about redemptions and signatures together, first narrow with list_redemptions, then call get_redemption_details with the resulting IDs (max 20 at a time).
 - list_docusign_envelopes: DocuSign envelope status for both applications and redemptions.
 - list_applications: investment application records and their review status.
+- get_new_activity_report: use this (not list_applications/list_redemptions/get_capital_ledger) for "what's new / what came in in the last N days" questions about investments or redemptions — it returns records already bucketed into "effective" vs "submitted" for you.
 - list_pending_changes / get_pending_counts: the maker-checker-approver queue (pending Investment/Redemption/Distribution changes awaiting review).
 - list_audit_logs: the admin action audit trail (who did what, when, success/failure).
 - list_distributions: monthly distribution records and payment status.
@@ -173,6 +226,8 @@ Formatting rule for tables: when a table lists individual applications, redempti
 When presenting more than one row of parallel data (a ranked list, several records, a comparison), do not hand-write a markdown pipe table. Instead, emit a fenced code block labeled exactly "table" containing JSON shaped like {"columns": ["Rank", "Investor", "Total Invested"], "rows": [{"Rank": "1", "Investor": "3DXB LLC", "Total Invested": "$3,200,000"}, {"Rank": "2", "Investor": "Nathani Family Investments, LLC", "Total Invested": "$1,800,000"}]} — every row object must use the exact same column-header strings as its keys, and every row must include a value for every column (use "" if something genuinely doesn't apply, e.g. no rank medal for a row). This is rendered into a real table automatically. Naming each row's values by column, rather than writing them positionally, is what prevents a column silently drifting out of alignment partway down a long table (e.g. folding a rank medal into the name cell for the top 3 rows, then switching to a separate bare rank cell for the rest).
 
 A blank table cell is never acceptable when the tool result actually contains that field for that record (e.g. effectiveDate, distributionMonth, submittedAt) — go back to the tool result and use the real value. If some rows in a table were sourced from a call that genuinely doesn't return a given field at all, don't include that column for those rows with blanks; either fetch the tool call that has it before answering, or drop the column from that table entirely. A column full of real values with a few silent blanks reads as a data bug to the admin, not an intentional omission. This drop-the-column allowance does NOT apply to "App ID" specifically — always include it for application-record tables per the rule above, even if you're unsure of the exact value, since the UI cross-checks and corrects that specific column from the underlying data regardless of what you write there.
+
+Submitted vs. effective, and get_new_activity_report: an investment or redemption has two distinct dates — when it was submitted (the request came in) and when it becomes effective (the date it actually starts counting: interest begins accruing on an investment's effectiveDate, and stops the day before a redemption's effectiveDate). For any "what's new / what came in in the last N days" question, call get_new_activity_report instead of computing this yourself from list_applications/list_redemptions/get_capital_ledger — it already returns four buckets (investmentsEffective, investmentsSubmitted, redemptionsEffective, redemptionsSubmitted), pre-split so that a record whose effective date ALSO falls in the window only appears in the "Effective" bucket, never both. Render each non-empty bucket as its own table (e.g. "Newly Effective Investments", "Newly Submitted Investments (still pending)", and the equivalent pair for redemptions) using the records exactly as given, in the field values provided — do not merge buckets, do not move a record from one bucket to the other, and do not recompute which bucket a record belongs in.
 `.trim();
 
 // Short domain context for the tool-free follow-up-suggestion call (see
@@ -351,6 +406,84 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
           (id) => `/investor-statements?userId=${id}`,
           investorLabelFor,
           byIdField,
+        ),
+      ];
+    },
+  },
+  {
+    definition: {
+      name: "get_new_activity_report",
+      description:
+        "For '<what came in / what's new> in the last N days' questions about investments or redemptions, returns applications and redemptions already split into two mutually-exclusive buckets: 'effective' (became effective within the window, regardless of when it was submitted -- even if submitted long before) and 'submitted' (submitted within the window but NOT also effective within it, i.e. still pending/in the pipeline). Use this instead of list_applications/list_redemptions/get_capital_ledger for these questions: the bucketing and a full-dataset pagination sweep are done here in code, so you don't have to reason about per-record date-window overlaps or notice totalPages yourself. Render each non-empty bucket as its own table using the records exactly as given -- do not re-filter, re-bucket, merge, or move a record between buckets.",
+      input_schema: {
+        type: "object",
+        properties: {
+          days: { type: "number", description: "Look-back window in days from today, e.g. 10" },
+        },
+        required: ["days"],
+      },
+    },
+    execute: async (input, token) => {
+      const days = Math.min(365, Math.max(1, Math.round(Number((input as { days?: number })?.days)) || 10));
+      const windowEndMs = Date.now();
+      const windowStartMs = windowEndMs - days * 24 * 60 * 60 * 1000;
+
+      const [applications, redemptions] = await Promise.all([
+        fetchAllPages((page) => applicationsPath({ page, pageSize: ACTIVITY_REPORT_PAGE_SIZE }), token),
+        fetchAllPages((page) => redemptionsPath({ page, pageSize: ACTIVITY_REPORT_PAGE_SIZE }), token),
+      ]);
+
+      const investments = bucketByActivityWindow(applications, "submittedAt", windowStartMs, windowEndMs);
+      // Redemptions have no separate submission timestamp on the backend (RedemptionForm
+      // has EffectiveDate but no SubmittedAt) -- createdOn is the closest equivalent: when
+      // the redemption request entered the system.
+      const redemptionBuckets = bucketByActivityWindow(redemptions, "createdOn", windowStartMs, windowEndMs);
+
+      return {
+        windowDays: days,
+        windowStart: new Date(windowStartMs).toISOString(),
+        windowEnd: new Date(windowEndMs).toISOString(),
+        investmentsEffective: investments.effective,
+        investmentsSubmitted: investments.submitted,
+        redemptionsEffective: redemptionBuckets.effective,
+        redemptionsSubmitted: redemptionBuckets.submitted,
+      };
+    },
+    // Same dual-citation shape as list_applications/list_redemptions -- an investor's
+    // NAME links to their full statement page, while the record's own id (App ID for an
+    // investment, Redemption ID for a redemption) links to that specific record.
+    extractCitations: (result) => {
+      const r = result as {
+        investmentsEffective?: unknown[];
+        investmentsSubmitted?: unknown[];
+        redemptionsEffective?: unknown[];
+        redemptionsSubmitted?: unknown[];
+      };
+      const investmentItems = [...(r.investmentsEffective ?? []), ...(r.investmentsSubmitted ?? [])];
+      const redemptionItems = [...(r.redemptionsEffective ?? []), ...(r.redemptionsSubmitted ?? [])];
+      const investorLabelFor = (rec: Record<string, unknown>) =>
+        (rec.investorName as string) ||
+        `${(rec.userFirstName as string) ?? ""} ${(rec.userLastName as string) ?? ""}`.trim() ||
+        undefined;
+      return [
+        ...citationsFromRecords(investmentItems, "application", byIdField, (id) => `/applications/${id}`, () => undefined),
+        ...citationsFromRecords(
+          investmentItems,
+          "investor",
+          (item) => (typeof item.userId === "number" ? item.userId : undefined),
+          (id) => `/investor-statements?userId=${id}`,
+          investorLabelFor,
+          byIdField,
+        ),
+        ...citationsFromRecords(redemptionItems, "redemption", byIdField, (id) => `/redemptions/${id}`, () => undefined),
+        ...citationsFromRecords(
+          redemptionItems,
+          "investor",
+          (item) => (typeof item.accountUserId === "number" ? item.accountUserId : undefined),
+          (id) => `/investor-statements?userId=${id}`,
+          (rec) => (rec.sellingPartnerName as string) || (rec.accountUserName as string) || (rec.email as string),
+          byIdField,
+          "Redemption ID",
         ),
       ];
     },
