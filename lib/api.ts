@@ -233,6 +233,7 @@ export interface ApplicationDetail extends ApplicationListItem {
 export interface RedemptionListItem {
   id: number;
   sellingPartnerName?: string;
+  accountUserName?: string;
   effectiveDate?: string;
   investorType: string;
   unitsToRedeem?: string;

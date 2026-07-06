@@ -83,9 +83,9 @@ function RedemptionsContent() {
     if (to) params.to = to;
     const r = await adminApi.redemptions(params);
     if (r.success) {
-      const headers = ['ID', 'Investor Name', 'Email', 'Type', 'Units to Redeem', 'Total Units', 'Capital Redeemed', 'Income', 'Net Amount', 'Status', 'Effective Date', 'Created'];
+      const headers = ['ID', 'App ID', 'Investor', 'Account User', 'Email', 'Type', 'Units to Redeem', 'Total Units', 'Capital Redeemed', 'Income', 'Net Amount', 'Status', 'Effective Date', 'Created'];
       const rows = r.data.items.map(a => [
-        a.id, a.sellingPartnerName ?? '', a.email ?? '', a.investorType,
+        a.id, a.trancheApplicationId ? `#${a.trancheApplicationId}` : '', a.sellingPartnerName ?? '', a.accountUserName ?? '', a.email ?? '', a.investorType,
         a.unitsToRedeem ?? '', a.totalUnitsOwned ?? '',
         capitalRedeemed(a).toFixed(2), income(a).toFixed(2), a.netAggregatePrice ?? '',
         a.status,
@@ -369,7 +369,7 @@ function RedemptionsContent() {
           ) : result ? (
             <>
               <div className="table-scroll">
-              <table style={{ minWidth: 1140 }}>
+              <table style={{ minWidth: 1360 }}>
                 <thead>
                   <tr>
                     <th style={{ width: 40, padding: '12px 8px 12px 16px' }}>
@@ -382,7 +382,9 @@ function RedemptionsContent() {
                       />
                     </th>
                     <SortableTh label="ID" sortKey="id" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
-                    <SortableTh label="Partner Name" sortKey="sellingPartnerName" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                    <SortableTh label="App ID" sortKey="applicationId" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                    <SortableTh label="Investor" sortKey="sellingPartnerName" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                    <SortableTh label="Account User" sortKey="accountUserName" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Type" sortKey="investorType" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Units to Redeem" sortKey="unitsToRedeem" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Total Units Owned" sortKey="totalUnitsOwned" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
@@ -396,7 +398,7 @@ function RedemptionsContent() {
                 </thead>
                 <tbody>
                   {result.items.length === 0 ? (
-                    <tr><td colSpan={12} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No redemption requests found</td></tr>
+                    <tr><td colSpan={14} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No redemption requests found</td></tr>
                   ) : result.items.map(r => (
                     <tr key={r.id} style={{ background: selected.has(r.id) ? '#fff7ed' : undefined }}>
                       <td style={{ padding: '12px 8px 12px 16px' }}>
@@ -408,7 +410,13 @@ function RedemptionsContent() {
                         />
                       </td>
                       <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#b8923a' }}>#{r.id}</td>
+                      <td style={{ fontSize: 13 }}>
+                        {r.trancheApplicationId
+                          ? <Link href={`/applications/${r.trancheApplicationId}`} style={{ color: '#b8923a', textDecoration: 'underline', fontWeight: 600 }}>#{r.trancheApplicationId}</Link>
+                          : '—'}
+                      </td>
                       <td style={{ fontWeight: 600 }}>{r.sellingPartnerName ?? '—'}</td>
+                      <td style={{ color: '#64748b' }}>{r.accountUserName ?? '—'}</td>
                       <td>{r.investorType}</td>
                       <td style={{ fontWeight: 700, color: '#0e3416' }}>{r.unitsToRedeem ?? '—'}</td>
                       <td style={{ color: '#64748b' }}>{r.totalUnitsOwned ?? '—'}</td>
