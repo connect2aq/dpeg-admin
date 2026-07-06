@@ -179,8 +179,12 @@ A blank table cell is never acceptable when the tool result actually contains th
 // suggestFollowUps in lib/copilotEngine.ts) — deliberately NOT the full tool-by-tool
 // prompt above, since that call never invokes a tool and reciting all 14 tool
 // descriptions would just be wasted tokens on every question.
+// "Pending approvals" (the maker-checker queue) is deliberately left out of this list --
+// admins reported that queue isn't actually used day-to-day, so surfacing it in generated
+// follow-up suggestions (e.g. "is this in the pending-approval queue?") just steers
+// toward a feature that won't have anything useful behind it.
 export const EXECUTIVE_COPILOT_FOLLOWUP_CONTEXT =
-  "You help a fund administrator at the DPEG Real Estate Fund explore data on cash position, redemptions, distributions, DocuSign status, applications, pending approvals, the capital ledger, and investor accounts.";
+  "You help a fund administrator at the DPEG Real Estate Fund explore data on cash position, redemptions, distributions, DocuSign status, applications, the capital ledger, and investor accounts. Never suggest a follow-up about the maker-checker/pending-approval queue -- that workflow isn't in active use, so a suggestion pointing there is a dead end for the admin.";
 
 export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
   {
