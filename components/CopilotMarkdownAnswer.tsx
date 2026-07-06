@@ -78,19 +78,30 @@ function buildComponents(citations: CopilotCitation[]): Components {
       </div>
     ),
     thead: ({ ...props }) => <thead style={{ background: "#f8fafc" }} {...props} />,
-    th: ({ ...props }) => (
-      <th
-        style={{
-          textAlign: "left",
-          padding: "6px 10px",
-          borderBottom: "2px solid #cbd5e1",
-          color: "#0e3416",
-          fontWeight: 700,
-          whiteSpace: "nowrap",
-        }}
-        {...props}
-      />
-    ),
+    th: ({ children, ...props }) => {
+      // "App ID" cells are always short ("#42") — without a width hint the browser's
+      // auto table layout still gives this column an even share of the row, leaving a
+      // wide gap of unused space next to a two-character link. width:"1%" is the
+      // standard shrink-to-fit hint: it makes this column take only what its content
+      // needs, and the remaining space goes to columns that actually use it (names, etc).
+      const isAppId = cellText(children).trim().toLowerCase() === "app id";
+      return (
+        <th
+          style={{
+            textAlign: "left",
+            padding: "6px 10px",
+            borderBottom: "2px solid #cbd5e1",
+            color: "#0e3416",
+            fontWeight: 700,
+            whiteSpace: "nowrap",
+            ...(isAppId ? { width: "1%" } : {}),
+          }}
+          {...props}
+        >
+          {children}
+        </th>
+      );
+    },
     td: ({ children, ...props }) => (
       <td style={{ padding: "6px 10px", borderBottom: "1px solid #e2e8f0", color: "#334155" }} {...props}>
         {renderCellContent(cellText(children), children)}
