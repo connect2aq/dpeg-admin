@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { adminApi } from "@/lib/api";
+import { isExecutiveCopilotAllowed } from "@/lib/executiveCopilot/accessControl";
 import Image from "next/image";
 
 const NAV = [
@@ -117,6 +118,8 @@ export default function AdminLayout({
           {NAV.map(({ href, label, icon }) => {
             // Pending Approvals — visible to Checker, Approver, SuperAdmin only
             if (href === '/pending-approvals' && adminRole === 'Maker') return null;
+            // Executive Copilot — not ready for every admin yet, restricted to one account
+            if (href === '/executive-copilot' && !isExecutiveCopilotAllowed(user?.email)) return null;
             return (
               <Link
                 key={href}
