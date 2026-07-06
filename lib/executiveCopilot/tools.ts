@@ -85,21 +85,27 @@ export function isWithinWindow(value: unknown, windowStartMs: number, windowEndM
 }
 
 // Splits records into two mutually-exclusive buckets for a "what's new in the last N
-// days" report: "effective" wins whenever a record's effectiveDate falls in the window,
-// regardless of when it was submitted; "submitted" only catches records submitted in the
-// window that AREN'T also effective within it (i.e. still pending/in the pipeline). This
-// is computed here in code rather than left for the model to reason about per-row date
-// overlaps -- see the conversation this was requested in for the full rationale.
+// days" report: "effective" requires BOTH the effectiveDate falling in the window AND the
+// record's status being the one that means "actually live" (confirmed against the DB:
+// EffectiveDate gets prepopulated to the submission timestamp for EVERY application the
+// moment it's created -- UnderReview included -- not just once it's approved, so an
+// UnderReview application submitted this week already has an in-window "effective" date
+// that means nothing yet). "submitted" catches records submitted in the window that
+// aren't counted as effective (either the date isn't in-window, or the status isn't the
+// live one) -- so a record that's still UnderReview correctly lands in "submitted", not
+// "effective", even though its EffectiveDate field happens to fall in the window too.
 export function bucketByActivityWindow(
   records: Record<string, unknown>[],
   submittedField: string,
+  effectiveStatusValue: string,
   windowStartMs: number,
   windowEndMs: number,
 ): { effective: Record<string, unknown>[]; submitted: Record<string, unknown>[] } {
   const effective: Record<string, unknown>[] = [];
   const submitted: Record<string, unknown>[] = [];
   for (const r of records) {
-    if (isWithinWindow(r.effectiveDate, windowStartMs, windowEndMs)) {
+    const isEffectiveNow = r.status === effectiveStatusValue && isWithinWindow(r.effectiveDate, windowStartMs, windowEndMs);
+    if (isEffectiveNow) {
       effective.push(r);
     } else if (isWithinWindow(r[submittedField], windowStartMs, windowEndMs)) {
       submitted.push(r);
@@ -433,11 +439,14 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
         fetchAllPages((page) => redemptionsPath({ page, pageSize: ACTIVITY_REPORT_PAGE_SIZE }), token),
       ]);
 
-      const investments = bucketByActivityWindow(applications, "submittedAt", windowStartMs, windowEndMs);
+      const investments = bucketByActivityWindow(applications, "submittedAt", "Active", windowStartMs, windowEndMs);
       // Redemptions have no separate submission timestamp on the backend (RedemptionForm
       // has EffectiveDate but no SubmittedAt) -- createdOn is the closest equivalent: when
-      // the redemption request entered the system.
-      const redemptionBuckets = bucketByActivityWindow(redemptions, "createdOn", windowStartMs, windowEndMs);
+      // the redemption request entered the system. RedemptionForm.Status reuses
+      // eApplicationStatus (UnderReview/Active/Rejected/Redeemed) -- "Redeemed" is the
+      // terminal, actually-paid-out state, so that's the effective-status value here, NOT
+      // "Active" (which for a redemption means "approved, not yet executed").
+      const redemptionBuckets = bucketByActivityWindow(redemptions, "createdOn", "Redeemed", windowStartMs, windowEndMs);
 
       return {
         windowDays: days,

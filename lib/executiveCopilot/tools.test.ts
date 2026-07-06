@@ -108,38 +108,73 @@ describe("bucketByActivityWindow", () => {
   const start = new Date("2026-06-23T00:00:00Z").getTime();
   const end = new Date("2026-07-03T00:00:00Z").getTime();
 
-  it("puts a record with both dates in-window only in the effective bucket, never both", () => {
-    const records = [{ id: 1, submittedAt: "2026-07-01T00:00:00Z", effectiveDate: "2026-07-01T00:00:00Z" }];
-    const { effective, submitted } = bucketByActivityWindow(records, "submittedAt", start, end);
+  it("puts an Active record with both dates in-window only in the effective bucket, never both", () => {
+    const records = [{ id: 1, status: "Active", submittedAt: "2026-07-01T00:00:00Z", effectiveDate: "2026-07-01T00:00:00Z" }];
+    const { effective, submitted } = bucketByActivityWindow(records, "submittedAt", "Active", start, end);
     expect(effective).toEqual(records);
     expect(submitted).toEqual([]);
   });
 
-  it("puts a record submitted long before the window, but effective within it, in the effective bucket", () => {
-    const records = [{ id: 2, submittedAt: "2026-01-01T00:00:00Z", effectiveDate: "2026-06-30T00:00:00Z" }];
-    const { effective, submitted } = bucketByActivityWindow(records, "submittedAt", start, end);
+  it("puts an Active record submitted long before the window, but effective within it, in the effective bucket", () => {
+    const records = [{ id: 2, status: "Active", submittedAt: "2026-01-01T00:00:00Z", effectiveDate: "2026-06-30T00:00:00Z" }];
+    const { effective, submitted } = bucketByActivityWindow(records, "submittedAt", "Active", start, end);
     expect(effective).toEqual(records);
     expect(submitted).toEqual([]);
   });
 
   it("puts a record submitted in-window with no effective date yet in the submitted bucket", () => {
-    const records = [{ id: 3, submittedAt: "2026-06-25T00:00:00Z", effectiveDate: null }];
-    const { effective, submitted } = bucketByActivityWindow(records, "submittedAt", start, end);
+    const records = [{ id: 3, status: "UnderReview", submittedAt: "2026-06-25T00:00:00Z", effectiveDate: null }];
+    const { effective, submitted } = bucketByActivityWindow(records, "submittedAt", "Active", start, end);
     expect(effective).toEqual([]);
     expect(submitted).toEqual(records);
   });
 
   it("excludes a record whose effective date is outside the window and whose submitted date is also outside it", () => {
-    const records = [{ id: 4, submittedAt: "2026-01-01T00:00:00Z", effectiveDate: "2026-01-05T00:00:00Z" }];
-    const { effective, submitted } = bucketByActivityWindow(records, "submittedAt", start, end);
+    const records = [{ id: 4, status: "Active", submittedAt: "2026-01-01T00:00:00Z", effectiveDate: "2026-01-05T00:00:00Z" }];
+    const { effective, submitted } = bucketByActivityWindow(records, "submittedAt", "Active", start, end);
     expect(effective).toEqual([]);
     expect(submitted).toEqual([]);
   });
 
   it("uses whichever field name is passed as the submitted-date field (e.g. createdOn for redemptions)", () => {
-    const records = [{ id: 5, createdOn: "2026-06-25T00:00:00Z", effectiveDate: null }];
-    const { submitted } = bucketByActivityWindow(records, "createdOn", start, end);
+    const records = [{ id: 5, status: "UnderReview", createdOn: "2026-06-25T00:00:00Z", effectiveDate: null }];
+    const { submitted } = bucketByActivityWindow(records, "createdOn", "Redeemed", start, end);
     expect(submitted).toEqual(records);
+  });
+
+  // Regression guard for the exact reported bug: EffectiveDate gets prepopulated to the
+  // submission timestamp for every application the moment it's created (confirmed
+  // against the live DB), not only once it's actually approved -- so an UnderReview
+  // application already has an in-window "effective" date that means nothing yet. A
+  // status check is what tells apart "really effective now" from "just created".
+  it("puts an UnderReview record in submitted, not effective, even though its effectiveDate is in-window", () => {
+    const records = [{ id: 6, status: "UnderReview", submittedAt: "2026-07-02T00:00:00Z", effectiveDate: "2026-07-02T00:00:00Z" }];
+    const { effective, submitted } = bucketByActivityWindow(records, "submittedAt", "Active", start, end);
+    expect(effective).toEqual([]);
+    expect(submitted).toEqual(records);
+  });
+
+  it("puts a Rejected record in submitted, not effective, even though its effectiveDate is in-window", () => {
+    const records = [{ id: 7, status: "Rejected", submittedAt: "2026-07-02T00:00:00Z", effectiveDate: "2026-07-02T00:00:00Z" }];
+    const { effective, submitted } = bucketByActivityWindow(records, "submittedAt", "Active", start, end);
+    expect(effective).toEqual([]);
+    expect(submitted).toEqual(records);
+  });
+
+  it("for redemptions, treats 'Active' (approved but not yet executed) as still-pending, not effective", () => {
+    // RedemptionForm.Status reuses the same enum as applications, but "Redeemed" (not
+    // "Active") is the terminal, actually-paid-out state for a redemption.
+    const records = [{ id: 8, status: "Active", createdOn: "2026-07-02T00:00:00Z", effectiveDate: "2026-07-02T00:00:00Z" }];
+    const { effective, submitted } = bucketByActivityWindow(records, "createdOn", "Redeemed", start, end);
+    expect(effective).toEqual([]);
+    expect(submitted).toEqual(records);
+  });
+
+  it("for redemptions, treats 'Redeemed' with an in-window effective date as effective", () => {
+    const records = [{ id: 9, status: "Redeemed", createdOn: "2026-01-01T00:00:00Z", effectiveDate: "2026-06-30T00:00:00Z" }];
+    const { effective, submitted } = bucketByActivityWindow(records, "createdOn", "Redeemed", start, end);
+    expect(effective).toEqual(records);
+    expect(submitted).toEqual([]);
   });
 });
 
