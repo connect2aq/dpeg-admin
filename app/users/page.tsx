@@ -277,7 +277,8 @@ function UsersContent() {
             <div style={{ padding: 32, color: '#64748b' }}>Loading...</div>
           ) : result ? (
             <>
-              <table>
+              <div className="table-scroll">
+              <table style={{ minWidth: viewMode === 'investors' ? 1100 : 700 }}>
                 <thead>
                   <tr>
                     {viewMode === 'investors' && (
@@ -384,6 +385,7 @@ function UsersContent() {
                   ))}
                 </tbody>
               </table>
+              </div>
 
               {/* Pagination */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderTop: '1px solid #f1f5f9' }}>

@@ -258,7 +258,8 @@ function CapitalLedgerContent() {
           {loading ? (
             <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Loading…</div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <div className="table-scroll">
+            <table style={{ width: '100%', minWidth: 1360, borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0' }}>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>ID</th>
@@ -380,6 +381,7 @@ function CapitalLedgerContent() {
                 </tfoot>
               )}
             </table>
+            </div>
           )}
         </div>
 
