@@ -275,7 +275,7 @@ function ApplicationsContent() {
                       </td>
                       <td>
                         {a.userId ? (
-                          <Link href={`/investor-statements?userId=${a.userId}`} style={{ fontWeight: 600, color: '#1e293b', textDecoration: 'none' }} title="Open Investor Statement">
+                          <Link href={`/investor-statements?userId=${a.userId}`} style={{ fontWeight: 600, color: '#1e293b', textDecoration: 'underline' }} title="Open Investor Statement">
                             {a.userFirstName} {a.userLastName}
                           </Link>
                         ) : (
