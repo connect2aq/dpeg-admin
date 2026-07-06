@@ -122,7 +122,7 @@ function CapitalLedgerContent() {
   // Running Balance is only meaningful when rows are shown in true chronological order:
   // any filter that hides rows, or any sort other than Date, breaks the row-to-row build-up
   // (the From/To date range is exempt — the Opening Balance card already accounts for it).
-  const runningBalanceUnreliable = !!typeFilter || !!search || !!appIdFilter || sortField !== 'date';
+  const runningBalanceUnreliable = !!typeFilter || !!search || !!appIdFilter || sortField !== 'date' || sortDir !== 'asc';
 
   const exportToExcel = async () => {
     setExporting(true);
@@ -239,8 +239,9 @@ function CapitalLedgerContent() {
             <span style={{ fontSize: 16, lineHeight: '18px' }}>ℹ️</span>
             <span style={{ fontSize: 13, color: '#1e40af', lineHeight: 1.5 }}>
               <strong>Running Balance</strong> is each row&rsquo;s true fund balance as of that date, but it only <em>builds up</em> correctly
-              when every row is shown, in date order. With a search, App ID, type filter, or non-Date sort applied, rows are hidden or
-              reordered, so consecutive balances won&rsquo;t add up — clear filters and sort by Date to see it build up in order.
+              oldest → newest with every row shown. A search, App ID, or type filter hides rows, and any sort other than Date
+              (oldest first) reorders them — either way, consecutive balances won&rsquo;t add up. Clear filters and sort by Date
+              ascending to see it build up in order.
               (The From/To date range is fine on its own — the Opening Balance card above already accounts for it.)
             </span>
           </div>
