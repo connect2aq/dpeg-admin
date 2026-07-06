@@ -443,10 +443,14 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
       // Redemptions have no separate submission timestamp on the backend (RedemptionForm
       // has EffectiveDate but no SubmittedAt) -- createdOn is the closest equivalent: when
       // the redemption request entered the system. RedemptionForm.Status reuses
-      // eApplicationStatus (UnderReview/Active/Rejected/Redeemed) -- "Redeemed" is the
-      // terminal, actually-paid-out state, so that's the effective-status value here, NOT
-      // "Active" (which for a redemption means "approved, not yet executed").
-      const redemptionBuckets = bucketByActivityWindow(redemptions, "createdOn", "Redeemed", windowStartMs, windowEndMs);
+      // eApplicationStatus (UnderReview/Active/Rejected/Redeemed), but the two entities use
+      // it differently -- confirmed directly by the fund admin: for a REDEMPTION, "Active"
+      // means fully executed/paid out (the terminal state); "Redeemed" is never actually
+      // set on a RedemptionForm -- that value only appears on the APPLICATION side, marking
+      // an investment as fully liquidated once every unit across all its redemptions is
+      // gone (see AdminRepository's tranche.Status = eApplicationStatus.Redeemed, keyed off
+      // NumUnits reaching 0, not off any RedemptionForm field).
+      const redemptionBuckets = bucketByActivityWindow(redemptions, "createdOn", "Active", windowStartMs, windowEndMs);
 
       return {
         windowDays: days,

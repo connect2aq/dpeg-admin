@@ -161,20 +161,21 @@ describe("bucketByActivityWindow", () => {
     expect(submitted).toEqual(records);
   });
 
-  it("for redemptions, treats 'Active' (approved but not yet executed) as still-pending, not effective", () => {
-    // RedemptionForm.Status reuses the same enum as applications, but "Redeemed" (not
-    // "Active") is the terminal, actually-paid-out state for a redemption.
-    const records = [{ id: 8, status: "Active", createdOn: "2026-07-02T00:00:00Z", effectiveDate: "2026-07-02T00:00:00Z" }];
-    const { effective, submitted } = bucketByActivityWindow(records, "createdOn", "Redeemed", start, end);
-    expect(effective).toEqual([]);
-    expect(submitted).toEqual(records);
-  });
-
-  it("for redemptions, treats 'Redeemed' with an in-window effective date as effective", () => {
-    const records = [{ id: 9, status: "Redeemed", createdOn: "2026-01-01T00:00:00Z", effectiveDate: "2026-06-30T00:00:00Z" }];
-    const { effective, submitted } = bucketByActivityWindow(records, "createdOn", "Redeemed", start, end);
+  it("for redemptions, treats 'Active' (fully executed) with an in-window effective date as effective", () => {
+    // RedemptionForm.Status reuses the same enum as applications, but a redemption's
+    // "Active" means fully executed/paid out -- "Redeemed" is never actually set on a
+    // RedemptionForm (it only marks an APPLICATION as fully liquidated).
+    const records = [{ id: 8, status: "Active", createdOn: "2026-01-01T00:00:00Z", effectiveDate: "2026-06-30T00:00:00Z" }];
+    const { effective, submitted } = bucketByActivityWindow(records, "createdOn", "Active", start, end);
     expect(effective).toEqual(records);
     expect(submitted).toEqual([]);
+  });
+
+  it("for redemptions, treats 'UnderReview' as still-pending even though its effectiveDate is in-window", () => {
+    const records = [{ id: 9, status: "UnderReview", createdOn: "2026-07-02T00:00:00Z", effectiveDate: "2026-07-02T00:00:00Z" }];
+    const { effective, submitted } = bucketByActivityWindow(records, "createdOn", "Active", start, end);
+    expect(effective).toEqual([]);
+    expect(submitted).toEqual(records);
   });
 });
 
