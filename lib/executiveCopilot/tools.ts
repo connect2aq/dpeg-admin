@@ -18,6 +18,7 @@ import {
   usersPath,
   bankDetailsPath,
   dailyBalancesPath,
+  investorStatementPath,
 } from "@/lib/apiContracts";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL;
@@ -34,6 +35,12 @@ const MAX_REDEMPTION_DETAIL_IDS = 20;
 const DEFAULT_PAGE_SIZE = 150;
 const BACKEND_FETCH_TIMEOUT_MS = 15_000; // bounds a single hung backend call
 const CAPITAL_LEDGER_DEFAULT_WINDOW_DAYS = 90; // see get_capital_ledger below -- this endpoint has no pagination
+// get_accrued_interest has no batch endpoint on the backend -- accrued is only computed
+// per-investor inside GetInvestorStatement, so an "all investors" call fans out into one
+// request per investor. This caps that fan-out; fine for this fund's current size (~40
+// active investors), but a genuine batch endpoint would be the right fix if the fund
+// grows enough for this to become slow.
+const MAX_ACCRUED_INTEREST_INVESTORS = 150;
 
 async function backendGet<T>(path: string, token: string): Promise<T> {
   const controller = new AbortController();
@@ -221,6 +228,7 @@ Available tools and what they cover:
 - list_distributions: monthly distribution records and payment status.
 - get_capital_ledger: chronological capital-flow ledger (contributions, redemptions, distributions).
 - list_users: registered investor/user accounts.
+- get_accrued_interest: today's not-yet-distributed accrued interest, per investor or for every active investor at once. Not available from any other tool.
 - get_bank_details / get_daily_balances: bank account reference details and the manually-entered daily balance log.
 
 Use list/get tools to narrow before fetching details on a large set. If a question needs data no tool here provides (e.g. something not in this list), say so rather than guessing.
@@ -731,6 +739,62 @@ export const EXECUTIVE_COPILOT_TOOLS: CopilotTool[] = [
         byIdField,
         (id) => `/users/${id}`,
         (r) => `${(r.firstName as string) ?? ""} ${(r.lastName as string) ?? ""}`.trim() || (r.email as string),
+      ),
+  },
+  {
+    definition: {
+      name: "get_accrued_interest",
+      description:
+        "Get today's formula-based accrued (not-yet-distributed) interest -- the same 'Accrued' figure shown on the Investor Statement page's summary card -- for one specific investor (pass userId) or for every currently active investor at once (omit userId). This is the only tool with this figure; it isn't part of get_dashboard_stats or list_applications. Calling with no userId fans out into one lookup per active investor -- for a large fund this is a lot of individual calls, so pass userId when the question is about one investor.",
+      input_schema: {
+        type: "object",
+        properties: {
+          userId: { type: "number", description: "Omit to get accrued interest for every active investor" },
+        },
+      },
+    },
+    execute: async (input, token) => {
+      const requestedUserId = (input as { userId?: number })?.userId;
+
+      async function fetchOne(userId: number, name?: string): Promise<Record<string, unknown>> {
+        const statement = await backendGet<{ accrued?: number; netPosition?: number }>(investorStatementPath(userId), token);
+        return { userId, name, accrued: statement.accrued ?? 0, netPosition: statement.netPosition ?? 0 };
+      }
+
+      if (typeof requestedUserId === "number") {
+        return { investors: [await fetchOne(requestedUserId)] };
+      }
+
+      // No specific investor asked for -- enumerate every currently-active investor
+      // (hasActiveInvestment mirrors the same "Active" status check the accrued formula
+      // itself uses, so an investor with zero current units never shows up here either)
+      // and fetch each one's accrued figure. Only userId/name/accrued/netPosition are kept
+      // -- the full statement's entries array is never forwarded to the model, so this
+      // stays cheap in tokens no matter how long an individual investor's history is.
+      const investorAccounts = await fetchAllPages(
+        (page) => usersPath({ page, pageSize: ACTIVITY_REPORT_PAGE_SIZE, hasActiveInvestment: "true" }),
+        token,
+      );
+      const capped = investorAccounts.slice(0, MAX_ACCRUED_INTEREST_INVESTORS);
+      const investors = await Promise.all(
+        capped.map((u) => {
+          const userId = u.id as number;
+          const name = `${(u.firstName as string) ?? ""} ${(u.lastName as string) ?? ""}`.trim() || (u.email as string);
+          return fetchOne(userId, name);
+        }),
+      );
+      return {
+        investors,
+        truncated: investorAccounts.length > MAX_ACCRUED_INTEREST_INVESTORS,
+      };
+    },
+    extractCitations: (result) =>
+      citationsFromRecords(
+        (result as { investors?: unknown[] })?.investors,
+        "investor",
+        (item) => (typeof item.userId === "number" ? item.userId : undefined),
+        (id) => `/investor-statements?userId=${id}`,
+        (r) => r.name as string,
       ),
   },
   {

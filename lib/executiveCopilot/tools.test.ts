@@ -225,6 +225,61 @@ describe("get_new_activity_report", () => {
   });
 });
 
+describe("get_accrued_interest", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function statementResponse(accrued: number, netPosition: number) {
+    return { success: true, data: { accrued, netPosition, entries: [] }, message: "" };
+  }
+
+  it("with a userId, fetches only that investor's statement", async () => {
+    const tool = EXECUTIVE_COPILOT_TOOLS.find((t) => t.definition.name === "get_accrued_interest");
+    expect(tool).toBeDefined();
+
+    const fetchMock = vi.fn((url: string) => {
+      expect(url).toContain("/investor-statement/42");
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(statementResponse(1234.56, 50000)) } as Response);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = (await tool!.execute({ userId: 42 }, "token")) as { investors: Array<Record<string, unknown>> };
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.investors).toEqual([{ userId: 42, name: undefined, accrued: 1234.56, netPosition: 50000 }]);
+  });
+
+  it("with no userId, sweeps every page of active investors and fetches each one's accrued figure", async () => {
+    const tool = EXECUTIVE_COPILOT_TOOLS.find((t) => t.definition.name === "get_accrued_interest");
+    expect(tool).toBeDefined();
+
+    const userPages = [
+      [{ id: 1, firstName: "Alice", lastName: "Anderson" }],
+      [{ id: 2, firstName: "Bob", lastName: "Brown" }],
+    ];
+    const accruedByUser: Record<number, number> = { 1: 100, 2: 200 };
+
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes("/users")) {
+        const page = Number(new URL(url, "http://x").searchParams.get("page"));
+        const body = { success: true, data: { items: userPages[page - 1] ?? [], page, pageSize: 1, totalCount: 2, totalPages: userPages.length }, message: "" };
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(body) } as Response);
+      }
+      const match = url.match(/\/investor-statement\/(\d+)/);
+      const userId = match ? Number(match[1]) : -1;
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(statementResponse(accruedByUser[userId] ?? -1, 0)) } as Response);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = (await tool!.execute({}, "token")) as { investors: Array<{ userId: number; name: string; accrued: number }> };
+
+    // Both pages of active investors must show up, not just page 1's single record.
+    expect(result.investors).toHaveLength(2);
+    expect(result.investors).toContainEqual({ userId: 1, name: "Alice Anderson", accrued: 100, netPosition: 0 });
+    expect(result.investors).toContainEqual({ userId: 2, name: "Bob Brown", accrued: 200, netPosition: 0 });
+  });
+});
+
 // Guards against the exact class of bug this feature has repeatedly hit: a tool that
 // returns individually-linkable records (applications, redemptions, ...) shipping with no
 // extractCitations at all, so admins get a table full of names/IDs with zero links. This
@@ -410,6 +465,7 @@ describe("sensitive-field redaction coverage", () => {
     list_distributions: "redacts", // bankName/bankAccountNumber
     get_capital_ledger: "no-sensitive-fields",
     list_users: "no-sensitive-fields",
+    get_accrued_interest: "no-sensitive-fields", // only userId/name/accrued/netPosition are ever forwarded -- the full statement's entries are never fetched-through
     get_bank_details: "no-sensitive-fields", // the FUND's own bank details -- this tool's entire purpose, not investor data
     get_daily_balances: "no-sensitive-fields",
   };

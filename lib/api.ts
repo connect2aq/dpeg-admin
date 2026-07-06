@@ -13,6 +13,7 @@ import {
   usersPath,
   bankDetailsPath,
   dailyBalancesPath,
+  investorStatementPath,
 } from "./apiContracts";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL;
@@ -774,9 +775,7 @@ export const adminApi = {
   capitalLedger: (params: { from?: string; to?: string } = {}) =>
     api.get<ApiResponse<CapitalLedger>>(capitalLedgerPath(params)),
   investorStatement: (userId: number, applicationId?: number) =>
-    api.get<ApiResponse<InvestorCapitalAccount>>(
-      `/investor-statement/${userId}${applicationId ? `?applicationId=${applicationId}` : ""}`,
-    ),
+    api.get<ApiResponse<InvestorCapitalAccount>>(investorStatementPath(userId, applicationId)),
 };
 
 export interface NotificationEmail {

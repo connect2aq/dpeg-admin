@@ -72,6 +72,10 @@ export function usersPath(params: Record<string, string | number>): string {
   return `/users?${q}`;
 }
 
+export function investorStatementPath(userId: number, applicationId?: number): string {
+  return `/investor-statement/${userId}${applicationId ? `?applicationId=${applicationId}` : ""}`;
+}
+
 export function bankDetailsPath(): string {
   return '/bank-details';
 }
