@@ -42,6 +42,26 @@ const TYPE_LABELS: Record<string, string> = {
   'Redemption,Dividend': 'Redemptions + Dividends',
 };
 
+type SortField =
+  | 'entryId' | 'applicationId' | 'date' | 'entryType' | 'investmentType'
+  | 'investorName' | 'accountUserName' | 'units' | 'amount' | 'dividendPaid' | 'runningBalance';
+
+const sortValue = (e: CapitalLedgerEntry, field: SortField): string | number => {
+  switch (field) {
+    case 'entryId':         return e.entryId ?? -Infinity;
+    case 'applicationId':   return e.applicationId ?? -Infinity;
+    case 'date':            return new Date(e.date).getTime();
+    case 'entryType':       return e.entryType;
+    case 'investmentType':  return e.investmentType ?? '';
+    case 'investorName':    return e.investorName.toLowerCase();
+    case 'accountUserName': return e.accountUserName.toLowerCase();
+    case 'units':           return e.units ?? -Infinity;
+    case 'amount':          return e.amount;
+    case 'dividendPaid':    return e.dividendPaid ?? -Infinity;
+    case 'runningBalance':  return e.runningBalance;
+  }
+};
+
 function CapitalLedgerContent() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<CapitalLedger | null>(null);
@@ -53,6 +73,13 @@ function CapitalLedgerContent() {
   const [appIdFilter, setAppIdFilter] = useState('');
   const [exporting, setExporting] = useState(false);
   const [page, setPage] = useState(1);
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortField(field); setSortDir('asc'); }
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -79,10 +106,23 @@ function CapitalLedgerContent() {
     return true;
   });
 
-  useEffect(() => { setPage(1); }, [data, typeFilter, search, appIdFilter]);
+  useEffect(() => { setPage(1); }, [data, typeFilter, search, appIdFilter, sortField, sortDir]);
+
+  const sortedEntries = [...visibleEntries].sort((a, b) => {
+    const av = sortValue(a, sortField);
+    const bv = sortValue(b, sortField);
+    if (av < bv) return sortDir === 'asc' ? -1 : 1;
+    if (av > bv) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
 
   const totalPages = Math.max(1, Math.ceil(visibleEntries.length / PAGE_SIZE));
-  const pageEntries = visibleEntries.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageEntries = sortedEntries.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Running Balance is only meaningful when rows are shown in true chronological order:
+  // any filter that hides rows, or any sort other than Date, breaks the row-to-row build-up
+  // (the From/To date range is exempt — the Opening Balance card already accounts for it).
+  const runningBalanceUnreliable = !!typeFilter || !!search || !!appIdFilter || sortField !== 'date';
 
   const exportToExcel = async () => {
     setExporting(true);
@@ -193,6 +233,19 @@ function CapitalLedgerContent() {
           </div>
         )}
 
+        {/* Running Balance reliability notice */}
+        {runningBalanceUnreliable && (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 16, padding: '12px 18px', background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 10 }}>
+            <span style={{ fontSize: 16, lineHeight: '18px' }}>ℹ️</span>
+            <span style={{ fontSize: 13, color: '#1e40af', lineHeight: 1.5 }}>
+              <strong>Running Balance</strong> is each row&rsquo;s true fund balance as of that date, but it only <em>builds up</em> correctly
+              when every row is shown, in date order. With a search, App ID, type filter, or non-Date sort applied, rows are hidden or
+              reordered, so consecutive balances won&rsquo;t add up — clear filters and sort by Date to see it build up in order.
+              (The From/To date range is fine on its own — the Opening Balance card above already accounts for it.)
+            </span>
+          </div>
+        )}
+
         {/* Table */}
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           {loading ? (
@@ -202,16 +255,34 @@ function CapitalLedgerContent() {
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0' }}>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>ID</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>App ID</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Date</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Type</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Inv. Type</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Investor</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>Account User</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>Units</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>Amount</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#b45309' }}>Dividend Paid</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>Running Balance</th>
+                  {([
+                    ['applicationId',   'App ID',        'left'],
+                    ['date',            'Date',          'left'],
+                    ['entryType',       'Type',          'left'],
+                    ['investmentType',  'Inv. Type',     'left'],
+                    ['investorName',    'Investor',      'left'],
+                    ['accountUserName', 'Account User',  'left'],
+                    ['units',           'Units',         'right'],
+                    ['amount',          'Amount',        'right'],
+                    ['dividendPaid',    'Dividend Paid', 'right'],
+                    ['runningBalance',  'Running Balance', 'right'],
+                  ] as [SortField, string, 'left' | 'right'][]).map(([field, label, align]) => {
+                    const active = sortField === field;
+                    return (
+                      <th key={field} onClick={() => toggleSort(field)}
+                        style={{
+                          padding: '12px 16px', textAlign: align, fontWeight: 600, whiteSpace: 'nowrap',
+                          color: field === 'dividendPaid' ? '#b45309' : (active ? '#0f2342' : '#475569'),
+                          cursor: 'pointer', userSelect: 'none',
+                        }}
+                        title="Click to sort">
+                        {label}
+                        <span style={{ marginLeft: 4, opacity: active ? 1 : 0.25 }}>
+                          {active ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+                        </span>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
