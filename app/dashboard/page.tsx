@@ -370,7 +370,7 @@ export default function DashboardPage() {
             {trends && (
               <>
                 <SectionLabel>Analytics</SectionLabel>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, marginBottom: 20 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(320px, 1fr))", gap: 20, marginBottom: 20 }}>
                   <div className="card">
                     <div style={{ fontSize: 14, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>Applications by Month</div>
                     <ResponsiveContainer width="100%" height={200}>
