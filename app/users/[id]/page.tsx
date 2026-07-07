@@ -5,11 +5,13 @@ import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PendingBadge } from '@/components/PendingBadge';
+import { SortableTh } from '@/components/SortableTh';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import {
   adminApi,
   type UserDetail,
   type ApplicationDetail,
+  type ApplicationSummary,
   type RedemptionListItem,
   type UserDistributionItem,
   type CreateApplicationRequest,
@@ -17,6 +19,42 @@ import {
   type CreateDistributionRequest,
   type PendingChangeItem,
 } from '@/lib/api';
+
+type InvestmentSortField = 'id' | 'ppmRefNO' | 'investorType' | 'numUnits' | 'totalAmount' | 'status' | 'submittedAt';
+const investmentSortValue = (a: ApplicationSummary, field: InvestmentSortField): string | number => {
+  switch (field) {
+    case 'id':          return a.id;
+    case 'ppmRefNO':    return a.ppmRefNO ?? '';
+    case 'investorType': return a.investorType;
+    case 'numUnits':    return a.numUnits ?? -Infinity;
+    case 'totalAmount': return a.totalAmount ?? -Infinity;
+    case 'status':      return a.status;
+    case 'submittedAt': return a.submittedAt ? new Date(a.submittedAt).getTime() : -Infinity;
+  }
+};
+
+type RedemptionSortField = 'trancheApplicationId' | 'sellingPartnerName' | 'unitsToRedeem' | 'effectiveDate' | 'netAggregatePrice' | 'status';
+const redemptionSortValue = (r: RedemptionListItem, field: RedemptionSortField): string | number => {
+  switch (field) {
+    case 'trancheApplicationId': return r.trancheApplicationId ?? -Infinity;
+    case 'sellingPartnerName':   return r.sellingPartnerName || r.email || '';
+    case 'unitsToRedeem':        return r.unitsToRedeem ? parseFloat(r.unitsToRedeem) : -Infinity;
+    case 'effectiveDate':        return r.effectiveDate ?? '';
+    case 'netAggregatePrice':    return r.netAggregatePrice ? parseFloat(r.netAggregatePrice) : (r.aggregatePurchasePrice ? parseFloat(r.aggregatePurchasePrice) : -Infinity);
+    case 'status':                return r.status;
+  }
+};
+
+type DistributionSortField = 'ppmRefNO' | 'distributionMonth' | 'totalNetAmount' | 'paymentStatus' | 'paidAt';
+const distributionSortValue = (d: UserDistributionItem, field: DistributionSortField): string | number => {
+  switch (field) {
+    case 'ppmRefNO':          return d.ppmRefNO ?? -Infinity;
+    case 'distributionMonth': return new Date(d.distributionMonth).getTime();
+    case 'totalNetAmount':    return d.totalNetAmount;
+    case 'paymentStatus':     return d.paymentStatus;
+    case 'paidAt':            return d.paidAt ? new Date(d.paidAt).getTime() : -Infinity;
+  }
+};
 import { type RedemptionCalculations } from '@/lib/redemptionCalculations';
 import { BankDetailsPanel, RedemptionSummaryPanel } from '@/components/RedemptionSummaryPanels';
 
@@ -131,6 +169,29 @@ export default function UserDetailPage() {
   // Redemptions & distributions for this user
   const [userRedemptions, setUserRedemptions] = useState<RedemptionListItem[]>([]);
   const [userDistributions, setUserDistributions] = useState<UserDistributionItem[]>([]);
+
+  // Sub-table sort state
+  const [invSort, setInvSort] = useState<InvestmentSortField>('submittedAt');
+  const [invSortDir, setInvSortDir] = useState<'asc' | 'desc'>('desc');
+  const toggleInvSort = (field: string) => {
+    const f = field as InvestmentSortField;
+    if (invSort === f) setInvSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    else { setInvSort(f); setInvSortDir('asc'); }
+  };
+  const [redeemSort, setRedeemSort] = useState<RedemptionSortField>('effectiveDate');
+  const [redeemSortDir, setRedeemSortDir] = useState<'asc' | 'desc'>('desc');
+  const toggleRedeemSort = (field: string) => {
+    const f = field as RedemptionSortField;
+    if (redeemSort === f) setRedeemSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    else { setRedeemSort(f); setRedeemSortDir('asc'); }
+  };
+  const [distSort, setDistSort] = useState<DistributionSortField>('distributionMonth');
+  const [distSortDir, setDistSortDir] = useState<'asc' | 'desc'>('desc');
+  const toggleDistSort = (field: string) => {
+    const f = field as DistributionSortField;
+    if (distSort === f) setDistSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    else { setDistSort(f); setDistSortDir('asc'); }
+  };
 
   // Pending-change badges (persist across navigation, unlike the transient pendingMsg toast)
   const [invPendingMap, setInvPendingMap] = useState<Record<number, PendingChangeItem>>({});
@@ -736,11 +797,24 @@ export default function UserDetailPage() {
               <table>
                 <thead>
                   <tr>
-                    <th>App ID</th><th>PPM#</th><th>Type</th><th>Units</th><th>Amount</th><th>Status</th><th>Effective</th><th></th>
+                    <SortableTh label="App ID" sortKey="id" sortOn={invSort} sortDirection={invSortDir} onSort={toggleInvSort} />
+                    <SortableTh label="PPM#" sortKey="ppmRefNO" sortOn={invSort} sortDirection={invSortDir} onSort={toggleInvSort} />
+                    <SortableTh label="Type" sortKey="investorType" sortOn={invSort} sortDirection={invSortDir} onSort={toggleInvSort} />
+                    <SortableTh label="Units" sortKey="numUnits" sortOn={invSort} sortDirection={invSortDir} onSort={toggleInvSort} />
+                    <SortableTh label="Amount" sortKey="totalAmount" sortOn={invSort} sortDirection={invSortDir} onSort={toggleInvSort} />
+                    <SortableTh label="Status" sortKey="status" sortOn={invSort} sortDirection={invSortDir} onSort={toggleInvSort} />
+                    <SortableTh label="Effective" sortKey="submittedAt" sortOn={invSort} sortDirection={invSortDir} onSort={toggleInvSort} />
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {user.applications.map(a => (
+                  {[...user.applications].sort((a, b) => {
+                    const av = investmentSortValue(a, invSort);
+                    const bv = investmentSortValue(b, invSort);
+                    if (av < bv) return invSortDir === 'asc' ? -1 : 1;
+                    if (av > bv) return invSortDir === 'asc' ? 1 : -1;
+                    return 0;
+                  }).map(a => (
                     <tr key={a.id}>
                       <td style={{ fontFamily: 'monospace', fontWeight: 600, color: '#64748b' }}>#{a.id}</td>
                       <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{a.ppmRefNO ?? '—'}</td>
@@ -781,10 +855,24 @@ export default function UserDetailPage() {
             <div style={{ overflowX: 'auto' }}>
               <table>
                 <thead>
-                  <tr><th>App ID</th><th>Investor</th><th>Units to Redeem</th><th>Effective Date</th><th>Redemption Amount</th><th>Status</th><th></th></tr>
+                  <tr>
+                    <SortableTh label="App ID" sortKey="trancheApplicationId" sortOn={redeemSort} sortDirection={redeemSortDir} onSort={toggleRedeemSort} />
+                    <SortableTh label="Investor" sortKey="sellingPartnerName" sortOn={redeemSort} sortDirection={redeemSortDir} onSort={toggleRedeemSort} />
+                    <SortableTh label="Units to Redeem" sortKey="unitsToRedeem" sortOn={redeemSort} sortDirection={redeemSortDir} onSort={toggleRedeemSort} />
+                    <SortableTh label="Effective Date" sortKey="effectiveDate" sortOn={redeemSort} sortDirection={redeemSortDir} onSort={toggleRedeemSort} />
+                    <SortableTh label="Redemption Amount" sortKey="netAggregatePrice" sortOn={redeemSort} sortDirection={redeemSortDir} onSort={toggleRedeemSort} />
+                    <SortableTh label="Status" sortKey="status" sortOn={redeemSort} sortDirection={redeemSortDir} onSort={toggleRedeemSort} />
+                    <th></th>
+                  </tr>
                 </thead>
                 <tbody>
-                  {userRedemptions.map(r => (
+                  {[...userRedemptions].sort((a, b) => {
+                    const av = redemptionSortValue(a, redeemSort);
+                    const bv = redemptionSortValue(b, redeemSort);
+                    if (av < bv) return redeemSortDir === 'asc' ? -1 : 1;
+                    if (av > bv) return redeemSortDir === 'asc' ? 1 : -1;
+                    return 0;
+                  }).map(r => (
                     <tr key={r.id}>
                       <td style={{ fontFamily: 'monospace', fontWeight: 600, color: '#64748b' }}>{r.trancheApplicationId ? `#${r.trancheApplicationId}` : '—'}</td>
                       <td style={{ fontWeight: 600 }}>{r.sellingPartnerName || r.email || '—'}</td>
@@ -823,10 +911,23 @@ export default function UserDetailPage() {
             <div style={{ overflowX: 'auto' }}>
               <table>
                 <thead>
-                  <tr><th>PPM#</th><th>Month</th><th>Net Amount</th><th>Status</th><th>Paid Date</th><th></th></tr>
+                  <tr>
+                    <SortableTh label="PPM#" sortKey="ppmRefNO" sortOn={distSort} sortDirection={distSortDir} onSort={toggleDistSort} />
+                    <SortableTh label="Month" sortKey="distributionMonth" sortOn={distSort} sortDirection={distSortDir} onSort={toggleDistSort} />
+                    <SortableTh label="Net Amount" sortKey="totalNetAmount" sortOn={distSort} sortDirection={distSortDir} onSort={toggleDistSort} />
+                    <SortableTh label="Status" sortKey="paymentStatus" sortOn={distSort} sortDirection={distSortDir} onSort={toggleDistSort} />
+                    <SortableTh label="Paid Date" sortKey="paidAt" sortOn={distSort} sortDirection={distSortDir} onSort={toggleDistSort} />
+                    <th></th>
+                  </tr>
                 </thead>
                 <tbody>
-                  {userDistributions.map(d => (
+                  {[...userDistributions].sort((a, b) => {
+                    const av = distributionSortValue(a, distSort);
+                    const bv = distributionSortValue(b, distSort);
+                    if (av < bv) return distSortDir === 'asc' ? -1 : 1;
+                    if (av > bv) return distSortDir === 'asc' ? 1 : -1;
+                    return 0;
+                  }).map(d => (
                     <tr key={d.id}>
                       <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{d.ppmRefNO ?? '—'}</td>
                       <td style={{ fontSize: 13 }}>{new Date(d.distributionMonth).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</td>

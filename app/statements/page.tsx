@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/components/AdminLayout';
+import { SortableTh } from '@/components/SortableTh';
 import { adminApi, type StatementListItem, type PagedResult } from '@/lib/api';
 
 const TYPES = ['', 'Monthly', 'InvestmentConfirmation', 'RedemptionConfirmation'];
@@ -17,6 +18,13 @@ export default function StatementsPage() {
   const [type, setType] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [sortOn, setSortOn] = useState('generated');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const toggleSort = (key: string) => {
+    if (sortOn === key) setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortOn(key); setSortDirection('asc'); }
+    setPage(1);
+  };
   const [downloading, setDownloading] = useState<number | null>(null);
 
   const downloadPdf = async (id: number, investorName: string) => {
@@ -43,13 +51,13 @@ export default function StatementsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE };
+    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
     if (type) params.type = type;
     if (search) params.search = search;
     adminApi.statements(params)
       .then(r => { if (r.success) setResult(r.data); })
       .finally(() => setLoading(false));
-  }, [page, type, search]);
+  }, [page, type, search, sortOn, sortDirection]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -93,9 +101,11 @@ export default function StatementsPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    {['Investor', 'Type', 'Period', 'Generated', 'PDF'].map(h => (
-                      <th key={h} style={thStyle}>{h}</th>
-                    ))}
+                    <SortableTh label="Investor" sortKey="investorname" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
+                    <SortableTh label="Type" sortKey="type" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
+                    <SortableTh label="Period" sortKey="period" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
+                    <SortableTh label="Generated" sortKey="generated" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
+                    <th style={thStyle}>PDF</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -4,7 +4,28 @@ import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AdminLayout from "@/components/AdminLayout";
+import { SortableTh } from "@/components/SortableTh";
 import { adminApi, type UserListItem, type ApplicationSummary, type InvestorCapitalAccount, type InvestorCapitalAccountEntry } from "@/lib/api";
+
+type SortField =
+  | "date" | "entryType" | "investmentType" | "investorName" | "accountUserName"
+  | "applicationId" | "ppmRefNo" | "units" | "amount" | "income" | "runningBalance";
+
+const sortValue = (e: InvestorCapitalAccountEntry, field: SortField): string | number => {
+  switch (field) {
+    case "date":            return new Date(e.date).getTime();
+    case "entryType":       return e.entryType;
+    case "investmentType":  return e.investmentType ?? "";
+    case "investorName":    return e.investorName ?? "";
+    case "accountUserName": return e.accountUserName ?? "";
+    case "applicationId":   return e.applicationId ?? -Infinity;
+    case "ppmRefNo":        return e.ppmRefNo ?? "";
+    case "units":           return e.units ?? -Infinity;
+    case "amount":          return e.amount;
+    case "income":          return e.income;
+    case "runningBalance":  return e.runningBalance;
+  }
+};
 
 const ACTIVE_STATUSES = new Set(["Active", "Redeemed"]);
 
@@ -169,6 +190,13 @@ function InvestorStatementsContent() {
   const [loading, setLoading] = useState(false);
   const [investorsLoading, setInvestorsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sortField, setSortField] = useState<SortField>("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const toggleSort = (field: string) => {
+    const f = field as SortField;
+    if (sortField === f) setSortDir(d => (d === "asc" ? "desc" : "asc"));
+    else { setSortField(f); setSortDir("asc"); }
+  };
   // Captures the search text at the moment an investor is picked, so once that user's
   // investments load we can tell whether the match was a specific investor/entity name
   // (vs. the account holder's own name or email) and auto-scope to that one investment.
@@ -258,6 +286,14 @@ function InvestorStatementsContent() {
     if (fromDate && entryDate < fromDate) return false;
     if (toDate && entryDate > toDate) return false;
     return true;
+  });
+
+  const sortedVisible = [...visible].sort((a, b) => {
+    const av = sortValue(a, sortField);
+    const bv = sortValue(b, sortField);
+    if (av < bv) return sortDir === "asc" ? -1 : 1;
+    if (av > bv) return sortDir === "asc" ? 1 : -1;
+    return 0;
   });
 
   return (
@@ -498,13 +534,33 @@ function InvestorStatementsContent() {
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: "var(--bg-section)", borderBottom: "1px solid var(--border)" }}>
-                      {["Date", "Type", "Inv. Type", "Investor", "Account User", "App ID", "PPM Ref", "Units", "Capital", "Income", "Capital Balance"].map((h, i) => (
-                        <th key={h} style={{ padding: "10px 14px", textAlign: i >= 7 ? "right" : "left", fontWeight: 600, fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap" }}>{h}</th>
+                      {([
+                        ["date", "Date", "left"],
+                        ["entryType", "Type", "left"],
+                        ["investmentType", "Inv. Type", "left"],
+                        ["investorName", "Investor", "left"],
+                        ["accountUserName", "Account User", "left"],
+                        ["applicationId", "App ID", "left"],
+                        ["ppmRefNo", "PPM Ref", "left"],
+                        ["units", "Units", "right"],
+                        ["amount", "Capital", "right"],
+                        ["income", "Income", "right"],
+                        ["runningBalance", "Capital Balance", "right"],
+                      ] as [SortField, string, "left" | "right"][]).map(([field, label, align]) => (
+                        <SortableTh
+                          key={field}
+                          label={label}
+                          sortKey={field}
+                          sortOn={sortField}
+                          sortDirection={sortDir}
+                          onSort={toggleSort}
+                          style={{ padding: "10px 14px", textAlign: align, fontWeight: 600, fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap" }}
+                        />
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {visible.map((e, i) => {
+                    {sortedVisible.map((e, i) => {
                       const colors = TYPE_COLORS[e.entryType] ?? TYPE_COLORS.Contribution;
                       return (
                         <tr key={i} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? undefined : "var(--bg-section)" }}>

@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/components/AdminLayout';
+import { SortableTh } from '@/components/SortableTh';
 import { adminApi, type EmailLogItem, type EmailLogDetail, type PagedResult } from '@/lib/api';
 
 const PAGE_SIZE = 25;
@@ -67,12 +68,19 @@ export default function EmailLogsPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
+  const [sortOn, setSortOn] = useState('sentat');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const toggleSort = (key: string) => {
+    if (sortOn === key) setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortOn(key); setSortDirection('asc'); }
+    setPage(1);
+  };
   const [detail, setDetail] = useState<{ id: number; data: EmailLogDetail } | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE };
+    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
     if (success !== '') params.success = success;
     if (search) params.search = search;
     if (from) params.from = from;
@@ -80,7 +88,7 @@ export default function EmailLogsPage() {
     adminApi.emailLogs(params)
       .then(r => { if (r.success) setResult(r.data); })
       .finally(() => setLoading(false));
-  }, [page, success, search, from, to]);
+  }, [page, success, search, from, to, sortOn, sortDirection]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -139,9 +147,20 @@ export default function EmailLogsPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                    {['Sent At', 'Status', 'Method', 'To', 'Subject', 'Triggered By', ''].map(h => (
-                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
+                    {(() => {
+                      const th: React.CSSProperties = { padding: '10px 12px', textAlign: 'left', color: '#475569', fontWeight: 600, whiteSpace: 'nowrap' };
+                      return (
+                        <>
+                          <SortableTh label="Sent At" sortKey="sentat" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                          <SortableTh label="Status" sortKey="success" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                          <SortableTh label="Method" sortKey="method" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                          <SortableTh label="To" sortKey="to" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                          <SortableTh label="Subject" sortKey="subject" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                          <SortableTh label="Triggered By" sortKey="useremail" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                          <th style={th}></th>
+                        </>
+                      );
+                    })()}
                   </tr>
                 </thead>
                 <tbody>

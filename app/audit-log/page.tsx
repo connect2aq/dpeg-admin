@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { adminApi, type AuditLogItem, type PagedResult } from '@/lib/api';
+import { SortableTh } from '@/components/SortableTh';
 
 const CATEGORIES = ['', 'Auth', 'Admin', 'Application', 'Redemption', 'Distribution', 'File'];
 const PAGE_SIZE = 50;
@@ -53,10 +54,17 @@ export default function AuditLogPage() {
   const [to, setTo] = useState('');
   const [successFilter, setSuccessFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [sortOn, setSortOn] = useState('timestamp');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const toggleSort = (key: string) => {
+    if (sortOn === key) setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortOn(key); setSortDirection('asc'); }
+    setPage(1);
+  };
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number | boolean> = { page, pageSize: PAGE_SIZE };
+    const params: Record<string, string | number | boolean> = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
     if (category) params.category = category;
     if (eventType) params.eventType = eventType;
     if (userId) params.userId = Number(userId);
@@ -68,7 +76,7 @@ export default function AuditLogPage() {
     adminApi.auditLogs(params)
       .then(r => { if (r.success) setResult(r.data); })
       .finally(() => setLoading(false));
-  }, [page, category, eventType, userId, userEmail, appId, from, to, successFilter]);
+  }, [page, category, eventType, userId, userEmail, appId, from, to, successFilter, sortOn, sortDirection]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -163,14 +171,14 @@ export default function AuditLogPage() {
                 <table style={{ minWidth: 1100 }}>
                   <thead>
                     <tr>
-                      <th style={{ minWidth: 170 }}>Timestamp (UTC)</th>
-                      <th>Category</th>
-                      <th style={{ minWidth: 200 }}>Event Type</th>
-                      <th>Actor</th>
-                      <th>User Email</th>
-                      <th>Entity</th>
-                      <th>App ID</th>
-                      <th>Result</th>
+                      <SortableTh label="Timestamp (UTC)" sortKey="timestamp" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={{ minWidth: 170 }} />
+                      <SortableTh label="Category" sortKey="category" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                      <SortableTh label="Event Type" sortKey="eventtype" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={{ minWidth: 200 }} />
+                      <SortableTh label="Actor" sortKey="actor" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                      <SortableTh label="User Email" sortKey="useremail" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                      <SortableTh label="Entity" sortKey="entity" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                      <SortableTh label="App ID" sortKey="appid" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                      <SortableTh label="Result" sortKey="result" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                       <th>Old Values</th>
                       <th>New Values</th>
                       <th>Metadata</th>

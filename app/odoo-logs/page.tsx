@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/components/AdminLayout';
+import { SortableTh } from '@/components/SortableTh';
 import { adminApi, type OdooLogItem, type OdooLogDetail, type PagedResult } from '@/lib/api';
 
 const PAGE_SIZE = 25;
@@ -61,12 +62,19 @@ export default function OdooLogsPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
+  const [sortOn, setSortOn] = useState('createdon');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const toggleSort = (key: string) => {
+    if (sortOn === key) setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortOn(key); setSortDirection('asc'); }
+    setPage(1);
+  };
   const [detail, setDetail] = useState<{ id: number; data: OdooLogDetail } | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE };
+    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
     if (direction) params.direction = direction;
     if (isSuccess !== '') params.isSuccess = isSuccess;
     if (search) params.search = search;
@@ -75,7 +83,7 @@ export default function OdooLogsPage() {
     adminApi.odooLogs(params)
       .then(r => { if (r.success) setResult(r.data); })
       .finally(() => setLoading(false));
-  }, [page, direction, isSuccess, search, from, to]);
+  }, [page, direction, isSuccess, search, from, to, sortOn, sortDirection]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -136,9 +144,15 @@ export default function OdooLogsPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    {['Time', 'Direction', 'Endpoint', 'Entity', 'HTTP', 'Attempt', 'Duration', 'Status', 'Payloads'].map(h => (
-                      <th key={h} style={th}>{h}</th>
-                    ))}
+                    <SortableTh label="Time" sortKey="createdon" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                    <SortableTh label="Direction" sortKey="direction" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                    <SortableTh label="Endpoint" sortKey="endpoint" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                    <SortableTh label="Entity" sortKey="entitytype" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                    <SortableTh label="HTTP" sortKey="httpstatuscode" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                    <th style={th}>Attempt</th>
+                    <SortableTh label="Duration" sortKey="durationms" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                    <SortableTh label="Status" sortKey="issuccess" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                    <th style={th}>Payloads</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -2,12 +2,33 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
+import { SortableTh } from '@/components/SortableTh';
 import { historicalImportApi, type ImportSessionListItem } from '@/lib/api';
+
+type SortField = 'id' | 'fileName' | 'importedAt' | 'totalRows' | 'succeeded' | 'failed';
+
+const sortValue = (s: ImportSessionListItem, field: SortField): string | number => {
+  switch (field) {
+    case 'id':         return s.id;
+    case 'fileName':   return s.fileName ?? '';
+    case 'importedAt': return new Date(s.importedAt).getTime();
+    case 'totalRows':  return s.totalRows;
+    case 'succeeded':  return s.succeeded;
+    case 'failed':     return s.failed;
+  }
+};
 
 export default function ImportHistoryPage() {
   const [sessions, setSessions]   = useState<ImportSessionListItem[]>([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState('');
+  const [sortField, setSortField] = useState<SortField>('importedAt');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const toggleSort = (field: string) => {
+    const f = field as SortField;
+    if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(f); setSortDir('asc'); }
+  };
 
   useEffect(() => {
     historicalImportApi.getSessions()
@@ -51,17 +72,23 @@ export default function ImportHistoryPage() {
               <table style={s.table}>
                 <thead>
                   <tr>
-                    <th style={s.th}>#</th>
-                    <th style={s.th}>File</th>
-                    <th style={s.th}>Imported At</th>
-                    <th style={s.th}>Total</th>
-                    <th style={s.th}>Succeeded</th>
-                    <th style={s.th}>Failed</th>
+                    <SortableTh label="#" sortKey="id" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
+                    <SortableTh label="File" sortKey="fileName" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
+                    <SortableTh label="Imported At" sortKey="importedAt" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
+                    <SortableTh label="Total" sortKey="totalRows" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
+                    <SortableTh label="Succeeded" sortKey="succeeded" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
+                    <SortableTh label="Failed" sortKey="failed" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
                     <th style={s.th}></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sessions.map(s2 => (
+                  {[...sessions].sort((a, b) => {
+                    const av = sortValue(a, sortField);
+                    const bv = sortValue(b, sortField);
+                    if (av < bv) return sortDir === 'asc' ? -1 : 1;
+                    if (av > bv) return sortDir === 'asc' ? 1 : -1;
+                    return 0;
+                  }).map(s2 => (
                     <tr key={s2.id}>
                       <td style={s.td}>{s2.id}</td>
                       <td style={s.td}>{s2.fileName}</td>

@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
+import { SortableTh } from '@/components/SortableTh';
 import { adminApi, type DistributionListItem, type DistributionRunResult, type PagedResult } from '@/lib/api';
 import { downloadCsv } from '@/lib/exportCsv';
 
@@ -43,6 +44,13 @@ function DistributionsContent() {
   const [year, setYear] = useState('');
   const [appIdFilter, setAppIdFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [sortOn, setSortOn] = useState('month');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const toggleSort = (key: string) => {
+    if (sortOn === key) setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortOn(key); setSortDirection('asc'); }
+    setPage(1);
+  };
   const [markingId, setMarkingId] = useState<number | null>(null);
   const [historyPushingId, setHistoryPushingId] = useState<number | null>(null);
   const [paidDateInput, setPaidDateInput] = useState<{ [id: number]: string }>({});
@@ -108,7 +116,7 @@ function DistributionsContent() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE };
+    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
     if (status) params.status = status;
     if (month)  params.month = month;
     if (year)   params.year = year;
@@ -117,7 +125,7 @@ function DistributionsContent() {
     adminApi.distributions(params)
       .then(r => { if (r.success) setResult(r.data); })
       .finally(() => setLoading(false));
-  }, [page, status, month, year, appIdFilter]);
+  }, [page, status, month, year, appIdFilter, sortOn, sortDirection]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -555,9 +563,14 @@ function DistributionsContent() {
                           else setSelectedHistoryIds(new Set());
                         }} />
                     </th>
-                    {['App ID', 'Investor', 'Month', 'Amount', 'Status', 'Paid At', 'Bank', 'Action'].map(h => (
-                      <th key={h} style={thStyle}>{h}</th>
-                    ))}
+                    <SortableTh label="App ID" sortKey="applicationid" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
+                    <SortableTh label="Investor" sortKey="investorname" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
+                    <SortableTh label="Month" sortKey="month" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
+                    <SortableTh label="Amount" sortKey="amount" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
+                    <SortableTh label="Status" sortKey="status" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
+                    <SortableTh label="Paid At" sortKey="paidat" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
+                    <SortableTh label="Bank" sortKey="bank" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
+                    <th style={thStyle}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
