@@ -1,5 +1,5 @@
 "use client";
-import { Children, isValidElement, type ReactNode } from "react";
+import { Children, isValidElement, memo, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import Link from "next/link";
@@ -139,7 +139,13 @@ function buildComponents(citations: CopilotCitation[]): Components {
   };
 }
 
-export default function CopilotMarkdownAnswer({ text, citations = [] }: { text: string; citations?: CopilotCitation[] }) {
+// Module-level, not an inline default parameter -- an inline `citations = []` default
+// creates a brand-new array reference on every call where citations is omitted, which
+// would defeat memo's shallow prop comparison below for exactly the turns it matters most
+// for (see the memo() wrapper for why that comparison needs to actually hold).
+const EMPTY_CITATIONS: CopilotCitation[] = [];
+
+function CopilotMarkdownAnswerImpl({ text, citations = EMPTY_CITATIONS }: { text: string; citations?: CopilotCitation[] }) {
   return (
     <div style={{ color: "#334155", fontSize: 14 }}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={buildComponents(citations)}>
@@ -148,3 +154,16 @@ export default function CopilotMarkdownAnswer({ text, citations = [] }: { text: 
     </div>
   );
 }
+
+// Memoized so typing in the input box (unrelated state one level up in
+// ExecutiveCopilotCard) doesn't re-render every past turn's answer on each keystroke.
+// Without this, buildComponents() re-runs per keystroke, handing react-markdown a
+// brand-new `code`/`td`/`th` function identity each time -- react-markdown treats a
+// changed component identity as a different component type and remounts the whole
+// subtree, which is what made a rendered chart visibly replay its mount animation
+// ("refresh") every time the admin typed a character, even in an old, already-answered
+// turn. `text`/`citations` are stable references across an input-only re-render (they
+// live in turn state that typing never touches), so the default shallow prop comparison
+// correctly bails out here.
+const CopilotMarkdownAnswer = memo(CopilotMarkdownAnswerImpl);
+export default CopilotMarkdownAnswer;
