@@ -303,6 +303,9 @@ export interface DashboardTrends {
   monthlyApplications: { month: string; total: number; approved: number }[];
   investorTypeBreakdown: { type: string; count: number }[];
   monthlyCapital: { month: string; deployed: number }[];
+  monthlyRedemption: { month: string; amount: number }[];
+  monthlyDeployment: { month: string; deployedAmount: number }[];
+  monthlyDistribution: { month: string; amount: number }[];
 }
 
 export interface InvestorCapitalAccountEntry {
