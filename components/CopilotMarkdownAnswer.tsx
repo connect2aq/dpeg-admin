@@ -5,6 +5,8 @@ import remarkGfm from "remark-gfm";
 import Link from "next/link";
 import type { CopilotCitation } from "@/lib/copilotEngine";
 import { idFromCellText, findLabelMatches } from "@/lib/copilotCitationLinking";
+import { parseChartSpec } from "@/lib/copilotChartSpec";
+import CopilotChart from "./CopilotChart";
 
 // Generic markdown renderer for copilot answers, reusable by any future copilot card.
 // Styled to match this app's existing hand-rolled look (brand colors, small fonts) rather
@@ -116,9 +118,24 @@ function buildComponents(citations: CopilotCitation[]): Components {
     ol: ({ ...props }) => <ol style={{ margin: "4px 0", paddingLeft: 20 }} {...props} />,
     li: ({ ...props }) => <li style={{ marginBottom: 2 }} {...props} />,
     a: ({ ...props }) => <a style={{ color: "#699172" }} {...props} />,
-    code: ({ ...props }) => (
-      <code style={{ background: "#f1f5f9", borderRadius: 4, padding: "1px 4px", fontSize: 12 }} {...props} />
-    ),
+    // A ```chart fenced block flows through copilotEngine.ts's post-processing untouched
+    // (there's no markdown-native chart syntax to convert into, unlike ```table) and
+    // arrives here exactly as the model wrote it -- react-markdown gives fenced code a
+    // className of "language-<lang>" (no separate "inline" prop exists in this version),
+    // so that's the signal used to intercept it. A spec that fails to parse falls through
+    // to the same plain <code> rendering as any other language, rather than a blank or
+    // crashed render -- the raw JSON stays visible and reportable.
+    code: ({ className, children, ...props }) => {
+      if (className?.includes("language-chart")) {
+        const spec = parseChartSpec(String(children).replace(/\n$/, ""));
+        if (spec) return <CopilotChart spec={spec} />;
+      }
+      return (
+        <code style={{ background: "#f1f5f9", borderRadius: 4, padding: "1px 4px", fontSize: 12 }} className={className} {...props}>
+          {children}
+        </code>
+      );
+    },
   };
 }
 
