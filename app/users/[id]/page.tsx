@@ -799,11 +799,11 @@ export default function UserDetailPage() {
                   <tr>
                     <SortableTh label="App ID" sortKey="id" sortOn={invSort} sortDirection={invSortDir} onSort={toggleInvSort} />
                     <SortableTh label="PPM#" sortKey="ppmRefNO" sortOn={invSort} sortDirection={invSortDir} onSort={toggleInvSort} />
+                    <SortableTh label="Effective" sortKey="submittedAt" sortOn={invSort} sortDirection={invSortDir} onSort={toggleInvSort} />
                     <SortableTh label="Type" sortKey="investorType" sortOn={invSort} sortDirection={invSortDir} onSort={toggleInvSort} />
                     <SortableTh label="Units" sortKey="numUnits" sortOn={invSort} sortDirection={invSortDir} onSort={toggleInvSort} />
                     <SortableTh label="Amount" sortKey="totalAmount" sortOn={invSort} sortDirection={invSortDir} onSort={toggleInvSort} />
                     <SortableTh label="Status" sortKey="status" sortOn={invSort} sortDirection={invSortDir} onSort={toggleInvSort} />
-                    <SortableTh label="Effective" sortKey="submittedAt" sortOn={invSort} sortDirection={invSortDir} onSort={toggleInvSort} />
                     <th></th>
                   </tr>
                 </thead>
@@ -818,6 +818,7 @@ export default function UserDetailPage() {
                     <tr key={a.id}>
                       <td style={{ fontFamily: 'monospace', fontWeight: 600, color: '#64748b' }}>#{a.id}</td>
                       <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{a.ppmRefNO ?? '—'}</td>
+                      <td style={{ color: '#64748b', fontSize: 13 }}>{a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : '—'}</td>
                       <td>{a.investorType}</td>
                       <td>{a.numUnits ?? '—'}</td>
                       <td>{a.totalAmount ? `$${a.totalAmount.toLocaleString()}` : '—'}</td>
@@ -825,7 +826,6 @@ export default function UserDetailPage() {
                         <StatusBadge status={a.status} />
                         {invPendingMap[a.id] && <PendingBadge item={invPendingMap[a.id]} />}
                       </td>
-                      <td style={{ color: '#64748b', fontSize: 13 }}>{a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : '—'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                           <Link href={`/applications/${a.id}`} style={{ color: '#b8923a', fontWeight: 600, fontSize: 12, textDecoration: 'none' }}>View</Link>
@@ -857,9 +857,9 @@ export default function UserDetailPage() {
                 <thead>
                   <tr>
                     <SortableTh label="App ID" sortKey="trancheApplicationId" sortOn={redeemSort} sortDirection={redeemSortDir} onSort={toggleRedeemSort} />
+                    <SortableTh label="Effective Date" sortKey="effectiveDate" sortOn={redeemSort} sortDirection={redeemSortDir} onSort={toggleRedeemSort} />
                     <SortableTh label="Investor" sortKey="sellingPartnerName" sortOn={redeemSort} sortDirection={redeemSortDir} onSort={toggleRedeemSort} />
                     <SortableTh label="Units to Redeem" sortKey="unitsToRedeem" sortOn={redeemSort} sortDirection={redeemSortDir} onSort={toggleRedeemSort} />
-                    <SortableTh label="Effective Date" sortKey="effectiveDate" sortOn={redeemSort} sortDirection={redeemSortDir} onSort={toggleRedeemSort} />
                     <SortableTh label="Redemption Amount" sortKey="netAggregatePrice" sortOn={redeemSort} sortDirection={redeemSortDir} onSort={toggleRedeemSort} />
                     <SortableTh label="Status" sortKey="status" sortOn={redeemSort} sortDirection={redeemSortDir} onSort={toggleRedeemSort} />
                     <th></th>
@@ -875,9 +875,9 @@ export default function UserDetailPage() {
                   }).map(r => (
                     <tr key={r.id}>
                       <td style={{ fontFamily: 'monospace', fontWeight: 600, color: '#64748b' }}>{r.trancheApplicationId ? `#${r.trancheApplicationId}` : '—'}</td>
+                      <td style={{ fontSize: 13, color: '#64748b' }}>{r.effectiveDate || '—'}</td>
                       <td style={{ fontWeight: 600 }}>{r.sellingPartnerName || r.email || '—'}</td>
                       <td>{r.unitsToRedeem ?? '—'}</td>
-                      <td style={{ fontSize: 13, color: '#64748b' }}>{r.effectiveDate || '—'}</td>
                       <td style={{ fontWeight: 600, color: '#0e3416' }}>{r.netAggregatePrice ? `$${parseFloat(r.netAggregatePrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : (r.aggregatePurchasePrice ?? '—')}</td>
                       <td>
                         <StatusBadge status={r.status} />
@@ -914,9 +914,9 @@ export default function UserDetailPage() {
                   <tr>
                     <SortableTh label="PPM#" sortKey="ppmRefNO" sortOn={distSort} sortDirection={distSortDir} onSort={toggleDistSort} />
                     <SortableTh label="Month" sortKey="distributionMonth" sortOn={distSort} sortDirection={distSortDir} onSort={toggleDistSort} />
+                    <SortableTh label="Paid Date" sortKey="paidAt" sortOn={distSort} sortDirection={distSortDir} onSort={toggleDistSort} />
                     <SortableTh label="Net Amount" sortKey="totalNetAmount" sortOn={distSort} sortDirection={distSortDir} onSort={toggleDistSort} />
                     <SortableTh label="Status" sortKey="paymentStatus" sortOn={distSort} sortDirection={distSortDir} onSort={toggleDistSort} />
-                    <SortableTh label="Paid Date" sortKey="paidAt" sortOn={distSort} sortDirection={distSortDir} onSort={toggleDistSort} />
                     <th></th>
                   </tr>
                 </thead>
@@ -931,9 +931,9 @@ export default function UserDetailPage() {
                     <tr key={d.id}>
                       <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{d.ppmRefNO ?? '—'}</td>
                       <td style={{ fontSize: 13 }}>{new Date(d.distributionMonth).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</td>
+                      <td style={{ fontSize: 13, color: '#64748b' }}>{d.paidAt ? new Date(d.paidAt).toLocaleDateString() : '—'}</td>
                       <td style={{ fontWeight: 600 }}>${d.totalNetAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td><StatusBadge status={d.paymentStatus} /></td>
-                      <td style={{ fontSize: 13, color: '#64748b' }}>{d.paidAt ? new Date(d.paidAt).toLocaleDateString() : '—'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button onClick={() => openEditDistribution(d)} style={{ fontSize: 12, color: '#0f2342', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Edit</button>

@@ -383,6 +383,7 @@ function RedemptionsContent() {
                     </th>
                     <SortableTh label="ID" sortKey="id" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="App ID" sortKey="applicationId" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                    <SortableTh label="Effective Date" sortKey="effectiveDate" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Investor" sortKey="sellingPartnerName" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Account User" sortKey="accountUserName" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Type" sortKey="investorType" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
@@ -391,7 +392,6 @@ function RedemptionsContent() {
                     <SortableTh label="Capital Redeemed" sortKey="capitalRedeemed" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Income" sortKey="proratedPreferredReturn" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Status" sortKey="status" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
-                    <SortableTh label="Effective Date" sortKey="effectiveDate" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <th>Action</th>
                   </tr>
                 </thead>
@@ -414,6 +414,7 @@ function RedemptionsContent() {
                           ? <Link href={`/applications/${r.trancheApplicationId}`} style={{ color: '#b8923a', textDecoration: 'underline', fontWeight: 600 }}>#{r.trancheApplicationId}</Link>
                           : '—'}
                       </td>
+                      <td style={{ fontSize: 13, color: '#64748b' }}>{r.effectiveDate || '—'}</td>
                       <td style={{ fontWeight: 600 }}>{r.sellingPartnerName ?? '—'}</td>
                       <td>
                         {r.accountUserName && r.accountUserId ? (
@@ -434,7 +435,6 @@ function RedemptionsContent() {
                         <StatusBadge status={r.status} />
                         {pendingMap[r.id] && <PendingBadge item={pendingMap[r.id]} />}
                       </td>
-                      <td style={{ fontSize: 13, color: '#64748b' }}>{r.effectiveDate || '—'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                           <Link href={`/redemptions/${r.id}`} style={{ color: '#699172', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>View</Link>

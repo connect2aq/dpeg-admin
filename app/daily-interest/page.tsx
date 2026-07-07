@@ -303,9 +303,9 @@ export default function DailyInterestPage() {
                           else setSelectedIds(new Set());
                         }} />
                     </th>
+                    <SortableTh label="App ID" sortKey="appid" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
                     <SortableTh label="Date" sortKey="date" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
                     <SortableTh label="Investor" sortKey="investor" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
-                    <SortableTh label="App ID" sortKey="appid" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
                     <SortableTh label="Units" sortKey="units" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
                     <SortableTh label="Capital" sortKey="capital" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
                     <SortableTh label="Rate" sortKey="rate" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
@@ -333,12 +333,12 @@ export default function DailyInterestPage() {
                               return s;
                             })} />
                         </td>
+                        <td style={{ ...td, color: '#6b7280' }}>#{row.applicationId}</td>
                         <td style={{ ...td, fontWeight: 600, whiteSpace: 'nowrap' }}>{new Date(row.date).toLocaleDateString()}</td>
                         <td style={td}>
                           <div style={{ fontWeight: 500 }}>{row.investorName}</div>
                           {row.investorEmail && <div style={{ fontSize: 11, color: '#9ca3af' }}>{row.investorEmail}</div>}
                         </td>
-                        <td style={{ ...td, color: '#6b7280' }}>#{row.applicationId}</td>
                         <td style={{ ...td, textAlign: 'center' }}>{row.units}</td>
                         <td style={td}>${row.capital.toLocaleString()}</td>
                         <td style={{ ...td, color: '#6b7280' }}>{(row.annualRate * 100).toFixed(0)}%</td>

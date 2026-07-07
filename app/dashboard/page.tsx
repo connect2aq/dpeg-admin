@@ -468,14 +468,14 @@ export default function DashboardPage() {
                   <thead>
                     <tr>
                       <SortableTh label="ID / REF" sortKey="id" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
+                      <SortableTh label="Effective Date" sortKey="effectiveDate" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
+                      <SortableTh label="Submitted" sortKey="submittedAt" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
                       <SortableTh label="Account User" sortKey="accountUser" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
                       <SortableTh label="Investor" sortKey="investorName" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
                       <SortableTh label="Type" sortKey="investorType" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
                       <SortableTh label="Units" sortKey="numUnits" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
                       <SortableTh label="Amount" sortKey="totalAmount" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
                       <SortableTh label="Status" sortKey="status" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
-                      <SortableTh label="Effective Date" sortKey="effectiveDate" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
-                      <SortableTh label="Submitted" sortKey="submittedAt" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
                     </tr>
                   </thead>
                   <tbody>
@@ -492,6 +492,12 @@ export default function DashboardPage() {
                             <Link href={`/applications/${a.id}`} style={{ color: "#0e3416", textDecoration: "none" }}>#{a.id}</Link>
                           </div>
                           {a.ppmRefNO && <div style={{ fontSize: 11, color: "#94a3b8" }}>PPM {a.ppmRefNO}</div>}
+                        </td>
+                        <td style={{ color: "#64748b", fontSize: 13 }}>
+                          {a.effectiveDate ? new Date(a.effectiveDate).toLocaleDateString() : "—"}
+                        </td>
+                        <td style={{ color: "#64748b", fontSize: 13 }}>
+                          {a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : "—"}
                         </td>
                         <td>
                           {a.userId ? (
@@ -516,12 +522,6 @@ export default function DashboardPage() {
                         <td>{a.numUnits ?? "—"}</td>
                         <td>{a.totalAmount ? `$${a.totalAmount.toLocaleString()}` : "—"}</td>
                         <td><StatusBadge status={a.status} /></td>
-                        <td style={{ color: "#64748b", fontSize: 13 }}>
-                          {a.effectiveDate ? new Date(a.effectiveDate).toLocaleDateString() : "—"}
-                        </td>
-                        <td style={{ color: "#64748b", fontSize: 13 }}>
-                          {a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : "—"}
-                        </td>
                       </tr>
                     ))}
                   </tbody>

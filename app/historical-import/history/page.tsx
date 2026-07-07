@@ -73,8 +73,8 @@ export default function ImportHistoryPage() {
                 <thead>
                   <tr>
                     <SortableTh label="#" sortKey="id" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
-                    <SortableTh label="File" sortKey="fileName" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
                     <SortableTh label="Imported At" sortKey="importedAt" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
+                    <SortableTh label="File" sortKey="fileName" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
                     <SortableTh label="Total" sortKey="totalRows" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
                     <SortableTh label="Succeeded" sortKey="succeeded" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
                     <SortableTh label="Failed" sortKey="failed" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
@@ -91,8 +91,8 @@ export default function ImportHistoryPage() {
                   }).map(s2 => (
                     <tr key={s2.id}>
                       <td style={s.td}>{s2.id}</td>
-                      <td style={s.td}>{s2.fileName}</td>
                       <td style={s.td}>{new Date(s2.importedAt).toLocaleString()}</td>
+                      <td style={s.td}>{s2.fileName}</td>
                       <td style={s.td}>{s2.totalRows}</td>
                       <td style={{ ...s.td, color: '#166534', fontWeight: 600 }}>{s2.succeeded}</td>
                       <td style={{ ...s.td, color: s2.failed > 0 ? '#991b1b' : '#64748b', fontWeight: 600 }}>{s2.failed}</td>

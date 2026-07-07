@@ -535,13 +535,13 @@ function InvestorStatementsContent() {
                   <thead>
                     <tr style={{ background: "var(--bg-section)", borderBottom: "1px solid var(--border)" }}>
                       {([
+                        ["applicationId", "App ID", "left"],
+                        ["ppmRefNo", "PPM Ref", "left"],
                         ["date", "Date", "left"],
                         ["entryType", "Type", "left"],
                         ["investmentType", "Inv. Type", "left"],
                         ["investorName", "Investor", "left"],
                         ["accountUserName", "Account User", "left"],
-                        ["applicationId", "App ID", "left"],
-                        ["ppmRefNo", "PPM Ref", "left"],
                         ["units", "Units", "right"],
                         ["amount", "Capital", "right"],
                         ["income", "Income", "right"],
@@ -564,6 +564,16 @@ function InvestorStatementsContent() {
                       const colors = TYPE_COLORS[e.entryType] ?? TYPE_COLORS.Contribution;
                       return (
                         <tr key={i} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? undefined : "var(--bg-section)" }}>
+                          <td style={{ padding: "9px 14px", fontSize: 12 }}>
+                            {e.applicationId ? (
+                              <Link href={`/applications/${e.applicationId}`} style={{ color: "var(--forest)", textDecoration: "underline", fontWeight: 600 }}>
+                                #{e.applicationId}
+                              </Link>
+                            ) : <span style={{ color: "var(--muted)" }}>—</span>}
+                          </td>
+                          <td style={{ padding: "9px 14px", color: "var(--muted)", fontSize: 12 }}>
+                            {e.ppmRefNo ? `#${e.ppmRefNo}` : "—"}
+                          </td>
                           <td style={{ padding: "9px 14px", color: "var(--text-primary)", whiteSpace: "nowrap" }}>
                             {new Date(e.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
                           </td>
@@ -584,16 +594,6 @@ function InvestorStatementsContent() {
                           </td>
                           <td style={{ padding: "9px 14px", fontWeight: 600, color: "var(--text-primary)", maxWidth: 140, whiteSpace: "normal", wordBreak: "break-word" }}>
                             {e.accountUserName || "—"}
-                          </td>
-                          <td style={{ padding: "9px 14px", fontSize: 12 }}>
-                            {e.applicationId ? (
-                              <Link href={`/applications/${e.applicationId}`} style={{ color: "var(--forest)", textDecoration: "underline", fontWeight: 600 }}>
-                                #{e.applicationId}
-                              </Link>
-                            ) : <span style={{ color: "var(--muted)" }}>—</span>}
-                          </td>
-                          <td style={{ padding: "9px 14px", color: "var(--muted)", fontSize: 12 }}>
-                            {e.ppmRefNo ? `#${e.ppmRefNo}` : "—"}
                           </td>
                           <td style={{ padding: "9px 14px", textAlign: "right", color: "var(--text-primary)" }}>
                             {e.units != null ? e.units : "—"}

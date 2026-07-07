@@ -245,14 +245,14 @@ function ApplicationsContent() {
                       />
                     </th>
                     <SortableTh label="ID / Ref" sortKey="id" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                    <SortableTh label="Effective Date" sortKey="effectiveDate" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                    <SortableTh label="Submitted" sortKey="submitted" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Account User" sortKey="accountUser" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Investor" sortKey="investor" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Type" sortKey="investorType" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Units" sortKey="units" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Amount" sortKey="amount" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <SortableTh label="Status" sortKey="status" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
-                    <SortableTh label="Effective Date" sortKey="effectiveDate" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
-                    <SortableTh label="Submitted" sortKey="submitted" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <th></th>
                   </tr>
                 </thead>
@@ -273,6 +273,8 @@ function ApplicationsContent() {
                         <div style={{ fontFamily: 'monospace', fontWeight: 700 }}>#{a.id}</div>
                         {a.ppmRefNO && <div style={{ fontSize: 11, color: '#94a3b8' }}>PPM {a.ppmRefNO}</div>}
                       </td>
+                      <td style={{ color: '#64748b', fontSize: 13 }}>{a.effectiveDate ? new Date(a.effectiveDate).toLocaleDateString() : '—'}</td>
+                      <td style={{ color: '#64748b', fontSize: 13 }}>{a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : '—'}</td>
                       <td>
                         {a.userId ? (
                           <Link href={`/investor-statements?userId=${a.userId}`} style={{ fontWeight: 600, color: '#1e293b', textDecoration: 'underline' }} title="Open Investor Statement">
@@ -293,8 +295,6 @@ function ApplicationsContent() {
                         <StatusBadge status={a.status} />
                         {pendingMap[a.id] && <PendingBadge item={pendingMap[a.id]} />}
                       </td>
-                      <td style={{ color: '#64748b', fontSize: 13 }}>{a.effectiveDate ? new Date(a.effectiveDate).toLocaleDateString() : '—'}</td>
-                      <td style={{ color: '#64748b', fontSize: 13 }}>{a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : '—'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                           <Link href={`/applications/${a.id}`} style={{ color: '#699172', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>View</Link>

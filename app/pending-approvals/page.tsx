@@ -561,10 +561,10 @@ export default function PendingApprovalsPage() {
                   <thead>
                     <tr>
                       <SortableTh label="ID" sortKey="id" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                      <SortableTh label="Submitted" sortKey="createdOn" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                       <SortableTh label="Type" sortKey="entityType" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                       <SortableTh label="Description" sortKey="description" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                       <SortableTh label="Maker" sortKey="makerName" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
-                      <SortableTh label="Submitted" sortKey="createdOn" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                       <SortableTh label="Checker" sortKey="checkerName" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                       <SortableTh label="Status" sortKey="status" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                       <th></th>
@@ -576,6 +576,7 @@ export default function PendingApprovalsPage() {
                     ) : result.items.map(item => (
                       <tr key={item.id}>
                         <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#b8923a' }}>#{item.id}</td>
+                        <td style={{ fontSize: 12, color: '#64748b', whiteSpace: 'nowrap' }}>{new Date(item.createdOn).toLocaleDateString()}</td>
                         <td>
                           <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>{item.entityType}</div>
                           <div style={{ fontSize: 12, color: '#94a3b8' }}>{item.operationType}</div>
@@ -587,7 +588,6 @@ export default function PendingApprovalsPage() {
                           <div style={{ fontWeight: 600 }}>{item.makerName}</div>
                           <div style={{ fontSize: 11, color: '#94a3b8' }}>{item.makerEmail}</div>
                         </td>
-                        <td style={{ fontSize: 12, color: '#64748b', whiteSpace: 'nowrap' }}>{new Date(item.createdOn).toLocaleDateString()}</td>
                         <td style={{ fontSize: 12, color: '#64748b' }}>{item.checkerName ?? '—'}</td>
                         <td><StatusChip status={item.status} /></td>
                         <td>

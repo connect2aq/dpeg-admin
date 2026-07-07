@@ -564,11 +564,11 @@ function DistributionsContent() {
                         }} />
                     </th>
                     <SortableTh label="App ID" sortKey="applicationid" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
-                    <SortableTh label="Investor" sortKey="investorname" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
                     <SortableTh label="Month" sortKey="month" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
+                    <SortableTh label="Paid At" sortKey="paidat" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
+                    <SortableTh label="Investor" sortKey="investorname" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
                     <SortableTh label="Amount" sortKey="amount" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
                     <SortableTh label="Status" sortKey="status" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
-                    <SortableTh label="Paid At" sortKey="paidat" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
                     <SortableTh label="Bank" sortKey="bank" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={thStyle} />
                     <th style={thStyle}>Action</th>
                   </tr>
@@ -596,15 +596,15 @@ function DistributionsContent() {
                             })} />
                         </td>
                         <td style={{ ...colStyle, fontFamily: 'monospace', color: '#64748b', fontSize: 13 }}>{d.applicationId}</td>
+                        <td style={colStyle}>{monthLabel}</td>
+                        <td style={colStyle}>{d.paidAt ? new Date(d.paidAt).toLocaleDateString() : '—'}</td>
                         <td style={colStyle}>
                           <div style={{ fontWeight: 500 }}>{d.investorName}</div>
                           {d.investorEmail && <div style={{ fontSize: 12, color: '#9ca3af' }}>{d.investorEmail}</div>}
                           {d.hasMismatch && <span style={{ fontSize: 11, color: '#d97706', fontWeight: 600 }}>⚠ Mismatch</span>}
                         </td>
-                        <td style={colStyle}>{monthLabel}</td>
                         <td style={{ ...colStyle, fontWeight: 600 }}>${d.totalNetAmount.toFixed(2)}</td>
                         <td style={colStyle}><StatusBadge status={d.paymentStatus} /></td>
-                        <td style={colStyle}>{d.paidAt ? new Date(d.paidAt).toLocaleDateString() : '—'}</td>
                         <td style={colStyle}>
                           {d.bankName && <div>{d.bankName}</div>}
                           {maskedAcct && <div style={{ fontSize: 12, color: '#6b7280' }}>{maskedAcct}</div>}
