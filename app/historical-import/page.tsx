@@ -1,8 +1,8 @@
-'use client';
-import { useRef, useState } from 'react';
-import Link from 'next/link';
-import AdminLayout from '@/components/AdminLayout';
-import { SortableTh } from '@/components/SortableTh';
+"use client";
+import { useRef, useState } from "react";
+import Link from "next/link";
+import AdminLayout from "@/components/AdminLayout";
+import { SortableTh } from "@/components/SortableTh";
 import {
   historicalImportApi,
   type ImportResult,
@@ -11,17 +11,27 @@ import {
   type OdooSyncResult,
   type OdooSyncRowResult,
   type WelcomeEmailRowResult,
-} from '@/lib/api';
+} from "@/lib/api";
 
-type SortField = 'rowNumber' | 'investorName' | 'userEmail' | 'success' | 'ppmRefNO';
+type SortField =
+  | "rowNumber"
+  | "investorName"
+  | "userEmail"
+  | "success"
+  | "ppmRefNO";
 
 const sortValue = (r: ImportRowResult, field: SortField): string | number => {
   switch (field) {
-    case 'rowNumber':    return r.rowNumber;
-    case 'investorName': return r.investorName ?? '';
-    case 'userEmail':    return r.userEmail ?? '';
-    case 'success':      return r.success ? 1 : 0;
-    case 'ppmRefNO':     return r.ppmRefNO ?? '';
+    case "rowNumber":
+      return r.rowNumber;
+    case "investorName":
+      return r.investorName ?? "";
+    case "userEmail":
+      return r.userEmail ?? "";
+    case "success":
+      return r.success ? 1 : 0;
+    case "ppmRefNO":
+      return r.ppmRefNO ?? "";
   }
 };
 
@@ -29,12 +39,19 @@ const sortValue = (r: ImportRowResult, field: SortField): string | number => {
 
 function Badge({ ok, label }: { ok: boolean; label: string }) {
   return (
-    <span style={{
-      display: 'inline-block', padding: '2px 10px', borderRadius: 12, fontSize: 12,
-      fontWeight: 600,
-      background: ok ? '#dcfce7' : '#fee2e2',
-      color: ok ? '#166534' : '#991b1b',
-    }}>{label}</span>
+    <span
+      style={{
+        display: "inline-block",
+        padding: "2px 10px",
+        borderRadius: 12,
+        fontSize: 12,
+        fontWeight: 600,
+        background: ok ? "#dcfce7" : "#fee2e2",
+        color: ok ? "#166534" : "#991b1b",
+      }}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -42,18 +59,24 @@ function exportToCsv(rows: object[], filename: string) {
   if (!rows.length) return;
   const headers = Object.keys(rows[0]);
   const lines = [
-    headers.join(','),
-    ...rows.map(r =>
-      headers.map(h => {
-        const v = String((r as Record<string, unknown>)[h] ?? '');
-        return v.includes(',') || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v;
-      }).join(',')
+    headers.join(","),
+    ...rows.map((r) =>
+      headers
+        .map((h) => {
+          const v = String((r as Record<string, unknown>)[h] ?? "");
+          return v.includes(",") || v.includes('"')
+            ? `"${v.replace(/"/g, '""')}"`
+            : v;
+        })
+        .join(","),
     ),
   ];
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const blob = new Blob([lines.join("\n")], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename; a.click();
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
   URL.revokeObjectURL(url);
 }
 
@@ -61,35 +84,42 @@ function exportToCsv(rows: object[], filename: string) {
 
 export default function HistoricalImportPage() {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading]       = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const [importError, setImportError]   = useState('');
+  const [importError, setImportError] = useState("");
   const [lastSessionId, setLastSessionId] = useState<number | null>(null);
 
   // Phase 2 — welcome email state per userId
-  const [emailSending, setEmailSending]  = useState(false);
-  const [emailResults, setEmailResults]  = useState<Record<number, WelcomeEmailRowResult>>({});
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailResults, setEmailResults] = useState<
+    Record<number, WelcomeEmailRowResult>
+  >({});
 
   // Phase 3 — Odoo sync state per applicationId
-  const [odooSyncing, setOdooSyncing]   = useState(false);
-  const [odooResults, setOdooResults]   = useState<Record<number, OdooSyncRowResult>>({});
+  const [odooSyncing, setOdooSyncing] = useState(false);
+  const [odooResults, setOdooResults] = useState<
+    Record<number, OdooSyncRowResult>
+  >({});
 
   const [showInstructions, setShowInstructions] = useState(false);
-  const [sortField, setSortField] = useState<SortField>('rowNumber');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [sortField, setSortField] = useState<SortField>("rowNumber");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const toggleSort = (field: string) => {
     const f = field as SortField;
-    if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortField(f); setSortDir('asc'); }
+    if (sortField === f) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortField(f);
+      setSortDir("asc");
+    }
   };
 
-  const successRows = importResult?.rows.filter(r => r.success) ?? [];
+  const successRows = importResult?.rows.filter((r) => r.success) ?? [];
   const sortedRows = importResult
     ? [...importResult.rows].sort((a, b) => {
         const av = sortValue(a, sortField);
         const bv = sortValue(b, sortField);
-        if (av < bv) return sortDir === 'asc' ? -1 : 1;
-        if (av > bv) return sortDir === 'asc' ? 1 : -1;
+        if (av < bv) return sortDir === "asc" ? -1 : 1;
+        if (av > bv) return sortDir === "asc" ? 1 : -1;
         return 0;
       })
     : [];
@@ -98,9 +128,12 @@ export default function HistoricalImportPage() {
 
   const handleUpload = async () => {
     const file = fileRef.current?.files?.[0];
-    if (!file) { setImportError('Please select a .xlsx file first.'); return; }
+    if (!file) {
+      setImportError("Please select a .xlsx file first.");
+      return;
+    }
     setUploading(true);
-    setImportError('');
+    setImportError("");
     setImportResult(null);
     setEmailResults({});
     setOdooResults({});
@@ -110,12 +143,12 @@ export default function HistoricalImportPage() {
       if (res.success) {
         setImportResult(res.data);
         setLastSessionId(res.data.sessionId ?? null);
-      } else setImportError(res.message || 'Upload failed.');
+      } else setImportError(res.message || "Upload failed.");
     } catch {
-      setImportError('Network error. Please try again.');
+      setImportError("Network error. Please try again.");
     } finally {
       setUploading(false);
-      if (fileRef.current) fileRef.current.value = '';
+      if (fileRef.current) fileRef.current.value = "";
     }
   };
 
@@ -123,9 +156,10 @@ export default function HistoricalImportPage() {
     const res = await historicalImportApi.downloadTemplate();
     if (!res.ok) return;
     const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = 'HistoricalImportTemplate.xlsx';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "HistoricalImportTemplate.xlsx";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -140,94 +174,181 @@ export default function HistoricalImportPage() {
       const res = await historicalImportApi.sendWelcomeEmails(userIds);
       if (res.success) {
         const map: Record<number, WelcomeEmailRowResult> = { ...emailResults };
-        res.data.rows.forEach(r => { map[r.userId] = r; });
+        res.data.rows.forEach((r) => {
+          map[r.userId] = r;
+        });
         setEmailResults(map);
       }
-    } catch {/* ignore */}
-    finally { setEmailSending(false); }
+    } catch {
+      /* ignore */
+    } finally {
+      setEmailSending(false);
+    }
   };
 
   const sendAllEmails = () => {
     const ids = successRows
-      .filter(r => r.userId && !emailResults[r.userId!]?.sent && !emailResults[r.userId!]?.alreadySent)
-      .map(r => r.userId!);
+      .filter(
+        (r) =>
+          r.userId &&
+          !emailResults[r.userId!]?.sent &&
+          !emailResults[r.userId!]?.alreadySent,
+      )
+      .map((r) => r.userId!);
     if (ids.length) sendEmails(ids);
   };
 
   // ── Step 3: Odoo sync ───────────────────────────────────────────────────────
 
   const syncOdoo = async () => {
-    const ids = successRows.map(r => r.applicationId).filter(Boolean) as number[];
+    const ids = successRows
+      .map((r) => r.applicationId)
+      .filter(Boolean) as number[];
     if (!ids.length) return;
     setOdooSyncing(true);
     try {
       const res = await historicalImportApi.syncToOdoo(ids);
       if (res.success) {
         const map: Record<number, OdooSyncRowResult> = {};
-        res.data.rows.forEach(r => { map[r.applicationId] = r; });
+        res.data.rows.forEach((r) => {
+          map[r.applicationId] = r;
+        });
         setOdooResults(map);
       }
-    } catch {/* ignore */}
-    finally { setOdooSyncing(false); }
+    } catch {
+      /* ignore */
+    } finally {
+      setOdooSyncing(false);
+    }
   };
 
   // ── Styles ──────────────────────────────────────────────────────────────────
 
   const s = {
-    page: { padding: '32px 0' } as React.CSSProperties,
-    h1:   { fontSize: 22, fontWeight: 700, color: '#0f2342', marginBottom: 4 } as React.CSSProperties,
-    sub:  { color: '#64748b', fontSize: 14, marginBottom: 28 } as React.CSSProperties,
-    card: {
-      background: '#fff', border: '1px solid var(--border)',
-      borderRadius: 8, padding: '20px 24px', marginBottom: 20,
+    h1: {
+      fontSize: 22,
+      fontWeight: 700,
+      color: "#0f2342",
+      marginBottom: 4,
     } as React.CSSProperties,
-    cardTitle: { fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 12 } as React.CSSProperties,
+    sub: {
+      color: "#64748b",
+      fontSize: 14,
+      marginBottom: 28,
+    } as React.CSSProperties,
+    card: {
+      background: "#fff",
+      border: "1px solid var(--border)",
+      borderRadius: 8,
+      padding: "20px 24px",
+      marginBottom: 20,
+    } as React.CSSProperties,
+    cardTitle: {
+      fontSize: 15,
+      fontWeight: 700,
+      color: "#0f2342",
+      marginBottom: 12,
+    } as React.CSSProperties,
     btn: (color: string, disabled?: boolean): React.CSSProperties => ({
-      padding: '8px 18px', borderRadius: 6, border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
-      fontSize: 13, fontWeight: 600, background: disabled ? '#d1d5db' : color, color: '#fff',
+      padding: "8px 18px",
+      borderRadius: 6,
+      border: "none",
+      cursor: disabled ? "not-allowed" : "pointer",
+      fontSize: 13,
+      fontWeight: 600,
+      background: disabled ? "#d1d5db" : color,
+      color: "#fff",
       opacity: disabled ? 0.7 : 1,
     }),
-    table: { width: '100%', borderCollapse: 'collapse' as const, fontSize: 13 },
+    table: { width: "100%", borderCollapse: "collapse" as const, fontSize: 13 },
     th: {
-      padding: '8px 12px', textAlign: 'left' as const, background: '#0f2342',
-      color: '#fff', fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const,
+      padding: "8px 12px",
+      textAlign: "left" as const,
+      background: "#0f2342",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 600,
+      textTransform: "uppercase" as const,
     },
-    td: { padding: '8px 12px', borderBottom: '1px solid #f1f5f9', color: '#1a1a2e' },
+    td: {
+      padding: "8px 12px",
+      borderBottom: "1px solid #f1f5f9",
+      color: "#1a1a2e",
+    },
   };
 
   return (
     <AdminLayout>
-      <div style={s.page}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+      <div className="page-content">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 4,
+          }}
+        >
           <h1 style={{ ...s.h1, marginBottom: 0 }}>Historical Import</h1>
-          <Link href="/historical-import/history" style={{
-            fontSize: 13, color: '#b8923a', fontWeight: 600, textDecoration: 'none',
-          }}>
+          <Link
+            href="/historical-import/history"
+            style={{
+              fontSize: 13,
+              color: "#b8923a",
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
             View Import History →
           </Link>
         </div>
         <p style={s.sub}>
-          Load historical investor records directly at Active status — no DocuSign, no approval workflow.
-          Follow the three steps below in order.
+          Load historical investor records directly at Active status — no
+          DocuSign, no approval workflow. Follow the three steps below in order.
         </p>
 
         {/* Instructions */}
         <div style={s.card}>
           <button
-            onClick={() => setShowInstructions(v => !v)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600,
-              fontSize: 14, color: '#0f2342', padding: 0 }}
+            onClick={() => setShowInstructions((v) => !v)}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: 14,
+              color: "#0f2342",
+              padding: 0,
+            }}
           >
-            {showInstructions ? '▾' : '▸'} Instructions
+            {showInstructions ? "▾" : "▸"} Instructions
           </button>
           {showInstructions && (
-            <div style={{ marginTop: 12, fontSize: 13, color: '#374151', lineHeight: 1.7 }}>
-              <p><strong>Step 1 — Upload:</strong> Download the template, fill in investor data, and upload the .xlsx file.
-                Records are saved directly at <em>Active</em> status. No DocuSign envelopes are created and no emails are sent to investors at this stage.</p>
-              <p><strong>Step 2 — Welcome Emails:</strong> After verifying the loaded data, send each investor a welcome email
-                with a password-setup link. You can send individually or in bulk. The system prevents duplicate sends.</p>
-              <p><strong>Step 3 — Odoo Sync:</strong> Once satisfied with the portal data, push all records to Odoo Financials
-                via the integration API. This can be retried independently if any records fail.</p>
+            <div
+              style={{
+                marginTop: 12,
+                fontSize: 13,
+                color: "#374151",
+                lineHeight: 1.7,
+              }}
+            >
+              <p>
+                <strong>Step 1 — Upload:</strong> Download the template, fill in
+                investor data, and upload the .xlsx file. Records are saved
+                directly at <em>Active</em> status. No DocuSign envelopes are
+                created and no emails are sent to investors at this stage.
+              </p>
+              <p>
+                <strong>Step 2 — Welcome Emails:</strong> After verifying the
+                loaded data, send each investor a welcome email with a
+                password-setup link. You can send individually or in bulk. The
+                system prevents duplicate sends.
+              </p>
+              <p>
+                <strong>Step 3 — Odoo Sync:</strong> Once satisfied with the
+                portal data, push all records to Odoo Financials via the
+                integration API. This can be retried independently if any
+                records fail.
+              </p>
             </div>
           )}
         </div>
@@ -235,27 +356,43 @@ export default function HistoricalImportPage() {
         {/* Step 1 — Upload */}
         <div style={s.card}>
           <div style={s.cardTitle}>Step 1 — Upload Investor Data</div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button onClick={handleDownloadTemplate} style={s.btn('#475569')}>
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <button onClick={handleDownloadTemplate} style={s.btn("#475569")}>
               ↓ Download Template
             </button>
             <input
               ref={fileRef}
               type="file"
               accept=".xlsx"
-              style={{ fontSize: 13, color: '#374151' }}
+              style={{ fontSize: 13, color: "#374151" }}
             />
             <button
               onClick={handleUpload}
               disabled={uploading}
-              style={s.btn('#0f2342', uploading)}
+              style={s.btn("#0f2342", uploading)}
             >
-              {uploading ? 'Importing…' : '⬆ Import'}
+              {uploading ? "Importing…" : "⬆ Import"}
             </button>
           </div>
           {importError && (
-            <div style={{ marginTop: 12, padding: '10px 14px', background: '#fee2e2',
-              border: '1px solid #fca5a5', borderRadius: 6, color: '#991b1b', fontSize: 13 }}>
+            <div
+              style={{
+                marginTop: 12,
+                padding: "10px 14px",
+                background: "#fee2e2",
+                border: "1px solid #fca5a5",
+                borderRadius: 6,
+                color: "#991b1b",
+                fontSize: 13,
+              }}
+            >
               {importError}
             </div>
           )}
@@ -265,26 +402,48 @@ export default function HistoricalImportPage() {
         {importResult && (
           <div style={s.card}>
             {/* Summary bar */}
-            <div style={{ display: 'flex', gap: 24, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontWeight: 700, color: '#0f2342', fontSize: 15 }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 24,
+                marginBottom: 16,
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
+              <span style={{ fontWeight: 700, color: "#0f2342", fontSize: 15 }}>
                 Import Results
                 {lastSessionId && (
-                  <Link href={`/historical-import/history/${lastSessionId}`} style={{
-                    marginLeft: 12, fontSize: 12, color: '#b8923a', fontWeight: 600, textDecoration: 'none',
-                  }}>
+                  <Link
+                    href={`/historical-import/history/${lastSessionId}`}
+                    style={{
+                      marginLeft: 12,
+                      fontSize: 12,
+                      color: "#b8923a",
+                      fontWeight: 600,
+                      textDecoration: "none",
+                    }}
+                  >
                     View in History →
                   </Link>
                 )}
               </span>
-              <span style={{ fontSize: 13, color: '#64748b' }}>
+              <span style={{ fontSize: 13, color: "#64748b" }}>
                 Total: <strong>{importResult.totalRows}</strong> &nbsp;|&nbsp;
-                <span style={{ color: '#166534' }}>Succeeded: <strong>{importResult.succeeded}</strong></span> &nbsp;|&nbsp;
-                <span style={{ color: '#991b1b' }}>Failed: <strong>{importResult.failed}</strong></span>
+                <span style={{ color: "#166534" }}>
+                  Succeeded: <strong>{importResult.succeeded}</strong>
+                </span>{" "}
+                &nbsp;|&nbsp;
+                <span style={{ color: "#991b1b" }}>
+                  Failed: <strong>{importResult.failed}</strong>
+                </span>
               </span>
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
                 <button
-                  onClick={() => exportToCsv(importResult.rows, 'import-results.csv')}
-                  style={s.btn('#475569')}
+                  onClick={() =>
+                    exportToCsv(importResult.rows, "import-results.csv")
+                  }
+                  style={s.btn("#475569")}
                 >
                   Export CSV
                 </button>
@@ -292,32 +451,69 @@ export default function HistoricalImportPage() {
                   <button
                     onClick={sendAllEmails}
                     disabled={emailSending}
-                    style={s.btn('#b8923a', emailSending)}
+                    style={s.btn("#b8923a", emailSending)}
                   >
-                    {emailSending ? 'Sending…' : `✉ Send All Welcome Emails (${successRows.length})`}
+                    {emailSending
+                      ? "Sending…"
+                      : `✉ Send All Welcome Emails (${successRows.length})`}
                   </button>
                 )}
                 {successRows.length > 0 && (
                   <button
                     onClick={syncOdoo}
                     disabled={odooSyncing}
-                    style={s.btn('#0f2342', odooSyncing)}
+                    style={s.btn("#0f2342", odooSyncing)}
                   >
-                    {odooSyncing ? 'Syncing…' : '⚡ Sync All to Odoo'}
+                    {odooSyncing ? "Syncing…" : "⚡ Sync All to Odoo"}
                   </button>
                 )}
               </div>
             </div>
 
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflowX: "auto" }}>
               <table style={s.table}>
                 <thead>
                   <tr>
-                    <SortableTh label="Row" sortKey="rowNumber" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
-                    <SortableTh label="Investor" sortKey="investorName" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
-                    <SortableTh label="Email" sortKey="userEmail" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
-                    <SortableTh label="Status" sortKey="success" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
-                    <SortableTh label="PPM Ref #" sortKey="ppmRefNO" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
+                    <SortableTh
+                      label="Row"
+                      sortKey="rowNumber"
+                      sortOn={sortField}
+                      sortDirection={sortDir}
+                      onSort={toggleSort}
+                      style={s.th}
+                    />
+                    <SortableTh
+                      label="Investor"
+                      sortKey="investorName"
+                      sortOn={sortField}
+                      sortDirection={sortDir}
+                      onSort={toggleSort}
+                      style={s.th}
+                    />
+                    <SortableTh
+                      label="Email"
+                      sortKey="userEmail"
+                      sortOn={sortField}
+                      sortDirection={sortDir}
+                      onSort={toggleSort}
+                      style={s.th}
+                    />
+                    <SortableTh
+                      label="Status"
+                      sortKey="success"
+                      sortOn={sortField}
+                      sortDirection={sortDir}
+                      onSort={toggleSort}
+                      style={s.th}
+                    />
+                    <SortableTh
+                      label="PPM Ref #"
+                      sortKey="ppmRefNO"
+                      sortOn={sortField}
+                      sortDirection={sortDir}
+                      onSort={toggleSort}
+                      style={s.th}
+                    />
                     <th style={s.th}>Welcome Email</th>
                     <th style={s.th}>Odoo Investor</th>
                     <th style={s.th}>Odoo Investment</th>
@@ -325,23 +521,30 @@ export default function HistoricalImportPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedRows.map(row => {
-                    const emailRow  = row.userId ? emailResults[row.userId] : undefined;
-                    const odooRow   = row.applicationId ? odooResults[row.applicationId] : undefined;
+                  {sortedRows.map((row) => {
+                    const emailRow = row.userId
+                      ? emailResults[row.userId]
+                      : undefined;
+                    const odooRow = row.applicationId
+                      ? odooResults[row.applicationId]
+                      : undefined;
                     return (
                       <tr key={row.rowNumber}>
                         <td style={s.td}>{row.rowNumber}</td>
-                        <td style={s.td}>{row.investorName ?? '—'}</td>
-                        <td style={s.td}>{row.userEmail ?? '—'}</td>
+                        <td style={s.td}>{row.investorName ?? "—"}</td>
+                        <td style={s.td}>{row.userEmail ?? "—"}</td>
                         <td style={s.td}>
-                          <Badge ok={row.success} label={row.success ? 'Imported' : 'Failed'} />
+                          <Badge
+                            ok={row.success}
+                            label={row.success ? "Imported" : "Failed"}
+                          />
                         </td>
-                        <td style={s.td}>{row.ppmRefNO ?? '—'}</td>
+                        <td style={s.td}>{row.ppmRefNO ?? "—"}</td>
 
                         {/* Welcome email cell */}
                         <td style={s.td}>
                           {!row.success ? (
-                            <span style={{ color: '#94a3b8' }}>—</span>
+                            <span style={{ color: "#94a3b8" }}>—</span>
                           ) : emailRow?.sent ? (
                             <Badge ok={true} label="Sent" />
                           ) : emailRow?.alreadySent ? (
@@ -350,9 +553,11 @@ export default function HistoricalImportPage() {
                             <Badge ok={false} label="Failed" />
                           ) : (
                             <button
-                              onClick={() => row.userId && sendEmails([row.userId])}
+                              onClick={() =>
+                                row.userId && sendEmails([row.userId])
+                              }
                               disabled={emailSending}
-                              style={s.btn('#b8923a', emailSending)}
+                              style={s.btn("#b8923a", emailSending)}
                             >
                               ✉ Send
                             </button>
@@ -361,23 +566,49 @@ export default function HistoricalImportPage() {
 
                         {/* Odoo investor cell */}
                         <td style={s.td}>
-                          {!row.success ? <span style={{ color: '#94a3b8' }}>—</span>
-                            : odooRow
-                              ? <Badge ok={odooRow.odooInvestorSynced} label={odooRow.odooInvestorSynced ? 'Synced' : 'Failed'} />
-                              : <span style={{ color: '#94a3b8' }}>Pending</span>}
+                          {!row.success ? (
+                            <span style={{ color: "#94a3b8" }}>—</span>
+                          ) : odooRow ? (
+                            <Badge
+                              ok={odooRow.odooInvestorSynced}
+                              label={
+                                odooRow.odooInvestorSynced ? "Synced" : "Failed"
+                              }
+                            />
+                          ) : (
+                            <span style={{ color: "#94a3b8" }}>Pending</span>
+                          )}
                         </td>
 
                         {/* Odoo investment cell */}
                         <td style={s.td}>
-                          {!row.success ? <span style={{ color: '#94a3b8' }}>—</span>
-                            : odooRow
-                              ? <Badge ok={odooRow.odooInvestmentSynced} label={odooRow.odooInvestmentSynced ? 'Synced' : 'Failed'} />
-                              : <span style={{ color: '#94a3b8' }}>Pending</span>}
+                          {!row.success ? (
+                            <span style={{ color: "#94a3b8" }}>—</span>
+                          ) : odooRow ? (
+                            <Badge
+                              ok={odooRow.odooInvestmentSynced}
+                              label={
+                                odooRow.odooInvestmentSynced
+                                  ? "Synced"
+                                  : "Failed"
+                              }
+                            />
+                          ) : (
+                            <span style={{ color: "#94a3b8" }}>Pending</span>
+                          )}
                         </td>
 
                         {/* Error cell */}
-                        <td style={{ ...s.td, color: '#991b1b', fontSize: 12, maxWidth: 220, wordBreak: 'break-word' }}>
-                          {row.errorMessage ?? odooRow?.errorMessage ?? ''}
+                        <td
+                          style={{
+                            ...s.td,
+                            color: "#991b1b",
+                            fontSize: 12,
+                            maxWidth: 220,
+                            wordBreak: "break-word",
+                          }}
+                        >
+                          {row.errorMessage ?? odooRow?.errorMessage ?? ""}
                         </td>
                       </tr>
                     );

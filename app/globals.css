@@ -267,7 +267,22 @@ tr:hover td {
 /* Horizontal-scroll wrapper for wide tables */
 .table-scroll {
   overflow-x: auto;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  max-height: 60vh;
+}
+
+.table-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-table-head);
+}
+.table-scroll tfoot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--bg-table-head);
 }
 
 /* Responsive page padding */
