@@ -6,6 +6,7 @@ import AdminLayout from "@/components/AdminLayout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PendingBadge } from "@/components/PendingBadge";
 import { RedemptionEditModal } from "@/components/RedemptionEditModal";
+import { SortableTh } from "@/components/SortableTh";
 import {
   adminApi,
   type RedemptionListItem,
@@ -20,20 +21,16 @@ import { useAdminAuth } from "@/contexts/AdminAuthContext";
 
 const STATUSES = ["", "UnderReview", "Active", "Rejected", "Redeemed"];
 const PAGE_SIZE = 20;
-const SORTABLE_COLUMNS = {
-  id: "id",
-  partnerName: "sellingPartnerName",
-  investorType: "investorType",
-  unitsToRedeem: "unitsToRedeem",
-  totalUnitsOwned: "totalUnitsOwned",
-  redemptionAmount: "netAggregatePrice",
-  email: "email",
-  status: "status",
-  effectiveDate: "effectiveDate",
-} as const;
 
-type SortKey = keyof typeof SORTABLE_COLUMNS;
-type SortDir = "asc" | "desc";
+// AggregatePurchasePrice = principal + interest; Income (ProratedPreferredReturn) is the interest
+// portion, so Capital Redeemed backs out the principal — mirrors the investor statement's
+// Capital/Income split.
+const income = (r: RedemptionListItem) =>
+  parseFloat(r.proratedPreferredReturn ?? "0") || 0;
+const capitalRedeemed = (r: RedemptionListItem) =>
+  (parseFloat(r.aggregatePurchasePrice ?? "0") || 0) - income(r);
+const fmtMoney = (n: number) =>
+  `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function RedemptionsPage() {
   return (
@@ -67,8 +64,17 @@ function RedemptionsContent() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [page, setPage] = useState(1);
-  const [sortKey, setSortKey] = useState<SortKey>("id");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sortOn, setSortOn] = useState("createdOn");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  const toggleSort = (key: string) => {
+    if (sortOn === key) setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortOn(key);
+      setSortDirection("asc");
+    }
+    setPage(1);
+  };
 
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -109,36 +115,42 @@ function RedemptionsContent() {
     const params: Record<string, string | number> = {
       page: 1,
       pageSize: 100000,
+      sortOn,
+      sortDirection,
     };
     if (status) params.status = status;
     if (search) params.search = search;
     if (from) params.from = from;
     if (to) params.to = to;
-    params.sortOn = SORTABLE_COLUMNS[sortKey];
-    params.sortDirection = sortDir;
     const r = await adminApi.redemptions(params);
     if (r.success) {
       const headers = [
         "ID",
-        "Investor Name",
+        "App ID",
+        "Investor",
+        "Account User",
         "Email",
         "Type",
         "Units to Redeem",
         "Total Units",
-        "Aggregate Price",
-        "Net Price",
+        "Capital Redeemed",
+        "Income",
+        "Net Amount",
         "Status",
         "Effective Date",
         "Created",
       ];
       const rows = r.data.items.map((a) => [
         a.id,
+        a.trancheApplicationId ? `#${a.trancheApplicationId}` : "",
         a.sellingPartnerName ?? "",
+        a.accountUserName ?? "",
         a.email ?? "",
         a.investorType,
         a.unitsToRedeem ?? "",
         a.totalUnitsOwned ?? "",
-        a.aggregatePurchasePrice ?? "",
+        capitalRedeemed(a).toFixed(2),
+        income(a).toFixed(2),
         a.netAggregatePrice ?? "",
         a.status,
         a.effectiveDate ? new Date(a.effectiveDate).toLocaleDateString() : "",
@@ -154,13 +166,13 @@ function RedemptionsContent() {
     const params: Record<string, string | number> = {
       page,
       pageSize: PAGE_SIZE,
+      sortOn,
+      sortDirection,
     };
     if (status) params.status = status;
     if (search) params.search = search;
     if (from) params.from = from;
     if (to) params.to = to;
-    params.sortOn = SORTABLE_COLUMNS[sortKey];
-    params.sortDirection = sortDir;
     adminApi
       .redemptions(params)
       .then((r) => {
@@ -183,7 +195,7 @@ function RedemptionsContent() {
         }
       })
       .finally(() => setLoading(false));
-  }, [page, status, search, from, to, sortKey, sortDir]);
+  }, [page, status, search, from, to, sortOn, sortDirection]);
 
   const loadPendingCreates = useCallback(async () => {
     const r = await adminApi.getPendingChanges({
@@ -321,32 +333,6 @@ function RedemptionsContent() {
       return next;
     });
   };
-
-  const toggleSort = (nextKey: SortKey) => {
-    setPage(1);
-    if (sortKey === nextKey) {
-      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
-      return;
-    }
-    setSortKey(nextKey);
-    setSortDir("asc");
-  };
-
-  const sortIndicator = (key: SortKey) => {
-    if (sortKey !== key) return " ⇵";
-    return sortDir === "asc" ? " ↑" : " ↓";
-  };
-
-  const sortableHeaderStyle = (key: SortKey) => ({
-    background: "none",
-    border: "none",
-    padding: 0,
-    cursor: "pointer",
-    font: "inherit",
-    color: sortKey === key ? "#0f2342" : "inherit",
-    fontWeight: sortKey === key ? 700 : 600,
-    whiteSpace: "nowrap" as const,
-  });
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -583,7 +569,7 @@ function RedemptionsContent() {
         >
           <input
             type="text"
-            placeholder="Search by name or email…"
+            placeholder="Search by investor, account user, or email…"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -696,7 +682,7 @@ function RedemptionsContent() {
           ) : result ? (
             <>
               <div className="table-scroll">
-                <table style={{ minWidth: 1020 }}>
+                <table style={{ minWidth: 1360 }}>
                   <thead>
                     <tr>
                       <th style={{ width: 40, padding: "12px 8px 12px 16px" }}>
@@ -708,78 +694,83 @@ function RedemptionsContent() {
                           style={{ cursor: "pointer" }}
                         />
                       </th>
-                      <th>
-                        <button
-                          onClick={() => toggleSort("id")}
-                          style={sortableHeaderStyle("id")}
-                        >
-                          ID{sortIndicator("id")}
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          onClick={() => toggleSort("partnerName")}
-                          style={sortableHeaderStyle("partnerName")}
-                        >
-                          Partner Name{sortIndicator("partnerName")}
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          onClick={() => toggleSort("investorType")}
-                          style={sortableHeaderStyle("investorType")}
-                        >
-                          Type{sortIndicator("investorType")}
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          onClick={() => toggleSort("unitsToRedeem")}
-                          style={sortableHeaderStyle("unitsToRedeem")}
-                        >
-                          Units to Redeem{sortIndicator("unitsToRedeem")}
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          onClick={() => toggleSort("totalUnitsOwned")}
-                          style={sortableHeaderStyle("totalUnitsOwned")}
-                        >
-                          Total Units Owned{sortIndicator("totalUnitsOwned")}
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          onClick={() => toggleSort("redemptionAmount")}
-                          style={sortableHeaderStyle("redemptionAmount")}
-                        >
-                          Redemption Amount{sortIndicator("redemptionAmount")}
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          onClick={() => toggleSort("email")}
-                          style={sortableHeaderStyle("email")}
-                        >
-                          Email{sortIndicator("email")}
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          onClick={() => toggleSort("status")}
-                          style={sortableHeaderStyle("status")}
-                        >
-                          Status{sortIndicator("status")}
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          onClick={() => toggleSort("effectiveDate")}
-                          style={sortableHeaderStyle("effectiveDate")}
-                        >
-                          Effective Date{sortIndicator("effectiveDate")}
-                        </button>
-                      </th>
+                      <SortableTh
+                        label="ID"
+                        sortKey="id"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
+                        label="App ID"
+                        sortKey="applicationId"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
+                        label="Effective Date"
+                        sortKey="effectiveDate"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
+                        label="Investor"
+                        sortKey="sellingPartnerName"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
+                        label="Account User"
+                        sortKey="accountUserName"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
+                        label="Type"
+                        sortKey="investorType"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
+                        label="Units to Redeem"
+                        sortKey="unitsToRedeem"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
+                        label="Total Units Owned"
+                        sortKey="totalUnitsOwned"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
+                        label="Capital Redeemed"
+                        sortKey="capitalRedeemed"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
+                        label="Income"
+                        sortKey="proratedPreferredReturn"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
+                        label="Status"
+                        sortKey="status"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
                       <th>Action</th>
                     </tr>
                   </thead>
@@ -787,7 +778,7 @@ function RedemptionsContent() {
                     {result.items.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={11}
+                          colSpan={13}
                           style={{
                             textAlign: "center",
                             color: "#94a3b8",
@@ -824,8 +815,51 @@ function RedemptionsContent() {
                           >
                             #{r.id}
                           </td>
+                          <td style={{ fontSize: 13 }}>
+                            {r.trancheApplicationId ? (
+                              <Link
+                                href={`/applications/${r.trancheApplicationId}`}
+                                style={{
+                                  color: "#b8923a",
+                                  textDecoration: "underline",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                #{r.trancheApplicationId}
+                              </Link>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td style={{ fontSize: 13, color: "#64748b" }}>
+                            {r.effectiveDate || "—"}
+                          </td>
                           <td style={{ fontWeight: 600 }}>
                             {r.sellingPartnerName ?? "—"}
+                          </td>
+                          <td>
+                            {r.accountUserName && r.accountUserId ? (
+                              <Link
+                                href={`/investor-statements?userId=${r.accountUserId}`}
+                                style={{
+                                  color: "#1e293b",
+                                  fontWeight: 600,
+                                  textDecoration: "underline",
+                                }}
+                                title="Open Investor Statement"
+                              >
+                                {r.accountUserName}
+                              </Link>
+                            ) : (
+                              <div style={{ color: "#1e293b" }}>
+                                {r.accountUserName ?? "—"}
+                              </div>
+                            )}
+                            {r.email && (
+                              <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                                {r.email}
+                              </div>
+                            )}
                           </td>
                           <td>{r.investorType}</td>
                           <td style={{ fontWeight: 700, color: "#0e3416" }}>
@@ -835,21 +869,20 @@ function RedemptionsContent() {
                             {r.totalUnitsOwned ?? "—"}
                           </td>
                           <td style={{ fontWeight: 600, color: "#0e3416" }}>
-                            {r.netAggregatePrice
-                              ? `$${parseFloat(r.netAggregatePrice).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                              : (r.aggregatePurchasePrice ?? "—")}
+                            {r.aggregatePurchasePrice
+                              ? fmtMoney(capitalRedeemed(r))
+                              : "—"}
                           </td>
-                          <td style={{ fontSize: 13, color: "#64748b" }}>
-                            {r.email ?? "—"}
+                          <td style={{ fontWeight: 600, color: "#b45309" }}>
+                            {r.proratedPreferredReturn
+                              ? `+${fmtMoney(income(r))}`
+                              : "—"}
                           </td>
                           <td>
                             <StatusBadge status={r.status} />
                             {pendingMap[r.id] && (
                               <PendingBadge item={pendingMap[r.id]} />
                             )}
-                          </td>
-                          <td style={{ fontSize: 13, color: "#64748b" }}>
-                            {r.effectiveDate || "—"}
                           </td>
                           <td>
                             <div

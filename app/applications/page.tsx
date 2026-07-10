@@ -6,6 +6,7 @@ import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PendingBadge } from '@/components/PendingBadge';
 import { InvestmentEditModal } from '@/components/InvestmentEditModal';
+import { SortableTh } from '@/components/SortableTh';
 import { adminApi, type ApplicationListItem, type PagedResult, type PendingChangeItem } from '@/lib/api';
 import { downloadCsv } from '@/lib/exportCsv';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
@@ -36,6 +37,13 @@ function ApplicationsContent() {
   );
   const [investorType, setInvestorType] = useState('');
   const [page, setPage] = useState(1);
+  const [sortOn, setSortOn] = useState('createdOn');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const toggleSort = (key: string) => {
+    if (sortOn === key) setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortOn(key); setSortDirection('asc'); }
+    setPage(1);
+  };
 
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -52,7 +60,7 @@ function ApplicationsContent() {
 
   const exportToExcel = async () => {
     setExporting(true);
-    const params: Record<string, string | number> = { page: 1, pageSize: 100000 };
+    const params: Record<string, string | number> = { page: 1, pageSize: 100000, sortOn, sortDirection };
     const parsedAppId = appIdInput ? parseInt(appIdInput, 10) : NaN;
     if (!isNaN(parsedAppId)) { params.id = parsedAppId; }
     else {
@@ -78,7 +86,7 @@ function ApplicationsContent() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE };
+    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
     const parsedAppId = appIdInput ? parseInt(appIdInput, 10) : NaN;
     if (!isNaN(parsedAppId)) { params.id = parsedAppId; }
     else {
@@ -104,7 +112,7 @@ function ApplicationsContent() {
         }
       })
       .finally(() => setLoading(false));
-  }, [page, search, appIdInput, status, investorType]);
+  }, [page, search, appIdInput, status, investorType, sortOn, sortDirection]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -200,7 +208,7 @@ function ApplicationsContent() {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search by investor name or email..."
+            placeholder="Search by investor, account user, or email..."
             style={{ flex: '1 1 250px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}
           />
           <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}
@@ -236,15 +244,15 @@ function ApplicationsContent() {
                         style={{ cursor: 'pointer' }}
                       />
                     </th>
-                    <th>ID / Ref</th>
-                    <th>Account User</th>
-                    <th>Investor</th>
-                    <th>Type</th>
-                    <th>Units</th>
-                    <th>Amount</th>
-                    <th>Status</th>
-                    <th>Effective Date</th>
-                    <th>Submitted</th>
+                    <SortableTh label="ID / Ref" sortKey="id" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                    <SortableTh label="Effective Date" sortKey="effectiveDate" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                    <SortableTh label="Submitted" sortKey="submitted" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                    <SortableTh label="Account User" sortKey="accountUser" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                    <SortableTh label="Investor" sortKey="investor" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                    <SortableTh label="Type" sortKey="investorType" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                    <SortableTh label="Units" sortKey="units" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                    <SortableTh label="Amount" sortKey="amount" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                    <SortableTh label="Status" sortKey="status" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <th></th>
                   </tr>
                 </thead>
@@ -265,8 +273,16 @@ function ApplicationsContent() {
                         <div style={{ fontFamily: 'monospace', fontWeight: 700 }}>#{a.id}</div>
                         {a.ppmRefNO && <div style={{ fontSize: 11, color: '#94a3b8' }}>PPM {a.ppmRefNO}</div>}
                       </td>
+                      <td style={{ color: '#64748b', fontSize: 13 }}>{a.effectiveDate ? new Date(a.effectiveDate).toLocaleDateString() : '—'}</td>
+                      <td style={{ color: '#64748b', fontSize: 13 }}>{a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : '—'}</td>
                       <td>
-                        <div style={{ fontWeight: 600 }}>{a.userFirstName} {a.userLastName}</div>
+                        {a.userId ? (
+                          <Link href={`/investor-statements?userId=${a.userId}`} style={{ fontWeight: 600, color: '#1e293b', textDecoration: 'underline' }} title="Open Investor Statement">
+                            {a.userFirstName} {a.userLastName}
+                          </Link>
+                        ) : (
+                          <div style={{ fontWeight: 600 }}>{a.userFirstName} {a.userLastName}</div>
+                        )}
                         <div style={{ fontSize: 12, color: '#94a3b8' }}>{a.userEmail}</div>
                       </td>
                       <td>
@@ -279,8 +295,6 @@ function ApplicationsContent() {
                         <StatusBadge status={a.status} />
                         {pendingMap[a.id] && <PendingBadge item={pendingMap[a.id]} />}
                       </td>
-                      <td style={{ color: '#64748b', fontSize: 13 }}>{a.effectiveDate ? new Date(a.effectiveDate).toLocaleDateString() : '—'}</td>
-                      <td style={{ color: '#64748b', fontSize: 13 }}>{a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : '—'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                           <Link href={`/applications/${a.id}`} style={{ color: '#699172', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>View</Link>

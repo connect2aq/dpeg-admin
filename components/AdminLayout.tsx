@@ -4,18 +4,20 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { adminApi } from "@/lib/api";
+import { isExecutiveCopilotAllowed } from "@/lib/executiveCopilot/accessControl";
 import Image from "next/image";
 
 const NAV = [
+  { href: "/executive-copilot", label: "Executive Copilot", icon: "💬" },
   { href: "/dashboard", label: "Dashboard", icon: "▦" },
   { href: "/users", label: "Users", icon: "👤" },
   { href: "/applications", label: "Applications", icon: "📋" },
   { href: "/redemptions", label: "Redemptions", icon: "↩" },
-  { href: "/distributions", label: "Distributions", icon: "$" },
   { href: "/capital-ledger", label: "Fund Capital Ledger", icon: "⊞" },
   { href: "/investor-statements", label: "Investor Statements", icon: "📄" },
-  { href: "/statements", label: "Statements", icon: "≡" },
   { href: "/daily-interest", label: "Daily Interest", icon: "%" },
+  { href: "/distributions", label: "Distributions", icon: "$" },
+  { href: "/pending-approvals", label: "Pending Approvals", icon: "⏳" },
   { href: "/odoo-logs", label: "Odoo Logs", icon: "⇄" },
   { href: "/email-logs", label: "Email Logs", icon: "✉" },
   { href: "/docusign", label: "DocuSign", icon: "✍" },
@@ -125,48 +127,48 @@ export default function AdminLayout({
             minHeight: 0,
           }}
         >
-          {/* Pending Approvals — visible to Checker, Approver, SuperAdmin */}
-          {adminRole !== "Maker" && (
-            <Link
-              href="/pending-approvals"
-              className={`sidebar-link ${pathname.startsWith("/pending-approvals") ? "active" : ""}`}
-              onClick={() => setMobileOpen(false)}
-              style={{ position: "relative" }}
-            >
-              <span style={{ fontSize: 15, width: 20, flexShrink: 0 }}>⏳</span>
-              Pending Approvals
-              {pendingBadge > 0 && (
-                <span
-                  style={{
-                    marginLeft: "auto",
-                    background: "#b8923a",
-                    color: "white",
-                    borderRadius: 10,
-                    fontSize: 10,
-                    fontWeight: 700,
-                    padding: "1px 6px",
-                    minWidth: 18,
-                    textAlign: "center",
-                  }}
-                >
-                  {pendingBadge}
+          {NAV.map(({ href, label, icon }) => {
+            // Pending Approvals — visible to Checker, Approver, SuperAdmin only
+            if (href === "/pending-approvals" && adminRole === "Maker")
+              return null;
+            // Executive Copilot — not ready for every admin yet, restricted to one account
+            if (
+              href === "/executive-copilot" &&
+              !isExecutiveCopilotAllowed(user?.email)
+            )
+              return null;
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`sidebar-link ${pathname.startsWith(href) ? "active" : ""}`}
+                onClick={() => setMobileOpen(false)}
+                style={{ position: "relative" }}
+              >
+                <span style={{ fontSize: 15, width: 20, flexShrink: 0 }}>
+                  {icon}
                 </span>
-              )}
-            </Link>
-          )}
-          {NAV.map(({ href, label, icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className={`sidebar-link ${pathname.startsWith(href) ? "active" : ""}`}
-              onClick={() => setMobileOpen(false)}
-            >
-              <span style={{ fontSize: 15, width: 20, flexShrink: 0 }}>
-                {icon}
-              </span>
-              {label}
-            </Link>
-          ))}
+                {label}
+                {href === "/pending-approvals" && pendingBadge > 0 && (
+                  <span
+                    style={{
+                      marginLeft: "auto",
+                      background: "#b8923a",
+                      color: "white",
+                      borderRadius: 10,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "1px 6px",
+                      minWidth: 18,
+                      textAlign: "center",
+                    }}
+                  >
+                    {pendingBadge}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
           {adminRole === "SuperAdmin" &&
             process.env.NEXT_PUBLIC_HANGFIRE_URL && (
               <a

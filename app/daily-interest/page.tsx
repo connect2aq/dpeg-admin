@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/components/AdminLayout';
+import { SortableTh } from '@/components/SortableTh';
 import {
   adminApi,
   type DailyInterestItem,
@@ -44,6 +45,13 @@ export default function DailyInterestPage() {
   const [to, setTo] = useState('');
   const [included, setIncluded] = useState('');
   const [page, setPage] = useState(1);
+  const [sortOn, setSortOn] = useState('date');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const toggleSort = (key: string) => {
+    if (sortOn === key) setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortOn(key); setSortDirection('asc'); }
+    setPage(1);
+  };
   const [pushingDIId, setPushingDIId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [diBulkPushing, setDiBulkPushing] = useState(false);
@@ -77,7 +85,7 @@ export default function DailyInterestPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE };
+    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
     if (appId) params.appId = appId;
     if (from) params.from = from;
     if (to) params.to = to;
@@ -86,7 +94,7 @@ export default function DailyInterestPage() {
     adminApi.dailyInterestLogs(params)
       .then(r => { if (r.success) setResult(r.data); })
       .finally(() => setLoading(false));
-  }, [page, appId, from, to, included]);
+  }, [page, appId, from, to, included, sortOn, sortDirection]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -295,9 +303,17 @@ export default function DailyInterestPage() {
                           else setSelectedIds(new Set());
                         }} />
                     </th>
-                    {['Date', 'Investor', 'App ID', 'Units', 'Capital', 'Rate', 'Net Interest', 'Odoo ID', 'Odoo Status', 'Distributed', 'Action'].map(h => (
-                      <th key={h} style={th}>{h}</th>
-                    ))}
+                    <SortableTh label="App ID" sortKey="appid" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                    <SortableTh label="Date" sortKey="date" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                    <SortableTh label="Investor" sortKey="investor" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                    <SortableTh label="Units" sortKey="units" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                    <SortableTh label="Capital" sortKey="capital" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                    <SortableTh label="Rate" sortKey="rate" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                    <SortableTh label="Net Interest" sortKey="netinterest" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                    <SortableTh label="Odoo ID" sortKey="odooid" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                    <SortableTh label="Odoo Status" sortKey="odoostatus" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                    <SortableTh label="Distributed" sortKey="distributed" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={th} />
+                    <th style={th}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -317,12 +333,12 @@ export default function DailyInterestPage() {
                               return s;
                             })} />
                         </td>
+                        <td style={{ ...td, color: '#6b7280' }}>#{row.applicationId}</td>
                         <td style={{ ...td, fontWeight: 600, whiteSpace: 'nowrap' }}>{new Date(row.date).toLocaleDateString()}</td>
                         <td style={td}>
                           <div style={{ fontWeight: 500 }}>{row.investorName}</div>
                           {row.investorEmail && <div style={{ fontSize: 11, color: '#9ca3af' }}>{row.investorEmail}</div>}
                         </td>
-                        <td style={{ ...td, color: '#6b7280' }}>#{row.applicationId}</td>
                         <td style={{ ...td, textAlign: 'center' }}>{row.units}</td>
                         <td style={td}>${row.capital.toLocaleString()}</td>
                         <td style={{ ...td, color: '#6b7280' }}>{(row.annualRate * 100).toFixed(0)}%</td>

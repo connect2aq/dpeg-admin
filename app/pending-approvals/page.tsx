@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import AdminLayout from "@/components/AdminLayout";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { SortableTh } from "@/components/SortableTh";
 import {
   adminApi,
   type PendingChangeItem,
@@ -29,18 +30,6 @@ const ENTITY_TYPES = [
   "BulkRedemptions",
 ];
 const PAGE_SIZE = 20;
-const SORTABLE_COLUMNS = {
-  id: "id",
-  type: "entityType",
-  description: "description",
-  maker: "makerName",
-  submitted: "createdOn",
-  checker: "checkerName",
-  status: "status",
-} as const;
-
-type SortKey = keyof typeof SORTABLE_COLUMNS;
-type SortDir = "asc" | "desc";
 
 // ── Field definitions (payload keys are PascalCase — C# JsonSerializer default) ──
 
@@ -1329,26 +1318,34 @@ export default function PendingApprovalsPage() {
   const [entityType, setEntityType] = useState("");
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<PendingChangeDetail | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>("submitted");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sortOn, setSortOn] = useState("createdOn");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const toggleSort = (key: string) => {
+    if (sortOn === key) setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortOn(key);
+      setSortDirection("asc");
+    }
+    setPage(1);
+  };
 
   const load = useCallback(() => {
     setLoading(true);
     const params: Record<string, string | number> = {
       page,
       pageSize: PAGE_SIZE,
+      sortOn,
+      sortDirection,
     };
     if (status) params.status = status;
     if (entityType) params.entityType = entityType;
-    params.sortOn = SORTABLE_COLUMNS[sortKey];
-    params.sortDirection = sortDir;
     adminApi
       .getPendingChanges(params)
       .then((r) => {
         if (r.success) setResult(r.data);
       })
       .finally(() => setLoading(false));
-  }, [page, status, entityType, sortKey, sortDir]);
+  }, [page, status, entityType, sortOn, sortDirection]);
 
   useEffect(() => {
     load();
@@ -1358,32 +1355,6 @@ export default function PendingApprovalsPage() {
     const r = await adminApi.getPendingChange(id);
     if (r.success && r.data) setDetail(r.data);
   };
-
-  const toggleSort = (nextKey: SortKey) => {
-    setPage(1);
-    if (sortKey === nextKey) {
-      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
-      return;
-    }
-    setSortKey(nextKey);
-    setSortDir("asc");
-  };
-
-  const sortIndicator = (key: SortKey) => {
-    if (sortKey !== key) return " ⇵";
-    return sortDir === "asc" ? " ↑" : " ↓";
-  };
-
-  const sortableHeaderStyle = (key: SortKey) => ({
-    background: "none",
-    border: "none",
-    padding: 0,
-    cursor: "pointer",
-    font: "inherit",
-    color: sortKey === key ? "#0f2342" : "inherit",
-    fontWeight: sortKey === key ? 700 : 600,
-    whiteSpace: "nowrap" as const,
-  });
 
   return (
     <AdminLayout>
@@ -1486,62 +1457,55 @@ export default function PendingApprovalsPage() {
                 <table style={{ minWidth: 900 }}>
                   <thead>
                     <tr>
-                      <th>
-                        <button
-                          onClick={() => toggleSort("id")}
-                          style={sortableHeaderStyle("id")}
-                        >
-                          ID{sortIndicator("id")}
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          onClick={() => toggleSort("type")}
-                          style={sortableHeaderStyle("type")}
-                        >
-                          Type{sortIndicator("type")}
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          onClick={() => toggleSort("description")}
-                          style={sortableHeaderStyle("description")}
-                        >
-                          Description{sortIndicator("description")}
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          onClick={() => toggleSort("maker")}
-                          style={sortableHeaderStyle("maker")}
-                        >
-                          Maker{sortIndicator("maker")}
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          onClick={() => toggleSort("submitted")}
-                          style={sortableHeaderStyle("submitted")}
-                        >
-                          Submitted{sortIndicator("submitted")}
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          onClick={() => toggleSort("checker")}
-                          style={sortableHeaderStyle("checker")}
-                        >
-                          Checker{sortIndicator("checker")}
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          onClick={() => toggleSort("status")}
-                          style={sortableHeaderStyle("status")}
-                        >
-                          Status{sortIndicator("status")}
-                        </button>
-                      </th>
+                      <SortableTh
+                        label="ID"
+                        sortKey="id"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
+                        label="Submitted"
+                        sortKey="createdOn"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
+                        label="Type"
+                        sortKey="entityType"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
+                        label="Description"
+                        sortKey="description"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
+                        label="Maker"
+                        sortKey="makerName"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
+                        label="Checker"
+                        sortKey="checkerName"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
+                        label="Status"
+                        sortKey="status"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
                       <th></th>
                     </tr>
                   </thead>
@@ -1570,6 +1534,15 @@ export default function PendingApprovalsPage() {
                             }}
                           >
                             #{item.id}
+                          </td>
+                          <td
+                            style={{
+                              fontSize: 12,
+                              color: "#64748b",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {new Date(item.createdOn).toLocaleDateString()}
                           </td>
                           <td>
                             <div
@@ -1606,15 +1579,6 @@ export default function PendingApprovalsPage() {
                             <div style={{ fontSize: 11, color: "#94a3b8" }}>
                               {item.makerEmail}
                             </div>
-                          </td>
-                          <td
-                            style={{
-                              fontSize: 12,
-                              color: "#64748b",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {new Date(item.createdOn).toLocaleDateString()}
                           </td>
                           <td style={{ fontSize: 12, color: "#64748b" }}>
                             {item.checkerName ?? "—"}

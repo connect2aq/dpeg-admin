@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { isExecutiveCopilotAllowed } from "@/lib/executiveCopilot/accessControl";
 import Image from "next/image";
 
 export default function LoginPage() {
@@ -13,7 +14,7 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) router.replace("/dashboard");
+    if (!loading && user) router.replace(isExecutiveCopilotAllowed(user.email) ? "/executive-copilot" : "/dashboard");
   }, [user, loading, router]);
 
   const submit = async (e: React.FormEvent) => {
@@ -24,7 +25,11 @@ export default function LoginPage() {
     if (err) {
       setError(err);
       setSubmitting(false);
-    } else router.push("/dashboard");
+      return;
+    }
+    const stored = typeof window !== "undefined" ? localStorage.getItem("adminUser") : null;
+    const loggedInEmail = stored ? (JSON.parse(stored) as { email?: string }).email : undefined;
+    router.push(isExecutiveCopilotAllowed(loggedInEmail) ? "/executive-copilot" : "/dashboard");
   };
 
   return (

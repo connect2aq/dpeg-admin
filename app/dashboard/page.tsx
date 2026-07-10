@@ -3,11 +3,30 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import AdminLayout from "@/components/AdminLayout";
 import { StatusBadge } from "@/components/StatusBadge";
-import { adminApi, type DashboardStats, type DashboardTrends } from "@/lib/api";
+import { SortableTh } from "@/components/SortableTh";
+import { adminApi, type DashboardStats, type DashboardTrends, type ApplicationListItem } from "@/lib/api";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from "recharts";
+
+type RecentAppSortField =
+  | "id" | "accountUser" | "investorName" | "investorType" | "numUnits"
+  | "totalAmount" | "status" | "effectiveDate" | "submittedAt";
+
+const recentAppSortValue = (a: ApplicationListItem, field: RecentAppSortField): string | number => {
+  switch (field) {
+    case "id":            return a.id;
+    case "accountUser":   return `${a.userFirstName} ${a.userLastName}`.trim().toLowerCase();
+    case "investorName":  return a.investorName?.toLowerCase() ?? "";
+    case "investorType":  return a.investorType;
+    case "numUnits":      return a.numUnits ?? -Infinity;
+    case "totalAmount":   return a.totalAmount ?? -Infinity;
+    case "status":        return a.status;
+    case "effectiveDate": return a.effectiveDate ? new Date(a.effectiveDate).getTime() : -Infinity;
+    case "submittedAt":   return a.submittedAt ? new Date(a.submittedAt).getTime() : -Infinity;
+  }
+};
 
 function KpiCard({
   label,
@@ -222,6 +241,13 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo]     = useState("");
+  const [recentAppSort, setRecentAppSort] = useState<RecentAppSortField>("submittedAt");
+  const [recentAppSortDir, setRecentAppSortDir] = useState<"asc" | "desc">("desc");
+  const toggleRecentAppSort = (field: string) => {
+    const f = field as RecentAppSortField;
+    if (recentAppSort === f) setRecentAppSortDir(d => (d === "asc" ? "desc" : "asc"));
+    else { setRecentAppSort(f); setRecentAppSortDir("asc"); }
+  };
 
   const fetchDashboard = useCallback((from?: string, to?: string) => {
     setLoading(true);
@@ -344,7 +370,7 @@ export default function DashboardPage() {
             {trends && (
               <>
                 <SectionLabel>Analytics</SectionLabel>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, marginBottom: 20 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(320px, 1fr))", gap: 20, marginBottom: 20 }}>
                   <div className="card">
                     <div style={{ fontSize: 14, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>Applications by Month</div>
                     <ResponsiveContainer width="100%" height={200}>
@@ -386,6 +412,45 @@ export default function DashboardPage() {
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
+
+                  <div className="card">
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>Monthly Redemptions</div>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={trends.monthlyRedemption} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                        <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={v => v >= 1_000_000 ? `$${(v/1_000_000).toFixed(1)}M` : `$${(v/1000).toFixed(0)}k`} />
+                        <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v: any) => [`$${Number(v).toLocaleString()}`, "Redeemed"]} />
+                        <Line type="monotone" dataKey="amount" stroke="#ef4444" strokeWidth={2} dot={{ r: 4, fill: "#ef4444" }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="card">
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>Monthly Deployment Trend</div>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={trends.monthlyDeployment} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                        <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={v => v >= 1_000_000 ? `$${(v/1_000_000).toFixed(1)}M` : `$${(v/1000).toFixed(0)}k`} />
+                        <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v: any) => [`$${Number(v).toLocaleString()}`, "Deployed Amount"]} />
+                        <Line type="monotone" dataKey="deployedAmount" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 4, fill: "#8b5cf6" }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="card">
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>Monthly Distributions</div>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={trends.monthlyDistribution} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                        <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={v => v >= 1_000_000 ? `$${(v/1_000_000).toFixed(1)}M` : `$${(v/1000).toFixed(0)}k`} />
+                        <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v: any) => [`$${Number(v).toLocaleString()}`, "Distributed"]} />
+                        <Line type="monotone" dataKey="amount" stroke="#b8923a" strokeWidth={2} dot={{ r: 4, fill: "#b8923a" }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               </>
             )}
@@ -402,25 +467,37 @@ export default function DashboardPage() {
                 <table>
                   <thead>
                     <tr>
-                      <th>ID / REF</th>
-                      <th>Account User</th>
-                      <th>Investor</th>
-                      <th>Type</th>
-                      <th>Units</th>
-                      <th>Amount</th>
-                      <th>Status</th>
-                      <th>Effective Date</th>
-                      <th>Submitted</th>
+                      <SortableTh label="ID / REF" sortKey="id" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
+                      <SortableTh label="Effective Date" sortKey="effectiveDate" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
+                      <SortableTh label="Submitted" sortKey="submittedAt" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
+                      <SortableTh label="Account User" sortKey="accountUser" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
+                      <SortableTh label="Investor" sortKey="investorName" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
+                      <SortableTh label="Type" sortKey="investorType" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
+                      <SortableTh label="Units" sortKey="numUnits" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
+                      <SortableTh label="Amount" sortKey="totalAmount" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
+                      <SortableTh label="Status" sortKey="status" sortOn={recentAppSort} sortDirection={recentAppSortDir} onSort={toggleRecentAppSort} />
                     </tr>
                   </thead>
                   <tbody>
-                    {stats.recentApplications.map((a) => (
+                    {[...stats.recentApplications].sort((a, b) => {
+                      const av = recentAppSortValue(a, recentAppSort);
+                      const bv = recentAppSortValue(b, recentAppSort);
+                      if (av < bv) return recentAppSortDir === "asc" ? -1 : 1;
+                      if (av > bv) return recentAppSortDir === "asc" ? 1 : -1;
+                      return 0;
+                    }).map((a) => (
                       <tr key={a.id}>
                         <td>
                           <div style={{ fontFamily: "monospace", fontWeight: 700 }}>
                             <Link href={`/applications/${a.id}`} style={{ color: "#0e3416", textDecoration: "none" }}>#{a.id}</Link>
                           </div>
                           {a.ppmRefNO && <div style={{ fontSize: 11, color: "#94a3b8" }}>PPM {a.ppmRefNO}</div>}
+                        </td>
+                        <td style={{ color: "#64748b", fontSize: 13 }}>
+                          {a.effectiveDate ? new Date(a.effectiveDate).toLocaleDateString() : "—"}
+                        </td>
+                        <td style={{ color: "#64748b", fontSize: 13 }}>
+                          {a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : "—"}
                         </td>
                         <td>
                           {a.userId ? (
@@ -445,12 +522,6 @@ export default function DashboardPage() {
                         <td>{a.numUnits ?? "—"}</td>
                         <td>{a.totalAmount ? `$${a.totalAmount.toLocaleString()}` : "—"}</td>
                         <td><StatusBadge status={a.status} /></td>
-                        <td style={{ color: "#64748b", fontSize: 13 }}>
-                          {a.effectiveDate ? new Date(a.effectiveDate).toLocaleDateString() : "—"}
-                        </td>
-                        <td style={{ color: "#64748b", fontSize: 13 }}>
-                          {a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : "—"}
-                        </td>
                       </tr>
                     ))}
                   </tbody>

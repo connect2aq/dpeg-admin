@@ -2,6 +2,7 @@
 import { useRef, useState } from 'react';
 import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
+import { SortableTh } from '@/components/SortableTh';
 import {
   historicalImportApi,
   type ImportResult,
@@ -11,6 +12,18 @@ import {
   type OdooSyncRowResult,
   type WelcomeEmailRowResult,
 } from '@/lib/api';
+
+type SortField = 'rowNumber' | 'investorName' | 'userEmail' | 'success' | 'ppmRefNO';
+
+const sortValue = (r: ImportRowResult, field: SortField): string | number => {
+  switch (field) {
+    case 'rowNumber':    return r.rowNumber;
+    case 'investorName': return r.investorName ?? '';
+    case 'userEmail':    return r.userEmail ?? '';
+    case 'success':      return r.success ? 1 : 0;
+    case 'ppmRefNO':     return r.ppmRefNO ?? '';
+  }
+};
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -62,8 +75,24 @@ export default function HistoricalImportPage() {
   const [odooResults, setOdooResults]   = useState<Record<number, OdooSyncRowResult>>({});
 
   const [showInstructions, setShowInstructions] = useState(false);
+  const [sortField, setSortField] = useState<SortField>('rowNumber');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const toggleSort = (field: string) => {
+    const f = field as SortField;
+    if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(f); setSortDir('asc'); }
+  };
 
   const successRows = importResult?.rows.filter(r => r.success) ?? [];
+  const sortedRows = importResult
+    ? [...importResult.rows].sort((a, b) => {
+        const av = sortValue(a, sortField);
+        const bv = sortValue(b, sortField);
+        if (av < bv) return sortDir === 'asc' ? -1 : 1;
+        if (av > bv) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+      })
+    : [];
 
   // ── Step 1: upload ──────────────────────────────────────────────────────────
 
@@ -284,11 +313,11 @@ export default function HistoricalImportPage() {
               <table style={s.table}>
                 <thead>
                   <tr>
-                    <th style={s.th}>Row</th>
-                    <th style={s.th}>Investor</th>
-                    <th style={s.th}>Email</th>
-                    <th style={s.th}>Status</th>
-                    <th style={s.th}>PPM Ref #</th>
+                    <SortableTh label="Row" sortKey="rowNumber" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
+                    <SortableTh label="Investor" sortKey="investorName" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
+                    <SortableTh label="Email" sortKey="userEmail" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
+                    <SortableTh label="Status" sortKey="success" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
+                    <SortableTh label="PPM Ref #" sortKey="ppmRefNO" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
                     <th style={s.th}>Welcome Email</th>
                     <th style={s.th}>Odoo Investor</th>
                     <th style={s.th}>Odoo Investment</th>
@@ -296,7 +325,7 @@ export default function HistoricalImportPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {importResult.rows.map(row => {
+                  {sortedRows.map(row => {
                     const emailRow  = row.userId ? emailResults[row.userId] : undefined;
                     const odooRow   = row.applicationId ? odooResults[row.applicationId] : undefined;
                     return (

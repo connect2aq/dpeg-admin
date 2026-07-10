@@ -1,8 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import AdminLayout from "@/components/AdminLayout";
-import { adminApi, type UserListItem, type InvestorCapitalAccount, type InvestorCapitalAccountEntry } from "@/lib/api";
+import { SortableTh } from "@/components/SortableTh";
+import { adminApi, type UserListItem, type ApplicationSummary, type InvestorCapitalAccount, type InvestorCapitalAccountEntry } from "@/lib/api";
+
+type SortField =
+  | "date" | "entryType" | "investmentType" | "investorName" | "accountUserName"
+  | "applicationId" | "ppmRefNo" | "units" | "amount" | "income" | "runningBalance";
+
+const sortValue = (e: InvestorCapitalAccountEntry, field: SortField): string | number => {
+  switch (field) {
+    case "date":            return new Date(e.date).getTime();
+    case "entryType":       return e.entryType;
+    case "investmentType":  return e.investmentType ?? "";
+    case "investorName":    return e.investorName ?? "";
+    case "accountUserName": return e.accountUserName ?? "";
+    case "applicationId":   return e.applicationId ?? -Infinity;
+    case "ppmRefNo":        return e.ppmRefNo ?? "";
+    case "units":           return e.units ?? -Infinity;
+    case "amount":          return e.amount;
+    case "income":          return e.income;
+    case "runningBalance":  return e.runningBalance;
+  }
+};
+
+const ACTIVE_STATUSES = new Set(["Active", "Redeemed"]);
 
 const TYPE_COLORS: Record<string, { badge: string; text: string }> = {
   Contribution: { badge: "bg-green-100 text-green-700",   text: "text-green-700"  },
@@ -22,11 +47,13 @@ function fmtInvType(t?: string) {
 }
 
 function exportCSV(data: InvestorCapitalAccount, investorName: string) {
-  const headers = ["Date", "Type", "Inv. Type", "App ID", "PPM Ref", "Units", "Capital", "Income", "Capital Balance"];
+  const headers = ["Date", "Type", "Inv. Type", "Investor", "Account User", "App ID", "PPM Ref", "Units", "Capital", "Income", "Capital Balance"];
   const rows = data.entries.map(e => [
     new Date(e.date).toLocaleDateString("en-US"),
     e.entryType,
     fmtInvType(e.investmentType),
+    e.investorName ?? "",
+    e.accountUserName ?? "",
     e.applicationId ? `#${e.applicationId}` : "",
     e.ppmRefNo ? `#${e.ppmRefNo}` : "",
     e.units ?? "",
@@ -44,12 +71,14 @@ function exportCSV(data: InvestorCapitalAccount, investorName: string) {
   URL.revokeObjectURL(url);
 }
 
-function exportPDF(data: InvestorCapitalAccount, investorName: string, ytdIncome: number, accrued: number) {
+function exportPDF(data: InvestorCapitalAccount, investorName: string, accrued: number) {
   const rows = data.entries.map(e => `
     <tr>
       <td>${new Date(e.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</td>
       <td>${e.entryType}</td>
       <td>${fmtInvType(e.investmentType) || "—"}</td>
+      <td>${e.investorName || "—"}</td>
+      <td>${e.accountUserName || "—"}</td>
       <td>${e.applicationId ? "#" + e.applicationId : "—"}</td>
       <td>${e.ppmRefNo ? "#" + e.ppmRefNo : "—"}</td>
       <td class="r">${e.units ?? "—"}</td>
@@ -96,14 +125,14 @@ function exportPDF(data: InvestorCapitalAccount, investorName: string, ytdIncome
   <div class="cards">
     <div class="card"><label>Total Contributed</label><div class="val green">${fmt(data.totalContributions)}</div></div>
     <div class="card"><label>Capital Deployed</label><div class="val">${fmt(data.netPosition)}</div></div>
-    <div class="card"><label>Total Income</label><div class="val amber">${fmt(data.totalIncome)}</div><div class="sub">${fmt(ytdIncome)} YTD</div></div>
+    <div class="card"><label>Total Income</label><div class="val amber">${fmt(data.totalIncome)}</div></div>
     <div class="card"><label>Accrued (Unpaid)</label><div class="val amber">${fmt(accrued)}</div></div>
   </div>
   <table>
-    <thead><tr><th>Date</th><th>Type</th><th>Inv. Type</th><th>App ID</th><th>PPM Ref</th><th class="r">Units</th><th class="r">Capital</th><th class="r">Income</th><th class="r">Capital Balance</th></tr></thead>
+    <thead><tr><th>Date</th><th>Type</th><th>Inv. Type</th><th>Investor</th><th>Account User</th><th>App ID</th><th>PPM Ref</th><th class="r">Units</th><th class="r">Capital</th><th class="r">Income</th><th class="r">Capital Balance</th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr>
-      <td colspan="6">${data.entries.length} entries</td>
+      <td colspan="8">${data.entries.length} entries</td>
       <td class="r">${fmtSigned(data.entries.reduce((s, e) => s + e.amount, 0))}</td>
       <td class="r amber">+${fmt(data.totalIncome)}</td>
       <td class="r">${fmt(data.netPosition)}</td>
@@ -124,16 +153,54 @@ function exportPDF(data: InvestorCapitalAccount, investorName: string, ytdIncome
 }
 
 export default function InvestorStatementsPage() {
+  return (
+    <Suspense fallback={<AdminLayout><div style={{ padding: 32, color: "var(--muted)" }}>Loading...</div></AdminLayout>}>
+      <InvestorStatementsContent />
+    </Suspense>
+  );
+}
+
+function InvestorStatementsContent() {
+  const searchParams = useSearchParams();
   const [investors, setInvestors] = useState<UserListItem[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  // Deep-link support (e.g. from the Executive Copilot's investor citations): reading the
+  // URL directly into the initial state, same pattern already used by
+  // app/applications/page.tsx, rather than an effect -- the investorStatement fetch
+  // effect below only needs the id itself, not the investors list to have loaded first.
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(() => {
+    const raw = searchParams.get("userId");
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed) ? parsed : null;
+  });
+  // null = whole account (all investments); a number scopes the statement to one application.
+  const [selectedApplicationId, setSelectedApplicationId] = useState<number | null>(() => {
+    const raw = searchParams.get("applicationId");
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed) ? parsed : null;
+  });
+  const [investments, setInvestments] = useState<ApplicationSummary[]>([]);
+  const [excludedApplications, setExcludedApplications] = useState<ApplicationSummary[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<InvestorCapitalAccount | null>(null);
   const [accrued, setAccrued] = useState(0);
   const [typeFilter, setTypeFilter] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [investorsLoading, setInvestorsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sortField, setSortField] = useState<SortField>("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const toggleSort = (field: string) => {
+    const f = field as SortField;
+    if (sortField === f) setSortDir(d => (d === "asc" ? "desc" : "asc"));
+    else { setSortField(f); setSortDir("asc"); }
+  };
+  // Captures the search text at the moment an investor is picked, so once that user's
+  // investments load we can tell whether the match was a specific investor/entity name
+  // (vs. the account holder's own name or email) and auto-scope to that one investment.
+  const scopeQueryRef = useRef("");
 
   useEffect(() => {
     adminApi.users({ page: 1, pageSize: 500 })
@@ -143,11 +210,34 @@ export default function InvestorStatementsPage() {
   }, []);
 
   useEffect(() => {
+    if (!selectedUserId) { setInvestments([]); setExcludedApplications([]); return; }
+    adminApi.user(selectedUserId)
+      .then(r => {
+        if (!r.success || !r.data) { setInvestments([]); setExcludedApplications([]); return; }
+        const active = r.data.applications.filter(a => ACTIVE_STATUSES.has(a.status));
+        setInvestments(active);
+        setExcludedApplications(r.data.applications.filter(a => !ACTIVE_STATUSES.has(a.status)));
+
+        const q = scopeQueryRef.current.trim().toLowerCase();
+        scopeQueryRef.current = "";
+        if (!q) return;
+        const accountName = `${r.data.firstName} ${r.data.lastName}`.trim().toLowerCase();
+        const matches = active.filter(a =>
+          a.investorName && a.investorName.trim().toLowerCase() !== accountName
+          && a.investorName.toLowerCase().includes(q));
+        // Only auto-scope when the query uniquely identifies one investment — an
+        // ambiguous match (e.g. the account holder's own name) falls back to "all".
+        setSelectedApplicationId(matches.length === 1 ? matches[0].id : null);
+      })
+      .catch(() => { setInvestments([]); setExcludedApplications([]); });
+  }, [selectedUserId]);
+
+  useEffect(() => {
     if (!selectedUserId) { setData(null); setAccrued(0); return; }
     setLoading(true);
     setError("");
     setData(null);
-    adminApi.investorStatement(selectedUserId)
+    adminApi.investorStatement(selectedUserId, selectedApplicationId ?? undefined)
       .then(r => {
         if (r.success && r.data) {
           setData(r.data);
@@ -158,18 +248,24 @@ export default function InvestorStatementsPage() {
       })
       .catch(() => setError("Failed to load statement."))
       .finally(() => setLoading(false));
-  }, [selectedUserId]);
+  }, [selectedUserId, selectedApplicationId]);
 
   const suggestions = investors.filter(u => {
     if (!inputValue || selectedUserId) return false;
     const q = inputValue.toLowerCase();
-    return `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(q);
+    const haystack = `${u.firstName} ${u.lastName} ${u.email} ${u.investorNames.join(" ")}`;
+    return haystack.toLowerCase().includes(q);
   }).slice(0, 8);
 
   const selectedInvestor = investors.find(u => u.id === selectedUserId);
   const investorName = selectedInvestor ? `${selectedInvestor.firstName} ${selectedInvestor.lastName}` : "";
+  const scopedInvestment = investments.find(a => a.id === selectedApplicationId);
+  // Label used for export filenames/titles — the specific investor/entity name when
+  // scoped to one investment, otherwise the account holder's name.
+  const exportLabel = scopedInvestment?.investorName || investorName;
 
   function selectInvestor(u: UserListItem) {
+    scopeQueryRef.current = inputValue;
     setSelectedUserId(u.id);
     setInputValue(`${u.firstName} ${u.lastName}`);
     setOpen(false);
@@ -177,23 +273,32 @@ export default function InvestorStatementsPage() {
 
   function clearSelection() {
     setSelectedUserId(null);
+    setSelectedApplicationId(null);
+    setInvestments([]);
     setInputValue("");
     setData(null);
     setOpen(false);
   }
 
-  const visible: InvestorCapitalAccountEntry[] = (data?.entries ?? []).filter(
-    e => !typeFilter || e.entryType === typeFilter,
-  );
+  const visible: InvestorCapitalAccountEntry[] = (data?.entries ?? []).filter(e => {
+    if (typeFilter && e.entryType !== typeFilter) return false;
+    const entryDate = e.date.slice(0, 10); // "YYYY-MM-DD", comparable lexicographically
+    if (fromDate && entryDate < fromDate) return false;
+    if (toDate && entryDate > toDate) return false;
+    return true;
+  });
 
-  const currentYear = new Date().getFullYear();
-  const ytdIncome = (data?.entries ?? [])
-    .filter(e => new Date(e.date).getFullYear() === currentYear)
-    .reduce((s, e) => s + e.income, 0);
+  const sortedVisible = [...visible].sort((a, b) => {
+    const av = sortValue(a, sortField);
+    const bv = sortValue(b, sortField);
+    if (av < bv) return sortDir === "asc" ? -1 : 1;
+    if (av > bv) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
 
   return (
     <AdminLayout>
-      <div style={{ padding: "28px 32px", maxWidth: 1100 }}>
+      <div style={{ padding: "28px 32px", maxWidth: 1500 }}>
         {/* Header */}
         <div style={{ marginBottom: 24 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--forest)", margin: 0 }}>
@@ -207,13 +312,13 @@ export default function InvestorStatementsPage() {
         {/* Investor combobox */}
         <div style={{ marginBottom: 28, maxWidth: 480, position: "relative" }}>
           <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
-            Search Investor
+            Search Account User or Investor
           </label>
           <div style={{ position: "relative" }}>
             <input
               type="text"
-              placeholder={investorsLoading ? "Loading investors…" : "Type name or email to search…"}
-              value={inputValue}
+              placeholder={investorsLoading ? "Loading investors…" : "Search Account User or Investor…"}
+              value={inputValue || investorName}
               disabled={investorsLoading}
               onChange={e => { setInputValue(e.target.value); setOpen(true); if (selectedUserId) clearSelection(); }}
               onFocus={() => { if (!selectedUserId && inputValue) setOpen(true); }}
@@ -239,6 +344,13 @@ export default function InvestorStatementsPage() {
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{u.firstName} {u.lastName}</div>
                     <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 1 }}>{u.email}</div>
+                    {(() => {
+                      const accountName = `${u.firstName} ${u.lastName}`.trim().toLowerCase();
+                      const otherInvestorNames = u.investorNames.filter(n => n.trim().toLowerCase() !== accountName);
+                      return otherInvestorNames.length > 0 ? (
+                        <div style={{ fontSize: 11, color: "var(--forest)", marginTop: 1 }}>Investor: {otherInvestorNames.join(", ")}</div>
+                      ) : null;
+                    })()}
                   </div>
                   <span style={{ fontSize: 10, color: "var(--muted)", background: "var(--bg-section)", borderRadius: 4, padding: "2px 6px" }}>{u.status}</span>
                 </button>
@@ -277,20 +389,85 @@ export default function InvestorStatementsPage() {
             <div style={{ marginBottom: 16 }}>
               <span style={{ fontSize: 16, fontWeight: 700, color: "var(--forest)" }}>{investorName}</span>
               <span style={{ fontSize: 12, color: "var(--muted)", marginLeft: 10 }}>{selectedInvestor?.email}</span>
+              {scopedInvestment && (
+                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
+                  Viewing investment: <strong style={{ color: "var(--text-primary)" }}>{scopedInvestment.investorName || investorName}</strong>
+                  {" "}(App #{scopedInvestment.id}{scopedInvestment.ppmRefNO ? `, PPM #${scopedInvestment.ppmRefNO}` : ""})
+                </div>
+              )}
             </div>
+
+            {/* Excluded-applications notice — this statement only reflects funded (Active/Redeemed) capital */}
+            {excludedApplications.length > 0 && (
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 16, padding: "12px 18px", background: "#fffbeb", border: "1.5px solid #fbbf24", borderRadius: 10 }}>
+                <span style={{ fontSize: 16, lineHeight: "18px" }}>⚠️</span>
+                <span style={{ fontSize: 13, color: "#92400e", lineHeight: 1.5 }}>
+                  This statement only reflects <strong>funded capital</strong> (Active or Redeemed investments).{" "}
+                  <strong>
+                    {excludedApplications.length} application{excludedApplications.length !== 1 ? "s" : ""} for this investor
+                  </strong>{" "}
+                  {excludedApplications.length !== 1 ? "are" : "is"} not included below —{" "}
+                  {Object.entries(
+                    excludedApplications.reduce<Record<string, number>>((acc, a) => {
+                      acc[a.status] = (acc[a.status] ?? 0) + 1;
+                      return acc;
+                    }, {})
+                  ).map(([status, count], i, arr) => (
+                    <span key={status}>
+                      {count} {status === "UnderReview" ? "Under Review" : status}
+                      {i < arr.length - 1 ? ", " : ""}
+                    </span>
+                  ))}
+                  {" "}— since no capital has been deployed for them yet (or, if rejected, none ever will be).
+                </span>
+              </div>
+            )}
+
+            {/* Investment scope selector — only meaningful when this account has more than one investment */}
+            {investments.length > 1 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+                <button
+                  onClick={() => setSelectedApplicationId(null)}
+                  style={{
+                    padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 999, cursor: "pointer",
+                    border: `1.5px solid ${selectedApplicationId === null ? "var(--forest)" : "var(--border)"}`,
+                    background: selectedApplicationId === null ? "var(--forest)" : "var(--bg-card)",
+                    color: selectedApplicationId === null ? "#fff" : "var(--text-primary)",
+                  }}
+                >
+                  All Investments
+                </button>
+                {investments.map(inv => {
+                  const active = selectedApplicationId === inv.id;
+                  return (
+                    <button
+                      key={inv.id}
+                      onClick={() => setSelectedApplicationId(inv.id)}
+                      style={{
+                        padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 999, cursor: "pointer",
+                        border: `1.5px solid ${active ? "var(--forest)" : "var(--border)"}`,
+                        background: active ? "var(--forest)" : "var(--bg-card)",
+                        color: active ? "#fff" : "var(--text-primary)",
+                      }}
+                    >
+                      {inv.investorName || investorName} · #{inv.id}{inv.ppmRefNO ? ` · PPM #${inv.ppmRefNO}` : ""}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Summary cards */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
               {[
                 { label: "Total Contributed", value: fmt(data.totalContributions), color: "#15803d" },
                 { label: "Capital Deployed",  value: fmt(data.netPosition),        color: "var(--forest)" },
-                { label: "Total Income",      value: fmt(data.totalIncome),        color: "#b45309", sub: `${fmt(ytdIncome)} YTD` },
+                { label: "Total Income",      value: fmt(data.totalIncome),        color: "#b45309" },
                 { label: "Accrued (Unpaid)",  value: fmt(accrued),                 color: "#b45309" },
               ].map(c => (
                 <div key={c.label} style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 16px", minWidth: 140 }}>
                   <p style={{ margin: 0, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)", marginBottom: 4 }}>{c.label}</p>
                   <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: c.color }}>{c.value}</p>
-                  {c.sub && <p style={{ margin: "2px 0 0", fontSize: 10, color: "var(--muted)" }}>{c.sub}</p>}
                 </div>
               ))}
             </div>
@@ -308,17 +485,42 @@ export default function InvestorStatementsPage() {
                   <option value="Redemption">Redemptions</option>
                   <option value="Dividend">Dividends</option>
                 </select>
+                <input
+                  type="date"
+                  value={fromDate}
+                  max={toDate || undefined}
+                  onChange={e => setFromDate(e.target.value)}
+                  title="From date"
+                  style={{ padding: "7px 10px", fontSize: 12, border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", color: "var(--text-primary)" }}
+                />
+                <span style={{ fontSize: 12, color: "var(--muted)" }}>–</span>
+                <input
+                  type="date"
+                  value={toDate}
+                  min={fromDate || undefined}
+                  onChange={e => setToDate(e.target.value)}
+                  title="To date"
+                  style={{ padding: "7px 10px", fontSize: 12, border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", color: "var(--text-primary)" }}
+                />
+                {(fromDate || toDate) && (
+                  <button
+                    onClick={() => { setFromDate(""); setToDate(""); }}
+                    style={{ fontSize: 12, color: "var(--muted)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+                  >
+                    Clear dates
+                  </button>
+                )}
                 <span style={{ fontSize: 12, color: "var(--muted)" }}>{visible.length} entries</span>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button
-                  onClick={() => exportCSV(data, investorName)}
+                  onClick={() => exportCSV(data, exportLabel)}
                   style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", fontSize: 12, border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", color: "var(--muted)", cursor: "pointer" }}
                 >
                   ↓ CSV
                 </button>
                 <button
-                  onClick={() => exportPDF(data, investorName, ytdIncome, accrued)}
+                  onClick={() => exportPDF(data, exportLabel, accrued)}
                   style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", fontSize: 12, border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", color: "var(--muted)", cursor: "pointer" }}
                 >
                   ↓ PDF
@@ -332,16 +534,46 @@ export default function InvestorStatementsPage() {
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: "var(--bg-section)", borderBottom: "1px solid var(--border)" }}>
-                      {["Date", "Type", "Inv. Type", "App ID", "PPM Ref", "Units", "Capital", "Income", "Capital Balance"].map((h, i) => (
-                        <th key={h} style={{ padding: "10px 14px", textAlign: i >= 5 ? "right" : "left", fontWeight: 600, fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap" }}>{h}</th>
+                      {([
+                        ["applicationId", "App ID", "left"],
+                        ["ppmRefNo", "PPM Ref", "left"],
+                        ["date", "Date", "left"],
+                        ["entryType", "Type", "left"],
+                        ["investmentType", "Inv. Type", "left"],
+                        ["investorName", "Investor", "left"],
+                        ["accountUserName", "Account User", "left"],
+                        ["units", "Units", "right"],
+                        ["amount", "Capital", "right"],
+                        ["income", "Income", "right"],
+                        ["runningBalance", "Capital Balance", "right"],
+                      ] as [SortField, string, "left" | "right"][]).map(([field, label, align]) => (
+                        <SortableTh
+                          key={field}
+                          label={label}
+                          sortKey={field}
+                          sortOn={sortField}
+                          sortDirection={sortDir}
+                          onSort={toggleSort}
+                          style={{ padding: "10px 14px", textAlign: align, fontWeight: 600, fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap" }}
+                        />
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {visible.map((e, i) => {
+                    {sortedVisible.map((e, i) => {
                       const colors = TYPE_COLORS[e.entryType] ?? TYPE_COLORS.Contribution;
                       return (
                         <tr key={i} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? undefined : "var(--bg-section)" }}>
+                          <td style={{ padding: "9px 14px", fontSize: 12 }}>
+                            {e.applicationId ? (
+                              <Link href={`/applications/${e.applicationId}`} style={{ color: "var(--forest)", textDecoration: "underline", fontWeight: 600 }}>
+                                #{e.applicationId}
+                              </Link>
+                            ) : <span style={{ color: "var(--muted)" }}>—</span>}
+                          </td>
+                          <td style={{ padding: "9px 14px", color: "var(--muted)", fontSize: 12 }}>
+                            {e.ppmRefNo ? `#${e.ppmRefNo}` : "—"}
+                          </td>
                           <td style={{ padding: "9px 14px", color: "var(--text-primary)", whiteSpace: "nowrap" }}>
                             {new Date(e.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
                           </td>
@@ -357,11 +589,11 @@ export default function InvestorStatementsPage() {
                               </span>
                             ) : <span style={{ color: "var(--muted)", fontSize: 12 }}>—</span>}
                           </td>
-                          <td style={{ padding: "9px 14px", color: "var(--muted)", fontSize: 12 }}>
-                            {e.applicationId ? `#${e.applicationId}` : "—"}
+                          <td style={{ padding: "9px 14px", fontWeight: 600, color: "var(--text-primary)", maxWidth: 140, whiteSpace: "normal", wordBreak: "break-word" }}>
+                            {e.investorName || "—"}
                           </td>
-                          <td style={{ padding: "9px 14px", color: "var(--muted)", fontSize: 12 }}>
-                            {e.ppmRefNo ? `#${e.ppmRefNo}` : "—"}
+                          <td style={{ padding: "9px 14px", fontWeight: 600, color: "var(--text-primary)", maxWidth: 140, whiteSpace: "normal", wordBreak: "break-word" }}>
+                            {e.accountUserName || "—"}
                           </td>
                           <td style={{ padding: "9px 14px", textAlign: "right", color: "var(--text-primary)" }}>
                             {e.units != null ? e.units : "—"}
@@ -381,7 +613,7 @@ export default function InvestorStatementsPage() {
                   </tbody>
                   <tfoot>
                     <tr style={{ borderTop: "2px solid var(--border)", background: "var(--bg-section)" }}>
-                      <td colSpan={6} style={{ padding: "9px 14px", fontWeight: 600, color: "var(--muted)", fontSize: 12 }}>
+                      <td colSpan={8} style={{ padding: "9px 14px", fontWeight: 600, color: "var(--muted)", fontSize: 12 }}>
                         {visible.length} entries
                       </td>
                       <td style={{ padding: "9px 14px", textAlign: "right", fontWeight: 700, color: "var(--text-primary)", fontSize: 13 }}>

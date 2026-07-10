@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
+import { SortableTh } from '@/components/SortableTh';
 import {
   historicalImportApi,
   type ImportSessionDetail,
@@ -10,6 +11,18 @@ import {
   type WelcomeEmailRowResult,
   type OdooSyncRowResult,
 } from '@/lib/api';
+
+type SortField = 'rowNumber' | 'investorName' | 'userEmail' | 'success' | 'ppmRefNo';
+
+const sortValue = (r: ImportSessionRow, field: SortField): string | number => {
+  switch (field) {
+    case 'rowNumber':    return r.rowNumber;
+    case 'investorName': return r.investorName ?? '';
+    case 'userEmail':    return r.userEmail ?? '';
+    case 'success':      return r.success ? 1 : 0;
+    case 'ppmRefNo':     return r.ppmRefNo ?? '';
+  }
+};
 
 function Badge({ ok, label }: { ok: boolean; label: string }) {
   return (
@@ -34,6 +47,13 @@ export default function SessionDetailPage() {
   const [emailResults, setEmailResults] = useState<Record<number, WelcomeEmailRowResult>>({});
   const [odooSyncing, setOdooSyncing]   = useState(false);
   const [odooResults, setOdooResults]   = useState<Record<number, OdooSyncRowResult>>({});
+  const [sortField, setSortField] = useState<SortField>('rowNumber');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const toggleSort = (field: string) => {
+    const f = field as SortField;
+    if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(f); setSortDir('asc'); }
+  };
 
   const load = () => {
     setLoading(true);
@@ -248,11 +268,11 @@ export default function SessionDetailPage() {
                           style={{ cursor: 'pointer', width: 14, height: 14 }}
                         />
                       </th>
-                      <th style={s.th}>Row</th>
-                      <th style={s.th}>Investor</th>
-                      <th style={s.th}>Email</th>
-                      <th style={s.th}>Status</th>
-                      <th style={s.th}>PPM Ref #</th>
+                      <SortableTh label="Row" sortKey="rowNumber" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
+                      <SortableTh label="Investor" sortKey="investorName" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
+                      <SortableTh label="Email" sortKey="userEmail" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
+                      <SortableTh label="Status" sortKey="success" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
+                      <SortableTh label="PPM Ref #" sortKey="ppmRefNo" sortOn={sortField} sortDirection={sortDir} onSort={toggleSort} style={s.th} />
                       <th style={s.th}>Welcome Email</th>
                       <th style={s.th}>Odoo Investor</th>
                       <th style={s.th}>Odoo Investment</th>
@@ -260,7 +280,13 @@ export default function SessionDetailPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {session.rows.map(row => {
+                    {[...session.rows].sort((a, b) => {
+                      const av = sortValue(a, sortField);
+                      const bv = sortValue(b, sortField);
+                      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+                      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+                      return 0;
+                    }).map(row => {
                       const isSelected = selected.has(row.id);
                       return (
                         <tr

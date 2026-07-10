@@ -1,7 +1,21 @@
 'use client';
 import { useEffect, useState } from 'react';
 import AdminLayout from '@/components/AdminLayout';
+import { SortableTh } from '@/components/SortableTh';
 import { adminApi, type BankDetails, type NotificationEmail, type DailyBalanceLog } from '@/lib/api';
+
+type BalanceSortField = 'date' | 'bankAccountBalance' | 'deployedAmount' | 'interestReceived' | 'dividendReceived' | 'sponsoredEquity' | 'otherCharges';
+const balanceSortValue = (b: DailyBalanceLog, field: BalanceSortField): string | number => {
+  switch (field) {
+    case 'date':               return new Date(b.date).getTime();
+    case 'bankAccountBalance': return b.bankAccountBalance;
+    case 'deployedAmount':     return b.deployedAmount;
+    case 'interestReceived':   return b.interestReceived ?? -Infinity;
+    case 'dividendReceived':   return b.dividendReceived ?? -Infinity;
+    case 'sponsoredEquity':    return b.sponsoredEquity ?? -Infinity;
+    case 'otherCharges':       return b.otherCharges ?? -Infinity;
+  }
+};
 
 const EMPTY: BankDetails = {
   beneficiaryName: '',
@@ -42,6 +56,13 @@ export default function SettingsPage() {
   const [balanceLoading, setBalanceLoading] = useState(true);
   const [balanceSaving, setBalanceSaving] = useState(false);
   const [balanceMsg, setBalanceMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [balanceSort, setBalanceSort] = useState<BalanceSortField>('date');
+  const [balanceSortDir, setBalanceSortDir] = useState<'asc' | 'desc'>('desc');
+  const toggleBalanceSort = (field: string) => {
+    const f = field as BalanceSortField;
+    if (balanceSort === f) setBalanceSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    else { setBalanceSort(f); setBalanceSortDir('asc'); }
+  };
 
   const loadBalances = () =>
     adminApi.getDailyBalances().then(r => { if (r.success && r.data) setBalances(r.data); });
@@ -255,13 +276,32 @@ export default function SettingsPage() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr>
-                        {['Date', 'Bank Account Balance', 'Deployed Amount', 'Interest Received', 'Dividend Received', 'Sponsored Equity', 'Other Charges', 'Notes', ''].map(h => (
-                          <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: '#6b7280', fontWeight: 600, borderBottom: '1.5px solid #e2e8f0' }}>{h}</th>
-                        ))}
+                        {(() => {
+                          const th = { textAlign: 'left' as const, padding: '8px 10px', color: '#6b7280', fontWeight: 600, borderBottom: '1.5px solid #e2e8f0' };
+                          return (
+                            <>
+                              <SortableTh label="Date" sortKey="date" sortOn={balanceSort} sortDirection={balanceSortDir} onSort={toggleBalanceSort} style={th} />
+                              <SortableTh label="Bank Account Balance" sortKey="bankAccountBalance" sortOn={balanceSort} sortDirection={balanceSortDir} onSort={toggleBalanceSort} style={th} />
+                              <SortableTh label="Deployed Amount" sortKey="deployedAmount" sortOn={balanceSort} sortDirection={balanceSortDir} onSort={toggleBalanceSort} style={th} />
+                              <SortableTh label="Interest Received" sortKey="interestReceived" sortOn={balanceSort} sortDirection={balanceSortDir} onSort={toggleBalanceSort} style={th} />
+                              <SortableTh label="Dividend Received" sortKey="dividendReceived" sortOn={balanceSort} sortDirection={balanceSortDir} onSort={toggleBalanceSort} style={th} />
+                              <SortableTh label="Sponsored Equity" sortKey="sponsoredEquity" sortOn={balanceSort} sortDirection={balanceSortDir} onSort={toggleBalanceSort} style={th} />
+                              <SortableTh label="Other Charges" sortKey="otherCharges" sortOn={balanceSort} sortDirection={balanceSortDir} onSort={toggleBalanceSort} style={th} />
+                              <th style={th}>Notes</th>
+                              <th style={th}></th>
+                            </>
+                          );
+                        })()}
                       </tr>
                     </thead>
                     <tbody>
-                      {balances.map(b => (
+                      {[...balances].sort((a, b) => {
+                        const av = balanceSortValue(a, balanceSort);
+                        const bv = balanceSortValue(b, balanceSort);
+                        if (av < bv) return balanceSortDir === 'asc' ? -1 : 1;
+                        if (av > bv) return balanceSortDir === 'asc' ? 1 : -1;
+                        return 0;
+                      }).map(b => (
                         <tr key={b.date}>
                           <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>{new Date(b.date).toLocaleDateString()}</td>
                           <td style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>${b.bankAccountBalance.toLocaleString()}</td>

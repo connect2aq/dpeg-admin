@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import { StatusBadge } from '@/components/StatusBadge';
+import { SortableTh } from '@/components/SortableTh';
 import { adminApi, type UserListItem, type PagedResult, type CreateUserAdminRequest } from '@/lib/api';
 import { downloadCsv } from '@/lib/exportCsv';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
@@ -39,6 +40,13 @@ function UsersContent() {
     return searchParams.get('status') ?? '';
   });
   const [page, setPage] = useState(1);
+  const [sortOn, setSortOn] = useState('createdOn');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const toggleSort = (key: string) => {
+    if (sortOn === key) setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortOn(key); setSortDirection('asc'); }
+    setPage(1);
+  };
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'investors' | 'admins'>('investors');
   const [exporting, setExporting] = useState(false);
@@ -57,7 +65,7 @@ function UsersContent() {
 
   const exportToExcel = async () => {
     setExporting(true);
-    const params: Record<string, string | number> = { page: 1, pageSize: 100000 };
+    const params: Record<string, string | number> = { page: 1, pageSize: 100000, sortOn, sortDirection };
     if (search) params.search = search;
     const specialFilters = ['Test', 'NeverApplied', 'HasDeposit', 'HasActiveInvestment', 'AwaitingApproval', 'LatestRejected'];
     if (status && !specialFilters.includes(status)) params.status = status;
@@ -93,7 +101,7 @@ function UsersContent() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE };
+    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
     if (search) params.search = search;
     const specialFilters = ['Test', 'NeverApplied', 'HasDeposit', 'HasActiveInvestment', 'AwaitingApproval', 'LatestRejected'];
     if (status && !specialFilters.includes(status)) params.status = status;
@@ -111,7 +119,7 @@ function UsersContent() {
         }
       })
       .finally(() => setLoading(false));
-  }, [page, search, status, viewMode]);
+  }, [page, search, status, viewMode, sortOn, sortDirection]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -269,7 +277,8 @@ function UsersContent() {
             <div style={{ padding: 32, color: '#64748b' }}>Loading...</div>
           ) : result ? (
             <>
-              <table>
+              <div className="table-scroll">
+              <table style={{ minWidth: viewMode === 'investors' ? 1100 : 700 }}>
                 <thead>
                   <tr>
                     {viewMode === 'investors' && (
@@ -282,25 +291,26 @@ function UsersContent() {
                         />
                       </th>
                     )}
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Status</th>
+                    <SortableTh label="Name" sortKey="name" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                    <SortableTh label="Email" sortKey="email" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                    <SortableTh label="Status" sortKey="status" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     {viewMode === 'investors' ? (
                       <>
-                        <th>Email Verified</th>
-                        <th>Step</th>
-                        <th>Applications</th>
+                        <SortableTh label="Step" sortKey="step" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                        <SortableTh label="Applications" sortKey="applications" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                        <SortableTh label="Redemptions" sortKey="redemptions" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                        <SortableTh label="Distributions" sortKey="distributions" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                       </>
                     ) : (
-                      <th>Admin Role</th>
+                      <SortableTh label="Admin Role" sortKey="adminRole" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     )}
-                    <th>Registered</th>
+                    <SortableTh label="Registered" sortKey="createdOn" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {result.items.length === 0 ? (
-                    <tr><td colSpan={viewMode === 'investors' ? 9 : 6} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No users found</td></tr>
+                    <tr><td colSpan={viewMode === 'investors' ? 10 : 6} style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>No users found</td></tr>
                   ) : result.items.map(u => (
                     <tr key={u.id} style={{ background: selected.has(u.id) ? '#fef9ec' : undefined }}>
                       {viewMode === 'investors' && (
@@ -326,13 +336,10 @@ function UsersContent() {
                       <td><StatusBadge status={u.status} /></td>
                       {viewMode === 'investors' ? (
                         <>
-                          <td>
-                            <span style={{ color: u.emailVerified ? '#10b981' : '#94a3b8', fontWeight: 600, fontSize: 12 }}>
-                              {u.emailVerified ? '✓ Verified' : '✗ Pending'}
-                            </span>
-                          </td>
                           <td style={{ textAlign: 'center' }}>{u.currentOnboardingStep}/7</td>
                           <td style={{ textAlign: 'center' }}>{u.applicationCount}</td>
+                          <td style={{ textAlign: 'center' }}>{u.redemptionCount}</td>
+                          <td style={{ textAlign: 'center' }}>{u.distributionCount}</td>
                         </>
                       ) : (
                         <td>
@@ -367,12 +374,18 @@ function UsersContent() {
                           <Link href={`/users/${u.id}`} style={{ color: '#699172', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>
                             View →
                           </Link>
+                          {viewMode === 'investors' && (
+                            <Link href={`/investor-statements?userId=${u.id}`} title="Open Investor Statement" style={{ color: '#b8923a', fontSize: 15, textDecoration: 'none', lineHeight: 1 }}>
+                              📄
+                            </Link>
+                          )}
                         </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
 
               {/* Pagination */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderTop: '1px solid #f1f5f9' }}>
