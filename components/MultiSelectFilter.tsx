@@ -50,10 +50,7 @@ export function MultiSelectFilter({
         : `${selectedLabels.length} selected`;
 
   return (
-    <div
-      ref={rootRef}
-      style={{ position: "relative", minWidth, flex: `1 1 ${minWidth}px` }}
-    >
+    <div ref={rootRef} style={{ position: "relative", minWidth }}>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}

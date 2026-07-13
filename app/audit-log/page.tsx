@@ -123,7 +123,8 @@ export default function AuditLogPage() {
     if (appId) params.applicationId = Number(appId);
     if (from) params.from = from;
     if (to) params.to = to;
-    if (successFilter.length === 1) params.success = successFilter[0] === "true";
+    if (successFilter.length === 1)
+      params.success = successFilter[0] === "true";
     adminApi
       .auditLogs(params)
       .then((r) => {
