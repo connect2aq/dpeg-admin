@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AdminLayout from "@/components/AdminLayout";
+import { MultiSelectFilter } from "@/components/MultiSelectFilter";
 import { SortableTh } from "@/components/SortableTh";
 import {
   adminApi,
@@ -251,7 +252,7 @@ function InvestorStatementsContent() {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<InvestorCapitalAccount | null>(null);
   const [accrued, setAccrued] = useState(0);
-  const [typeFilter, setTypeFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [loading, setLoading] = useState(false);
@@ -387,7 +388,8 @@ function InvestorStatementsContent() {
 
   const visible: InvestorCapitalAccountEntry[] = (data?.entries ?? []).filter(
     (e) => {
-      if (typeFilter && e.entryType !== typeFilter) return false;
+      if (typeFilter.length > 0 && !typeFilter.includes(e.entryType))
+        return false;
       const entryDate = e.date.slice(0, 10); // "YYYY-MM-DD", comparable lexicographically
       if (fromDate && entryDate < fromDate) return false;
       if (toDate && entryDate > toDate) return false;
@@ -891,23 +893,18 @@ function InvestorStatementsContent() {
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <select
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                  style={{
-                    padding: "7px 10px",
-                    fontSize: 12,
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    background: "var(--bg-card)",
-                    color: "var(--text-primary)",
-                  }}
-                >
-                  <option value="">All Activity</option>
-                  <option value="Contribution">Contributions</option>
-                  <option value="Redemption">Redemptions</option>
-                  <option value="Dividend">Dividends</option>
-                </select>
+                <MultiSelectFilter
+                  allLabel="All Activity"
+                  buttonLabel="Activity"
+                  options={[
+                    { value: "Contribution", label: "Contributions" },
+                    { value: "Redemption", label: "Redemptions" },
+                    { value: "Dividend", label: "Dividends" },
+                  ]}
+                  selectedValues={typeFilter}
+                  onChange={setTypeFilter}
+                  minWidth={180}
+                />
                 <input
                   type="date"
                   value={fromDate}
@@ -947,10 +944,10 @@ function InvestorStatementsContent() {
                     color: "var(--text-primary)",
                   }}
                 />
-                {(typeFilter || fromDate || toDate) && (
+                {(typeFilter.length > 0 || fromDate || toDate) && (
                   <button
                     onClick={() => {
-                      setTypeFilter("");
+                      setTypeFilter([]);
                       setFromDate("");
                       setToDate("");
                     }}

@@ -1,11 +1,14 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/components/AdminLayout';
+import { MultiSelectFilter } from '@/components/MultiSelectFilter';
 import { PaginationControls } from '@/components/PaginationControls';
 import { SortableTh } from '@/components/SortableTh';
 import { adminApi, type StatementListItem, type PagedResult } from '@/lib/api';
+import { encodeMultiFilterValue, hasMultiFilterValue } from '@/lib/filterUtils';
+import type { QueryParams } from '@/lib/apiContracts';
 
-const TYPES = ['', 'Monthly', 'InvestmentConfirmation', 'RedemptionConfirmation'];
+const TYPES = ['Monthly', 'InvestmentConfirmation', 'RedemptionConfirmation'];
 const TYPE_LABELS: Record<string, string> = {
   Monthly: 'Monthly',
   InvestmentConfirmation: 'Investment Confirmation',
@@ -16,7 +19,7 @@ const PAGE_SIZE = 20;
 export default function StatementsPage() {
   const [result, setResult] = useState<PagedResult<StatementListItem> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [type, setType] = useState('');
+  const [type, setType] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [sortOn, setSortOn] = useState('generated');
@@ -52,8 +55,9 @@ export default function StatementsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
-    if (type) params.type = type;
+    const params: QueryParams = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
+    const encodedType = encodeMultiFilterValue(type);
+    if (encodedType) params.type = encodedType;
     if (search) params.search = search;
     adminApi.statements(params)
       .then(r => { if (r.success) setResult(r.data); })
@@ -88,15 +92,19 @@ export default function StatementsPage() {
             onChange={e => { setSearch(e.target.value); setPage(1); }}
             style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, minWidth: 240 }}
           />
-          <select value={type} onChange={e => { setType(e.target.value); setPage(1); }}
-            style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
-            {TYPES.map(t => <option key={t} value={t}>{t ? (TYPE_LABELS[t] ?? t) : 'All Types'}</option>)}
-          </select>
-          {(search || type) && (
+          <MultiSelectFilter
+            allLabel="All Types"
+            buttonLabel="Type"
+            options={TYPES.map(t => ({ value: t, label: TYPE_LABELS[t] ?? t }))}
+            selectedValues={type}
+            onChange={next => { setType(next); setPage(1); }}
+            minWidth={220}
+          />
+          {(search || hasMultiFilterValue(type)) && (
             <button
               onClick={() => {
                 setSearch('');
-                setType('');
+                setType([]);
                 setPage(1);
               }}
               style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white', color: '#475569', cursor: 'pointer' }}

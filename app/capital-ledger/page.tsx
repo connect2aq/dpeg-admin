@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import AdminLayout from "@/components/AdminLayout";
+import { MultiSelectFilter } from "@/components/MultiSelectFilter";
 import { PaginationControls } from "@/components/PaginationControls";
 import {
   adminApi,
@@ -9,6 +10,7 @@ import {
   type CapitalLedgerEntry,
 } from "@/lib/api";
 import { downloadCsv } from "@/lib/exportCsv";
+import { parseMultiFilterValue } from "@/lib/filterUtils";
 import Link from "next/link";
 
 const TYPE_COLORS: Record<string, { bg: string; text: string; badge: string }> =
@@ -99,8 +101,8 @@ function CapitalLedgerContent() {
   const [loading, setLoading] = useState(true);
   const [from, setFrom] = useState(() => searchParams.get("from") ?? "");
   const [to, setTo] = useState(() => searchParams.get("to") ?? "");
-  const [typeFilter, setTypeFilter] = useState(
-    () => searchParams.get("type") ?? "",
+  const [typeFilter, setTypeFilter] = useState<string[]>(() =>
+    parseMultiFilterValue(searchParams.get("type")),
   );
   const [search, setSearch] = useState("");
   const [appIdFilter, setAppIdFilter] = useState("");
@@ -131,7 +133,7 @@ function CapitalLedgerContent() {
     load();
   }, [load]);
 
-  const activeTypes = typeFilter ? typeFilter.split(",") : [];
+  const activeTypes = typeFilter;
   const visibleEntries = (data?.entries ?? []).filter((e) => {
     if (activeTypes.length > 0 && !activeTypes.includes(e.entryType))
       return false;
@@ -173,7 +175,7 @@ function CapitalLedgerContent() {
   // any filter that hides rows, or any sort other than Date, breaks the row-to-row build-up
   // (the From/To date range is exempt — the Opening Balance card already accounts for it).
   const runningBalanceUnreliable =
-    !!typeFilter ||
+    typeFilter.length > 0 ||
     !!search ||
     !!appIdFilter ||
     sortField !== "date" ||
@@ -300,7 +302,7 @@ function CapitalLedgerContent() {
         </div>
 
         {/* Active filter banner — shown when arriving from dashboard deep-link */}
-        {typeFilter && (
+        {typeFilter.length > 0 && (
           <div
             style={{
               display: "flex",
@@ -323,10 +325,10 @@ function CapitalLedgerContent() {
                 textTransform: "uppercase",
               }}
             >
-              {TYPE_LABELS[typeFilter] ?? typeFilter}
+              {typeFilter.map((item) => TYPE_LABELS[item] ?? item).join(", ")}
             </span>
             <button
-              onClick={() => setTypeFilter("")}
+              onClick={() => setTypeFilter([])}
               style={{
                 marginLeft: "auto",
                 padding: "4px 12px",
@@ -392,7 +394,7 @@ function CapitalLedgerContent() {
             onClick={() => {
               setFrom("");
               setTo("");
-              setTypeFilter("");
+              setTypeFilter([]);
               setSearch("");
               setAppIdFilter("");
             }}
@@ -408,25 +410,18 @@ function CapitalLedgerContent() {
           >
             Reset
           </button>
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            style={{
-              padding: "9px 12px",
-              border: typeFilter ? "2px solid #f59e0b" : "1.5px solid #e2e8f0",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: typeFilter ? 700 : 400,
-              background: typeFilter ? "#fffbeb" : "white",
-              color: typeFilter ? "#92400e" : "#374151",
-            }}
-          >
-            <option value="">All Types</option>
-            <option value="Contribution">Contributions</option>
-            <option value="Redemption">Redemptions</option>
-            <option value="Dividend">Dividends</option>
-            <option value="Redemption,Dividend">Redemptions + Dividends</option>
-          </select>
+          <MultiSelectFilter
+            allLabel="All Types"
+            buttonLabel="Type"
+            options={[
+              { value: "Contribution", label: "Contributions" },
+              { value: "Redemption", label: "Redemptions" },
+              { value: "Dividend", label: "Dividends" },
+            ]}
+            selectedValues={typeFilter}
+            onChange={setTypeFilter}
+            minWidth={190}
+          />
           <input
             type="text"
             placeholder="Search Account User or Investor…"
@@ -559,7 +554,7 @@ function CapitalLedgerContent() {
             </span>
             <button
               onClick={() => {
-                setTypeFilter("");
+                setTypeFilter([]);
                 setSearch("");
                 setAppIdFilter("");
                 setSortField("date");

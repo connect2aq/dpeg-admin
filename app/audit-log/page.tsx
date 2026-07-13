@@ -1,12 +1,14 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import AdminLayout from "@/components/AdminLayout";
+import { MultiSelectFilter } from "@/components/MultiSelectFilter";
 import { PaginationControls } from "@/components/PaginationControls";
 import { adminApi, type AuditLogItem, type PagedResult } from "@/lib/api";
+import { encodeMultiFilterValue, hasMultiFilterValue } from "@/lib/filterUtils";
+import type { QueryParams } from "@/lib/apiContracts";
 import { SortableTh } from "@/components/SortableTh";
 
 const CATEGORIES = [
-  "",
   "Auth",
   "Admin",
   "Application",
@@ -85,14 +87,14 @@ function JsonCell({ json }: { json?: string }) {
 export default function AuditLogPage() {
   const [result, setResult] = useState<PagedResult<AuditLogItem> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState<string[]>([]);
   const [eventType, setEventType] = useState("");
   const [userId, setUserId] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [appId, setAppId] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [successFilter, setSuccessFilter] = useState("");
+  const [successFilter, setSuccessFilter] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [sortOn, setSortOn] = useState("timestamp");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -107,20 +109,21 @@ export default function AuditLogPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number | boolean> = {
+    const params: QueryParams = {
       page,
       pageSize: PAGE_SIZE,
       sortOn,
       sortDirection,
     };
-    if (category) params.category = category;
+    const encodedCategory = encodeMultiFilterValue(category);
+    if (encodedCategory) params.category = encodedCategory;
     if (eventType) params.eventType = eventType;
     if (userId) params.userId = Number(userId);
     if (userEmail) params.userEmail = userEmail;
     if (appId) params.applicationId = Number(appId);
     if (from) params.from = from;
     if (to) params.to = to;
-    if (successFilter !== "") params.success = successFilter === "true";
+    if (successFilter.length === 1) params.success = successFilter[0] === "true";
     adminApi
       .auditLogs(params)
       .then((r) => {
@@ -146,14 +149,14 @@ export default function AuditLogPage() {
   }, [load]);
 
   const onReset = () => {
-    setCategory("");
+    setCategory([]);
     setEventType("");
     setUserId("");
     setUserEmail("");
     setAppId("");
     setFrom("");
     setTo("");
-    setSuccessFilter("");
+    setSuccessFilter([]);
     setPage(1);
   };
 
@@ -206,27 +209,17 @@ export default function AuditLogPage() {
             >
               Category
             </label>
-            <select
-              value={category}
-              onChange={(e) => {
-                setCategory(e.target.value);
+            <MultiSelectFilter
+              allLabel="All Categories"
+              buttonLabel="Category"
+              options={CATEGORIES.map((item) => ({ value: item, label: item }))}
+              selectedValues={category}
+              onChange={(next) => {
+                setCategory(next);
                 setPage(1);
               }}
-              style={{
-                padding: "8px 12px",
-                border: "1.5px solid #e2e8f0",
-                borderRadius: 8,
-                fontSize: 13.5,
-                background: "white",
-                minWidth: 140,
-              }}
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c || "All Categories"}
-                </option>
-              ))}
-            </select>
+              minWidth={180}
+            />
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -409,25 +402,20 @@ export default function AuditLogPage() {
             >
               Result
             </label>
-            <select
-              value={successFilter}
-              onChange={(e) => {
-                setSuccessFilter(e.target.value);
+            <MultiSelectFilter
+              allLabel="All Results"
+              buttonLabel="Result"
+              options={[
+                { value: "true", label: "Success" },
+                { value: "false", label: "Failure" },
+              ]}
+              selectedValues={successFilter}
+              onChange={(next) => {
+                setSuccessFilter(next);
                 setPage(1);
               }}
-              style={{
-                padding: "8px 12px",
-                border: "1.5px solid #e2e8f0",
-                borderRadius: 8,
-                fontSize: 13.5,
-                background: "white",
-                width: 120,
-              }}
-            >
-              <option value="">All</option>
-              <option value="true">Success</option>
-              <option value="false">Failure</option>
-            </select>
+              minWidth={160}
+            />
           </div>
 
           <div style={{ display: "flex", gap: 8, alignSelf: "flex-end" }}>

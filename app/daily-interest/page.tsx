@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import AdminLayout from "@/components/AdminLayout";
+import { MultiSelectFilter } from "@/components/MultiSelectFilter";
 import { PaginationControls } from "@/components/PaginationControls";
 import { SortableTh } from "@/components/SortableTh";
 import {
@@ -11,6 +12,8 @@ import {
   type ResetMonthResult,
 } from "@/lib/api";
 import { downloadCsv } from "@/lib/exportCsv";
+import { hasMultiFilterValue } from "@/lib/filterUtils";
+import type { QueryParams } from "@/lib/apiContracts";
 import Link from "next/link";
 
 const PAGE_SIZE = 25;
@@ -65,7 +68,7 @@ export default function DailyInterestPage() {
   const [appId, setAppId] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [included, setIncluded] = useState("");
+  const [included, setIncluded] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [sortOn, setSortOn] = useState("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -91,14 +94,14 @@ export default function DailyInterestPage() {
 
   const exportToExcel = async () => {
     setExporting(true);
-    const params: Record<string, string | number> = {
+    const params: QueryParams = {
       page: 1,
       pageSize: 100000,
     };
     if (appId) params.appId = appId;
     if (from) params.from = from;
     if (to) params.to = to;
-    if (included !== "") params.included = included;
+    if (included.length === 1) params.included = included[0];
     const r = await adminApi.dailyInterestLogs(params);
     if (r.success) {
       const headers = [
@@ -136,7 +139,7 @@ export default function DailyInterestPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = {
+    const params: QueryParams = {
       page,
       pageSize: PAGE_SIZE,
       sortOn,
@@ -145,7 +148,7 @@ export default function DailyInterestPage() {
     if (appId) params.appId = appId;
     if (from) params.from = from;
     if (to) params.to = to;
-    if (included !== "") params.included = included;
+    if (included.length === 1) params.included = included[0];
     setSelectedIds(new Set());
     adminApi
       .dailyInterestLogs(params)
@@ -341,24 +344,20 @@ export default function DailyInterestPage() {
               fontSize: 13,
             }}
           />
-          <select
-            value={included}
-            onChange={(e) => {
-              setIncluded(e.target.value);
+          <MultiSelectFilter
+            allLabel="All Records"
+            buttonLabel="Included"
+            options={[
+              { value: "true", label: "Included in Distribution" },
+              { value: "false", label: "Pending Distribution" },
+            ]}
+            selectedValues={included}
+            onChange={(next) => {
+              setIncluded(next);
               setPage(1);
             }}
-            style={{
-              padding: "9px 12px",
-              border: "1.5px solid #e2e8f0",
-              borderRadius: 8,
-              fontSize: 13,
-              background: "white",
-            }}
-          >
-            <option value="">All Records</option>
-            <option value="true">Included in Distribution</option>
-            <option value="false">Pending Distribution</option>
-          </select>
+            minWidth={220}
+          />
           <button
             onClick={exportToExcel}
             disabled={exporting}
@@ -376,13 +375,13 @@ export default function DailyInterestPage() {
           >
             {exporting ? "Exporting…" : "↓ Export"}
           </button>
-          {(appId || from || to || included) && (
+          {(appId || from || to || hasMultiFilterValue(included)) && (
             <button
               onClick={() => {
                 setAppId("");
                 setFrom("");
                 setTo("");
-                setIncluded("");
+                setIncluded([]);
                 setPage(1);
                 setSelectedIds(new Set());
               }}

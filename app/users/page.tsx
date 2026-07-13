@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AdminLayout from "@/components/AdminLayout";
+import { MultiSelectFilter } from "@/components/MultiSelectFilter";
 import { PaginationControls } from "@/components/PaginationControls";
 import { EditableStatusBadge } from "@/components/StatusBadge";
 import { SortableTh } from "@/components/SortableTh";
@@ -12,12 +13,31 @@ import {
   type CreateUserAdminRequest,
 } from "@/lib/api";
 import { downloadCsv } from "@/lib/exportCsv";
+import {
+  encodeMultiFilterValue,
+  hasMultiFilterValue,
+  parseMultiFilterValue,
+} from "@/lib/filterUtils";
+import type { QueryParams } from "@/lib/apiContracts";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 
-const STATUSES = ["", "InProgress", "UnderReview", "Active", "Inactive"];
+const STATUSES = [
+  "InProgress",
+  "UnderReview",
+  "Active",
+  "Inactive",
+  "Test",
+  "NeverApplied",
+  "HasDeposit",
+  "HasActiveInvestment",
+  "AwaitingApproval",
+  "LatestRejected",
+];
 const STATUS_OPTIONS = ["InProgress", "UnderReview", "Active", "Inactive"];
 const STATUS_LABELS: Record<string, string> = {
-  "": "All Statuses",
+  InProgress: "In Progress",
+  UnderReview: "Under Review",
+  Test: "Test Users",
   NeverApplied: "Never Applied",
   HasDeposit: "Total Depositors (Active/Redeemed)",
   HasActiveInvestment: "Active Depositors",
@@ -60,14 +80,14 @@ function UsersContent() {
   const [result, setResult] = useState<PagedResult<UserListItem> | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState(() => {
+  const [status, setStatus] = useState<string[]>(() => {
     const filter = searchParams.get("filter");
-    if (filter === "neverApplied") return "NeverApplied";
-    if (filter === "hasDeposit") return "HasDeposit";
-    if (filter === "hasActiveInvestment") return "HasActiveInvestment";
-    if (filter === "awaitingApproval") return "AwaitingApproval";
-    if (filter === "latestRejected") return "LatestRejected";
-    return searchParams.get("status") ?? "";
+    if (filter === "neverApplied") return ["NeverApplied"];
+    if (filter === "hasDeposit") return ["HasDeposit"];
+    if (filter === "hasActiveInvestment") return ["HasActiveInvestment"];
+    if (filter === "awaitingApproval") return ["AwaitingApproval"];
+    if (filter === "latestRejected") return ["LatestRejected"];
+    return parseMultiFilterValue(searchParams.get("status"));
   });
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -86,6 +106,12 @@ function UsersContent() {
   const [statusUpdatingId, setStatusUpdatingId] = useState<number | null>(null);
   const [statusErrorId, setStatusErrorId] = useState<number | null>(null);
   const [statusError, setStatusError] = useState("");
+  const [pendingStatusChange, setPendingStatusChange] = useState<{
+    id: number;
+    label: string;
+    currentStatus: string;
+    nextStatus: string;
+  } | null>(null);
   const [viewMode, setViewMode] = useState<"investors" | "admins">("investors");
   const [exporting, setExporting] = useState(false);
 
@@ -104,7 +130,7 @@ function UsersContent() {
 
   const exportToExcel = async () => {
     setExporting(true);
-    const params: Record<string, string | number> = {
+    const params: QueryParams = {
       page: 1,
       pageSize: 100000,
       sortOn,
@@ -119,17 +145,21 @@ function UsersContent() {
       "AwaitingApproval",
       "LatestRejected",
     ];
-    if (status && !specialFilters.includes(status)) params.status = status;
+    const encodedStatus = encodeMultiFilterValue(
+      status.filter((item) => !specialFilters.includes(item)),
+    );
+    if (encodedStatus) params.status = encodedStatus;
     if (viewMode === "admins") params.isAdmin = "true";
-    if (status === "NeverApplied") params.neverApplied = "true";
-    if (status === "HasDeposit") params.hasDeposit = "true";
-    if (status === "HasActiveInvestment") params.hasActiveInvestment = "true";
-    if (status === "AwaitingApproval") params.awaitingApproval = "true";
-    if (status === "LatestRejected") params.latestRejected = "true";
+    if (status.includes("NeverApplied")) params.neverApplied = "true";
+    if (status.includes("HasDeposit")) params.hasDeposit = "true";
+    if (status.includes("HasActiveInvestment"))
+      params.hasActiveInvestment = "true";
+    if (status.includes("AwaitingApproval")) params.awaitingApproval = "true";
+    if (status.includes("LatestRejected")) params.latestRejected = "true";
     const r = await adminApi.users(params);
     if (r.success) {
       const items =
-        status === "Test"
+        status.includes("Test")
           ? r.data.items.filter((u) => u.isTestUser)
           : r.data.items;
       if (viewMode === "investors") {
@@ -185,7 +215,7 @@ function UsersContent() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = {
+    const params: QueryParams = {
       page,
       pageSize: PAGE_SIZE,
       sortOn,
@@ -200,19 +230,23 @@ function UsersContent() {
       "AwaitingApproval",
       "LatestRejected",
     ];
-    if (status && !specialFilters.includes(status)) params.status = status;
+    const encodedStatus = encodeMultiFilterValue(
+      status.filter((item) => !specialFilters.includes(item)),
+    );
+    if (encodedStatus) params.status = encodedStatus;
     if (viewMode === "admins") params.isAdmin = "true";
-    if (status === "NeverApplied") params.neverApplied = "true";
-    if (status === "HasDeposit") params.hasDeposit = "true";
-    if (status === "HasActiveInvestment") params.hasActiveInvestment = "true";
-    if (status === "AwaitingApproval") params.awaitingApproval = "true";
-    if (status === "LatestRejected") params.latestRejected = "true";
+    if (status.includes("NeverApplied")) params.neverApplied = "true";
+    if (status.includes("HasDeposit")) params.hasDeposit = "true";
+    if (status.includes("HasActiveInvestment"))
+      params.hasActiveInvestment = "true";
+    if (status.includes("AwaitingApproval")) params.awaitingApproval = "true";
+    if (status.includes("LatestRejected")) params.latestRejected = "true";
     adminApi
       .users(params)
       .then((r) => {
         if (r.success) {
           const items =
-            status === "Test"
+            status.includes("Test")
               ? r.data.items.filter((u) => u.isTestUser)
               : r.data.items;
           setResult({ ...r.data, items });
@@ -253,6 +287,27 @@ function UsersContent() {
       setStatusError(r.message || "Failed to update status.");
     }
     setStatusUpdatingId(null);
+  };
+
+  const requestRowStatusChange = (u: UserListItem, nextStatus: string) => {
+    if (nextStatus === u.status) return;
+    setPendingStatusChange({
+      id: u.id,
+      label: `${u.firstName} ${u.lastName}`.trim() || u.email,
+      currentStatus: u.status,
+      nextStatus,
+    });
+  };
+
+  const confirmRowStatusChange = async () => {
+    if (!pendingStatusChange || !result) return;
+    const user = result.items.find((item) => item.id === pendingStatusChange.id);
+    if (!user) {
+      setPendingStatusChange(null);
+      return;
+    }
+    await updateRowStatus(user, pendingStatusChange.nextStatus);
+    setPendingStatusChange(null);
   };
 
   const toggleTestUser = async (u: UserListItem) => {
@@ -438,34 +493,28 @@ function UsersContent() {
             }}
             title="To date"
           />
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
+          <MultiSelectFilter
+            allLabel="All Statuses"
+            buttonLabel="Status"
+            options={STATUSES.map((item) => ({
+              value: item,
+              label: STATUS_LABELS[item] ?? item,
+            }))}
+            selectedValues={status}
+            onChange={(next) => {
+              setStatus(next);
               setPage(1);
             }}
-            style={{
-              padding: "10px 14px",
-              border: "1.5px solid #e2e8f0",
-              borderRadius: 8,
-              fontSize: 14,
-              background: "white",
-            }}
-          >
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {STATUS_LABELS[s] ?? s}
-              </option>
-            ))}
-          </select>
-          {(search || from || to || status) && (
+            minWidth={220}
+          />
+          {(search || from || to || hasMultiFilterValue(status)) && (
             <button
               type="button"
               onClick={() => {
                 setSearch("");
                 setFrom("");
                 setTo("");
-                setStatus("");
+                setStatus([]);
                 setPage(1);
                 setSelected(new Set());
               }}
@@ -745,7 +794,7 @@ function UsersContent() {
                                     setStatusErrorId(null);
                                     setStatusError("");
                                   }
-                                  void updateRowStatus(u, nextStatus);
+                                  requestRowStatusChange(u, nextStatus);
                                 }}
                               />
                               {statusUpdatingId === u.id && (
@@ -985,6 +1034,82 @@ function UsersContent() {
                   : isSuperAdmin
                     ? "Confirm Delete"
                     : "Submit for Approval"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingStatusChange && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 12,
+              padding: 32,
+              width: 420,
+              maxWidth: "90vw",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+            }}
+          >
+            <h2
+              style={{
+                fontSize: 17,
+                fontWeight: 700,
+                color: "#0f2342",
+                marginBottom: 10,
+              }}
+            >
+              Change user status?
+            </h2>
+            <p style={{ fontSize: 14, color: "#64748b", marginBottom: 8 }}>
+              {pendingStatusChange.label || `User #${pendingStatusChange.id}`}
+            </p>
+            <p style={{ fontSize: 14, color: "#64748b", marginBottom: 20 }}>
+              Change status from <strong>{pendingStatusChange.currentStatus}</strong>{" "}
+              to <strong>{pendingStatusChange.nextStatus}</strong>?
+            </p>
+            <div
+              style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}
+            >
+              <button
+                className="btn-secondary"
+                onClick={() => setPendingStatusChange(null)}
+                disabled={statusUpdatingId === pendingStatusChange.id}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void confirmRowStatusChange()}
+                disabled={statusUpdatingId === pendingStatusChange.id}
+                style={{
+                  padding: "10px 20px",
+                  background: "#0f9444",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 6,
+                  fontWeight: 600,
+                  fontSize: 14,
+                  cursor:
+                    statusUpdatingId === pendingStatusChange.id
+                      ? "not-allowed"
+                      : "pointer",
+                  opacity: statusUpdatingId === pendingStatusChange.id ? 0.7 : 1,
+                }}
+              >
+                {statusUpdatingId === pendingStatusChange.id
+                  ? "Saving..."
+                  : "Confirm Change"}
               </button>
             </div>
           </div>

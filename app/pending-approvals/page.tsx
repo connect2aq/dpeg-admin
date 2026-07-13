@@ -1,13 +1,16 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/components/AdminLayout';
+import { MultiSelectFilter } from '@/components/MultiSelectFilter';
 import { PaginationControls } from '@/components/PaginationControls';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { SortableTh } from '@/components/SortableTh';
 import { adminApi, type PendingChangeItem, type PendingChangeDetail, type PagedResult, type ApplicationDetail, type RedemptionDetail } from '@/lib/api';
+import { encodeMultiFilterValue, hasMultiFilterValue } from '@/lib/filterUtils';
+import type { QueryParams } from '@/lib/apiContracts';
 
-const STATUSES = ['', 'Pending', 'Checked', 'Approved', 'Rejected', 'Cancelled'];
-const ENTITY_TYPES = ['', 'Investment', 'Redemption', 'Distribution', 'BulkUsers', 'BulkApplications', 'BulkRedemptions'];
+const STATUSES = ['Pending', 'Checked', 'Approved', 'Rejected', 'Cancelled'];
+const ENTITY_TYPES = ['Investment', 'Redemption', 'Distribution', 'BulkUsers', 'BulkApplications', 'BulkRedemptions'];
 const PAGE_SIZE = 20;
 
 // ── Field definitions (payload keys are PascalCase — C# JsonSerializer default) ──
@@ -499,8 +502,8 @@ export default function PendingApprovalsPage() {
 
   const [result, setResult] = useState<PagedResult<PendingChangeItem> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState('');
-  const [entityType, setEntityType] = useState('');
+  const [status, setStatus] = useState<string[]>([]);
+  const [entityType, setEntityType] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<PendingChangeDetail | null>(null);
   const [sortOn, setSortOn] = useState('createdOn');
@@ -513,9 +516,11 @@ export default function PendingApprovalsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
-    if (status) params.status = status;
-    if (entityType) params.entityType = entityType;
+    const params: QueryParams = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
+    const encodedStatus = encodeMultiFilterValue(status);
+    if (encodedStatus) params.status = encodedStatus;
+    const encodedEntityType = encodeMultiFilterValue(entityType);
+    if (encodedEntityType) params.entityType = encodedEntityType;
     adminApi.getPendingChanges(params)
       .then(r => { if (r.success) setResult(r.data); })
       .finally(() => setLoading(false));
@@ -538,16 +543,24 @@ export default function PendingApprovalsPage() {
 
         {/* Filters */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-          <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}
-            style={{ flex: '1 1 140px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
-            {STATUSES.map(s => <option key={s} value={s}>{s || 'All Statuses'}</option>)}
-          </select>
-          <select value={entityType} onChange={e => { setEntityType(e.target.value); setPage(1); }}
-            style={{ flex: '1 1 160px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
-            {ENTITY_TYPES.map(t => <option key={t} value={t}>{t || 'All Types'}</option>)}
-          </select>
-          {(status || entityType) && (
-            <button onClick={() => { setStatus(''); setEntityType(''); setPage(1); }}
+          <MultiSelectFilter
+            allLabel="All Statuses"
+            buttonLabel="Status"
+            options={STATUSES.map(s => ({ value: s, label: s }))}
+            selectedValues={status}
+            onChange={next => { setStatus(next); setPage(1); }}
+            minWidth={180}
+          />
+          <MultiSelectFilter
+            allLabel="All Types"
+            buttonLabel="Type"
+            options={ENTITY_TYPES.map(t => ({ value: t, label: t }))}
+            selectedValues={entityType}
+            onChange={next => { setEntityType(next); setPage(1); }}
+            minWidth={200}
+          />
+          {(hasMultiFilterValue(status) || hasMultiFilterValue(entityType)) && (
+            <button onClick={() => { setStatus([]); setEntityType([]); setPage(1); }}
               style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white', cursor: 'pointer', color: '#64748b' }}>Reset</button>
           )}
         </div>

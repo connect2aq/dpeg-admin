@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AdminLayout from "@/components/AdminLayout";
+import { MultiSelectFilter } from "@/components/MultiSelectFilter";
 import { PaginationControls } from "@/components/PaginationControls";
 import { EditableStatusBadge } from "@/components/StatusBadge";
 import { PendingBadge } from "@/components/PendingBadge";
@@ -18,9 +19,15 @@ import {
   type RedemptionCalculationPreview,
 } from "@/lib/api";
 import { downloadCsv } from "@/lib/exportCsv";
+import {
+  encodeMultiFilterValue,
+  hasMultiFilterValue,
+  parseMultiFilterValue,
+} from "@/lib/filterUtils";
+import type { QueryParams } from "@/lib/apiContracts";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 
-const STATUSES = ["", "UnderReview", "Active", "Rejected"];
+const STATUSES = ["UnderReview", "Active", "Rejected"];
 const STATUS_OPTIONS = ["UnderReview", "Active", "Rejected"];
 const PAGE_SIZE = 20;
 
@@ -62,7 +69,9 @@ function RedemptionsContent() {
     null,
   );
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState(() => searchParams.get("status") ?? "");
+  const [status, setStatus] = useState<string[]>(() =>
+    parseMultiFilterValue(searchParams.get("status")),
+  );
   const [search, setSearch] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -89,6 +98,12 @@ function RedemptionsContent() {
   const [statusUpdatingId, setStatusUpdatingId] = useState<number | null>(null);
   const [statusErrorId, setStatusErrorId] = useState<number | null>(null);
   const [statusError, setStatusError] = useState("");
+  const [pendingStatusChange, setPendingStatusChange] = useState<{
+    id: number;
+    label: string;
+    currentStatus: string;
+    nextStatus: string;
+  } | null>(null);
   const [editingRedeemId, setEditingRedeemId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deletingOne, setDeletingOne] = useState(false);
@@ -118,13 +133,14 @@ function RedemptionsContent() {
 
   const exportToExcel = async () => {
     setExporting(true);
-    const params: Record<string, string | number> = {
+    const params: QueryParams = {
       page: 1,
       pageSize: 100000,
       sortOn,
       sortDirection,
     };
-    if (status) params.status = status;
+    const encodedStatus = encodeMultiFilterValue(status);
+    if (encodedStatus) params.status = encodedStatus;
     if (search) params.search = search;
     if (from) params.from = from;
     if (to) params.to = to;
@@ -169,13 +185,14 @@ function RedemptionsContent() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = {
+    const params: QueryParams = {
       page,
       pageSize: PAGE_SIZE,
       sortOn,
       sortDirection,
     };
-    if (status) params.status = status;
+    const encodedStatus = encodeMultiFilterValue(status);
+    if (encodedStatus) params.status = encodedStatus;
     if (search) params.search = search;
     if (from) params.from = from;
     if (to) params.to = to;
@@ -246,6 +263,32 @@ function RedemptionsContent() {
       setStatusError(r.message || "Failed to update status.");
     }
     setStatusUpdatingId(null);
+  };
+
+  const requestRowStatusChange = (
+    redemption: RedemptionListItem,
+    nextStatus: string,
+  ) => {
+    if (nextStatus === redemption.status) return;
+    setPendingStatusChange({
+      id: redemption.id,
+      label: redemption.sellingPartnerName || redemption.accountUserName || "",
+      currentStatus: redemption.status,
+      nextStatus,
+    });
+  };
+
+  const confirmRowStatusChange = async () => {
+    if (!pendingStatusChange || !result) return;
+    const redemption = result.items.find(
+      (item) => item.id === pendingStatusChange.id,
+    );
+    if (!redemption) {
+      setPendingStatusChange(null);
+      return;
+    }
+    await updateRowStatus(redemption, pendingStatusChange.nextStatus);
+    setPendingStatusChange(null);
   };
 
   const openViewCreate = async (item: PendingChangeItem) => {
@@ -618,27 +661,17 @@ function RedemptionsContent() {
               fontSize: 14,
             }}
           />
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
+          <MultiSelectFilter
+            allLabel="All Statuses"
+            buttonLabel="Status"
+            options={STATUSES.map((item) => ({ value: item, label: item }))}
+            selectedValues={status}
+            onChange={(next) => {
+              setStatus(next);
               setPage(1);
             }}
-            style={{
-              flex: "1 1 130px",
-              padding: "10px 14px",
-              border: "1.5px solid #e2e8f0",
-              borderRadius: 8,
-              fontSize: 14,
-              background: "white",
-            }}
-          >
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s || "All Statuses"}
-              </option>
-            ))}
-          </select>
+            minWidth={180}
+          />
           <input
             type="date"
             value={from}
@@ -694,10 +727,10 @@ function RedemptionsContent() {
           >
             {exporting ? "Exporting…" : "↓ Export"}
           </button>
-          {(status || search || from || to) && (
+          {(hasMultiFilterValue(status) || search || from || to) && (
             <button
               onClick={() => {
-                setStatus("");
+                setStatus([]);
                 setSearch("");
                 setFrom("");
                 setTo("");
@@ -939,7 +972,7 @@ function RedemptionsContent() {
                                     setStatusErrorId(null);
                                     setStatusError("");
                                   }
-                                  void updateRowStatus(r, nextStatus);
+                                  requestRowStatusChange(r, nextStatus);
                                 }}
                               />
                               {statusUpdatingId === r.id && (
@@ -1179,6 +1212,82 @@ function RedemptionsContent() {
                 }}
               >
                 {deletingOne ? "Deleting..." : "Confirm Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingStatusChange && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 12,
+              padding: 32,
+              width: 420,
+              maxWidth: "90vw",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+            }}
+          >
+            <h2
+              style={{
+                fontSize: 17,
+                fontWeight: 700,
+                color: "#0f2342",
+                marginBottom: 10,
+              }}
+            >
+              Change redemption status?
+            </h2>
+            <p style={{ fontSize: 14, color: "#64748b", marginBottom: 8 }}>
+              {pendingStatusChange.label || `Redemption #${pendingStatusChange.id}`}
+            </p>
+            <p style={{ fontSize: 14, color: "#64748b", marginBottom: 20 }}>
+              Change status from <strong>{pendingStatusChange.currentStatus}</strong>{" "}
+              to <strong>{pendingStatusChange.nextStatus}</strong>?
+            </p>
+            <div
+              style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}
+            >
+              <button
+                className="btn-secondary"
+                onClick={() => setPendingStatusChange(null)}
+                disabled={statusUpdatingId === pendingStatusChange.id}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void confirmRowStatusChange()}
+                disabled={statusUpdatingId === pendingStatusChange.id}
+                style={{
+                  padding: "10px 20px",
+                  background: "#0f9444",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 6,
+                  fontWeight: 600,
+                  fontSize: 14,
+                  cursor:
+                    statusUpdatingId === pendingStatusChange.id
+                      ? "not-allowed"
+                      : "pointer",
+                  opacity: statusUpdatingId === pendingStatusChange.id ? 0.7 : 1,
+                }}
+              >
+                {statusUpdatingId === pendingStatusChange.id
+                  ? "Saving..."
+                  : "Confirm Change"}
               </button>
             </div>
           </div>

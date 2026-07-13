@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AdminLayout from "@/components/AdminLayout";
+import { MultiSelectFilter } from "@/components/MultiSelectFilter";
 import { PaginationControls } from "@/components/PaginationControls";
 import { EditableStatusBadge } from "@/components/StatusBadge";
 import { PendingBadge } from "@/components/PendingBadge";
@@ -15,21 +16,20 @@ import {
   type PendingChangeItem,
 } from "@/lib/api";
 import { downloadCsv } from "@/lib/exportCsv";
+import {
+  encodeMultiFilterValue,
+  hasMultiFilterValue,
+  parseMultiFilterValue,
+} from "@/lib/filterUtils";
+import type { QueryParams } from "@/lib/apiContracts";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 
-const STATUSES = [
-  "",
-  "Deposited",
-  "UnderReview",
-  "Active",
-  "Redeemed",
-  "Rejected",
-];
+const STATUSES = ["Deposited", "UnderReview", "Active", "Redeemed", "Rejected"];
 const STATUS_LABELS: Record<string, string> = {
   "": "All Statuses",
   Deposited: "All Deposits (Active/Redeemed)",
 };
-const TYPES = ["", "Individual", "Entity", "IRA", "Trust"];
+const TYPES = ["Individual", "Entity", "IRA", "Trust"];
 const STATUS_OPTIONS = ["UnderReview", "Active", "Rejected"];
 const PAGE_SIZE = 20;
 
@@ -63,12 +63,13 @@ function ApplicationsContent() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [appIdInput, setAppIdInput] = useState("");
-  const [status, setStatus] = useState(() =>
-    searchParams.get("filter") === "deposited"
-      ? "Deposited"
-      : (searchParams.get("status") ?? ""),
+  const [status, setStatus] = useState<string[]>(() => {
+    if (searchParams.get("filter") === "deposited") return ["Deposited"];
+    return parseMultiFilterValue(searchParams.get("status"));
+  });
+  const [investorType, setInvestorType] = useState<string[]>(() =>
+    parseMultiFilterValue(searchParams.get("investorType")),
   );
-  const [investorType, setInvestorType] = useState("");
   const [page, setPage] = useState(1);
   const [sortOn, setSortOn] = useState("createdOn");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -91,6 +92,12 @@ function ApplicationsContent() {
   const [statusUpdatingId, setStatusUpdatingId] = useState<number | null>(null);
   const [statusErrorId, setStatusErrorId] = useState<number | null>(null);
   const [statusError, setStatusError] = useState("");
+  const [pendingStatusChange, setPendingStatusChange] = useState<{
+    id: number;
+    label: string;
+    currentStatus: string;
+    nextStatus: string;
+  } | null>(null);
   const [editingAppId, setEditingAppId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deletingOne, setDeletingOne] = useState(false);
@@ -101,7 +108,7 @@ function ApplicationsContent() {
 
   const exportToExcel = async () => {
     setExporting(true);
-    const params: Record<string, string | number> = {
+    const params: QueryParams = {
       page: 1,
       pageSize: 100000,
       sortOn,
@@ -112,9 +119,13 @@ function ApplicationsContent() {
       params.id = parsedAppId;
     } else {
       if (search) params.search = search;
-      if (status === "Deposited") params.deposited = "true";
-      else if (status) params.status = status;
-      if (investorType) params.investorType = investorType;
+      if (status.includes("Deposited")) params.deposited = "true";
+      const encodedStatus = encodeMultiFilterValue(
+        status.filter((item) => item !== "Deposited"),
+      );
+      if (encodedStatus) params.status = encodedStatus;
+      const encodedInvestorType = encodeMultiFilterValue(investorType);
+      if (encodedInvestorType) params.investorType = encodedInvestorType;
     }
     const r = await adminApi.applications(params);
     if (r.success) {
@@ -151,7 +162,7 @@ function ApplicationsContent() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = {
+    const params: QueryParams = {
       page,
       pageSize: PAGE_SIZE,
       sortOn,
@@ -162,9 +173,13 @@ function ApplicationsContent() {
       params.id = parsedAppId;
     } else {
       if (search) params.search = search;
-      if (status === "Deposited") params.deposited = "true";
-      else if (status) params.status = status;
-      if (investorType) params.investorType = investorType;
+      if (status.includes("Deposited")) params.deposited = "true";
+      const encodedStatus = encodeMultiFilterValue(
+        status.filter((item) => item !== "Deposited"),
+      );
+      if (encodedStatus) params.status = encodedStatus;
+      const encodedInvestorType = encodeMultiFilterValue(investorType);
+      if (encodedInvestorType) params.investorType = encodedInvestorType;
     }
     adminApi
       .applications(params)
@@ -219,6 +234,30 @@ function ApplicationsContent() {
       setStatusError(r.message || "Failed to update status.");
     }
     setStatusUpdatingId(null);
+  };
+
+  const requestRowStatusChange = (
+    app: ApplicationListItem,
+    nextStatus: string,
+  ) => {
+    if (nextStatus === app.status) return;
+    setPendingStatusChange({
+      id: app.id,
+      label: app.investorName || `${app.userFirstName} ${app.userLastName}`.trim(),
+      currentStatus: app.status,
+      nextStatus,
+    });
+  };
+
+  const confirmRowStatusChange = async () => {
+    if (!pendingStatusChange || !result) return;
+    const app = result.items.find((item) => item.id === pendingStatusChange.id);
+    if (!app) {
+      setPendingStatusChange(null);
+      return;
+    }
+    await updateRowStatus(app, pendingStatusChange.nextStatus);
+    setPendingStatusChange(null);
   };
 
   // Keep select-all checkbox indeterminate state in sync
@@ -388,56 +427,42 @@ function ApplicationsContent() {
               fontSize: 14,
             }}
           />
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
+          <MultiSelectFilter
+            allLabel="All Statuses"
+            buttonLabel="Status"
+            options={STATUSES.map((item) => ({
+              value: item,
+              label: STATUS_LABELS[item] ?? item,
+            }))}
+            selectedValues={status}
+            onChange={(next) => {
+              setStatus(next);
               setPage(1);
             }}
-            style={{
-              flex: "1 1 130px",
-              padding: "10px 14px",
-              border: "1.5px solid #e2e8f0",
-              borderRadius: 8,
-              fontSize: 14,
-              background: "white",
-            }}
-          >
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {STATUS_LABELS[s] ?? s}
-              </option>
-            ))}
-          </select>
-          <select
-            value={investorType}
-            onChange={(e) => {
-              setInvestorType(e.target.value);
+            minWidth={190}
+          />
+          <MultiSelectFilter
+            allLabel="All Types"
+            buttonLabel="Type"
+            options={TYPES.map((item) => ({ value: item, label: item }))}
+            selectedValues={investorType}
+            onChange={(next) => {
+              setInvestorType(next);
               setPage(1);
             }}
-            style={{
-              flex: "1 1 130px",
-              padding: "10px 14px",
-              border: "1.5px solid #e2e8f0",
-              borderRadius: 8,
-              fontSize: 14,
-              background: "white",
-            }}
-          >
-            {TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t || "All Types"}
-              </option>
-            ))}
-          </select>
-          {(appIdInput || search || status || investorType) && (
+            minWidth={170}
+          />
+          {(appIdInput ||
+            search ||
+            hasMultiFilterValue(status) ||
+            hasMultiFilterValue(investorType)) && (
             <button
               type="button"
               onClick={() => {
                 setAppIdInput("");
                 setSearch("");
-                setStatus("");
-                setInvestorType("");
+                setStatus([]);
+                setInvestorType([]);
                 setPage(1);
                 setSelected(new Set());
               }}
@@ -662,7 +687,7 @@ function ApplicationsContent() {
                                     setStatusErrorId(null);
                                     setStatusError("");
                                   }
-                                  void updateRowStatus(a, nextStatus);
+                                  requestRowStatusChange(a, nextStatus);
                                 }}
                               />
                               {statusUpdatingId === a.id && (
@@ -931,6 +956,82 @@ function ApplicationsContent() {
                 }}
               >
                 {deletingOne ? "Deleting..." : "Confirm Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingStatusChange && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 12,
+              padding: 32,
+              width: 420,
+              maxWidth: "90vw",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+            }}
+          >
+            <h2
+              style={{
+                fontSize: 17,
+                fontWeight: 700,
+                color: "#0f2342",
+                marginBottom: 10,
+              }}
+            >
+              Change application status?
+            </h2>
+            <p style={{ fontSize: 14, color: "#64748b", marginBottom: 8 }}>
+              {pendingStatusChange.label || `Application #${pendingStatusChange.id}`}
+            </p>
+            <p style={{ fontSize: 14, color: "#64748b", marginBottom: 20 }}>
+              Change status from <strong>{pendingStatusChange.currentStatus}</strong>{" "}
+              to <strong>{pendingStatusChange.nextStatus}</strong>?
+            </p>
+            <div
+              style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}
+            >
+              <button
+                className="btn-secondary"
+                onClick={() => setPendingStatusChange(null)}
+                disabled={statusUpdatingId === pendingStatusChange.id}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void confirmRowStatusChange()}
+                disabled={statusUpdatingId === pendingStatusChange.id}
+                style={{
+                  padding: "10px 20px",
+                  background: "#0f9444",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 6,
+                  fontWeight: 600,
+                  fontSize: 14,
+                  cursor:
+                    statusUpdatingId === pendingStatusChange.id
+                      ? "not-allowed"
+                      : "pointer",
+                  opacity: statusUpdatingId === pendingStatusChange.id ? 0.7 : 1,
+                }}
+              >
+                {statusUpdatingId === pendingStatusChange.id
+                  ? "Saving..."
+                  : "Confirm Change"}
               </button>
             </div>
           </div>

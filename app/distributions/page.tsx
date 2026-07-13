@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import AdminLayout from "@/components/AdminLayout";
+import { MultiSelectFilter } from "@/components/MultiSelectFilter";
 import { PaginationControls } from "@/components/PaginationControls";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SortableTh } from "@/components/SortableTh";
@@ -12,9 +13,15 @@ import {
   type PagedResult,
 } from "@/lib/api";
 import { downloadCsv } from "@/lib/exportCsv";
+import {
+  encodeMultiFilterValue,
+  hasMultiFilterValue,
+  parseMultiFilterValue,
+} from "@/lib/filterUtils";
+import type { QueryParams } from "@/lib/apiContracts";
 import Link from "next/link";
 
-const STATUSES = ["", "Pending", "Sent", "Failed", "Paid"];
+const STATUSES = ["Pending", "Sent", "Failed", "Paid"];
 const MONTHS = [
   "",
   "1",
@@ -86,7 +93,9 @@ function DistributionsContent() {
   const [result, setResult] =
     useState<PagedResult<DistributionListItem> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState(() => searchParams.get("status") ?? "");
+  const [status, setStatus] = useState<string[]>(() =>
+    parseMultiFilterValue(searchParams.get("status")),
+  );
   const [search, setSearch] = useState("");
   const [month, setMonth] = useState("");
   const [year, setYear] = useState("");
@@ -169,11 +178,12 @@ function DistributionsContent() {
 
   const exportToExcel = async () => {
     setExporting(true);
-    const params: Record<string, string | number> = {
+    const params: QueryParams = {
       page: 1,
       pageSize: 100000,
     };
-    if (status) params.status = status;
+    const encodedStatus = encodeMultiFilterValue(status);
+    if (encodedStatus) params.status = encodedStatus;
     if (search) params.search = search;
     if (month) params.month = month;
     if (year) params.year = year;
@@ -220,13 +230,14 @@ function DistributionsContent() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = {
+    const params: QueryParams = {
       page,
       pageSize: PAGE_SIZE,
       sortOn,
       sortDirection,
     };
-    if (status) params.status = status;
+    const encodedStatus = encodeMultiFilterValue(status);
+    if (encodedStatus) params.status = encodedStatus;
     if (search) params.search = search;
     if (month) params.month = month;
     if (year) params.year = year;
@@ -1149,27 +1160,18 @@ function DistributionsContent() {
           <span style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
             Distribution History
           </span>
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
+          <MultiSelectFilter
+            allLabel="All Statuses"
+            buttonLabel="Status"
+            options={STATUSES.map((item) => ({ value: item, label: item }))}
+            selectedValues={status}
+            onChange={(next) => {
+              setStatus(next);
               setPage(1);
               setSelectedHistoryIds(new Set());
             }}
-            style={{
-              padding: "10px 14px",
-              border: "1.5px solid #e2e8f0",
-              borderRadius: 8,
-              fontSize: 14,
-              background: "white",
-            }}
-          >
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s || "All Statuses"}
-              </option>
-            ))}
-          </select>
+            minWidth={180}
+          />
           <input
             type="text"
             placeholder="Search investor name"
@@ -1259,10 +1261,10 @@ function DistributionsContent() {
           >
             {exporting ? "Exporting…" : "↓ Export"}
           </button>
-          {(status || search || month || year || appIdFilter) && (
+          {(hasMultiFilterValue(status) || search || month || year || appIdFilter) && (
             <button
               onClick={() => {
-                setStatus("");
+                setStatus([]);
                 setSearch("");
                 setMonth("");
                 setYear("");

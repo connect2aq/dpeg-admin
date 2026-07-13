@@ -1,9 +1,12 @@
 'use client';
 import React, { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/components/AdminLayout';
+import { MultiSelectFilter } from '@/components/MultiSelectFilter';
 import { PaginationControls } from '@/components/PaginationControls';
 import { SortableTh } from '@/components/SortableTh';
 import { adminApi, type OdooLogItem, type OdooLogDetail, type PagedResult } from '@/lib/api';
+import { encodeMultiFilterValue, hasMultiFilterValue } from '@/lib/filterUtils';
+import type { QueryParams } from '@/lib/apiContracts';
 
 const PAGE_SIZE = 25;
 
@@ -57,8 +60,8 @@ function PayloadViewer({ label, json }: { label: string; json?: string | null })
 export default function OdooLogsPage() {
   const [result, setResult] = useState<PagedResult<OdooLogItem> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [direction, setDirection] = useState('');
-  const [isSuccess, setIsSuccess] = useState('');
+  const [direction, setDirection] = useState<string[]>([]);
+  const [isSuccess, setIsSuccess] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -75,9 +78,10 @@ export default function OdooLogsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
-    if (direction) params.direction = direction;
-    if (isSuccess !== '') params.isSuccess = isSuccess;
+    const params: QueryParams = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
+    const encodedDirection = encodeMultiFilterValue(direction);
+    if (encodedDirection) params.direction = encodedDirection;
+    if (isSuccess.length === 1) params.isSuccess = isSuccess[0];
     if (search) params.search = search;
     if (from) params.from = from;
     if (to) params.to = to;
@@ -119,30 +123,40 @@ export default function OdooLogsPage() {
           <input type="text" placeholder="Search endpoint / entity…" value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
             style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, minWidth: 220 }} />
-          <select value={direction} onChange={e => { setDirection(e.target.value); setPage(1); }}
-            style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, background: 'white' }}>
-            <option value="">All Directions</option>
-            <option value="Outbound">Outbound</option>
-            <option value="Inbound">Inbound</option>
-          </select>
-          <select value={isSuccess} onChange={e => { setIsSuccess(e.target.value); setPage(1); }}
-            style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, background: 'white' }}>
-            <option value="">All Results</option>
-            <option value="true">Success</option>
-            <option value="false">Failed</option>
-          </select>
+          <MultiSelectFilter
+            allLabel="All Directions"
+            buttonLabel="Direction"
+            options={[
+              { value: 'Outbound', label: 'Outbound' },
+              { value: 'Inbound', label: 'Inbound' },
+            ]}
+            selectedValues={direction}
+            onChange={next => { setDirection(next); setPage(1); }}
+            minWidth={190}
+          />
+          <MultiSelectFilter
+            allLabel="All Results"
+            buttonLabel="Result"
+            options={[
+              { value: 'true', label: 'Success' },
+              { value: 'false', label: 'Failed' },
+            ]}
+            selectedValues={isSuccess}
+            onChange={next => { setIsSuccess(next); setPage(1); }}
+            minWidth={170}
+          />
           <input type="date" value={from} onChange={e => { const nextFrom = e.target.value; setFrom(nextFrom); if (to && nextFrom && to < nextFrom) setTo(nextFrom); setPage(1); }}
             max={to || undefined}
             style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13 }} />
           <input type="date" value={to} onChange={e => { const nextTo = e.target.value; setTo(nextTo); if (from && nextTo && from > nextTo) setFrom(nextTo); setPage(1); }}
             min={from || undefined}
             style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13 }} />
-          {(search || direction || isSuccess || from || to) && (
+          {(search || hasMultiFilterValue(direction) || hasMultiFilterValue(isSuccess) || from || to) && (
             <button
               onClick={() => {
                 setSearch('');
-                setDirection('');
-                setIsSuccess('');
+                setDirection([]);
+                setIsSuccess([]);
                 setFrom('');
                 setTo('');
                 setPage(1);

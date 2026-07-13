@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
 import AdminLayout from "@/components/AdminLayout";
+import { MultiSelectFilter } from "@/components/MultiSelectFilter";
 import { PaginationControls } from "@/components/PaginationControls";
 import { SortableTh } from "@/components/SortableTh";
 import {
@@ -9,6 +10,8 @@ import {
   type EmailLogDetail,
   type PagedResult,
 } from "@/lib/api";
+import { hasMultiFilterValue } from "@/lib/filterUtils";
+import type { QueryParams } from "@/lib/apiContracts";
 
 const PAGE_SIZE = 25;
 
@@ -117,7 +120,7 @@ function fmt(iso: string) {
 export default function EmailLogsPage() {
   const [result, setResult] = useState<PagedResult<EmailLogItem> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [success, setSuccess] = useState("");
+  const [success, setSuccess] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -140,13 +143,13 @@ export default function EmailLogsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = {
+    const params: QueryParams = {
       page,
       pageSize: PAGE_SIZE,
       sortOn,
       sortDirection,
     };
-    if (success !== "") params.success = success;
+    if (success.length === 1) params.success = success[0];
     if (search) params.search = search;
     if (from) params.from = from;
     if (to) params.to = to;
@@ -214,15 +217,20 @@ export default function EmailLogsPage() {
             alignItems: "center",
           }}
         >
-          <select
-            value={success}
-            onChange={(e) => setSuccess(e.target.value)}
-            style={inputStyle}
-          >
-            <option value="">All Status</option>
-            <option value="true">Sent</option>
-            <option value="false">Failed</option>
-          </select>
+          <MultiSelectFilter
+            allLabel="All Status"
+            buttonLabel="Status"
+            options={[
+              { value: "true", label: "Sent" },
+              { value: "false", label: "Failed" },
+            ]}
+            selectedValues={success}
+            onChange={(next) => {
+              setSuccess(next);
+              setPage(1);
+            }}
+            minWidth={180}
+          />
           <input
             placeholder="Search: to, subject, user email"
             value={search}
@@ -251,10 +259,10 @@ export default function EmailLogsPage() {
             min={from || undefined}
             style={inputStyle}
           />
-          {(success || search || from || to) && (
+          {(hasMultiFilterValue(success) || search || from || to) && (
             <button
               onClick={() => {
-                setSuccess("");
+                setSuccess([]);
                 setSearch("");
                 setFrom("");
                 setTo("");
