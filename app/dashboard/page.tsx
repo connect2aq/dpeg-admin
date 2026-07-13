@@ -330,7 +330,7 @@ export default function DashboardPage() {
                 </button>
               )}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, marginBottom: 4, alignItems: "stretch" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 20, marginBottom: 4, alignItems: "stretch" }}>
               <KpiCard
                 label="Capital Raised"
                 value={fmt(dateFrom && dateTo ? stats.totalDepositedDateRange : stats.totalDeployedCommencement)}
@@ -352,6 +352,13 @@ export default function DashboardPage() {
                 sub={dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "Since Inception (default)"}
                 color="#10b981"
                 href="/capital-ledger?type=Redemption,Dividend"
+              />
+              <KpiCard
+                label="Accrued & Unpaid"
+                value={fmt(stats.totalPendingAccruals)}
+                sub="Pending daily accruals, not yet distributed"
+                color="#7c3aed"
+                href="/capital-ledger"
               />
               <KpiCard
                 label="Sponsored Equity"
