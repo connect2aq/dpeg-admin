@@ -3,7 +3,8 @@ import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AdminLayout from "@/components/AdminLayout";
-import { StatusBadge } from "@/components/StatusBadge";
+import { PaginationControls } from "@/components/PaginationControls";
+import { EditableStatusBadge } from "@/components/StatusBadge";
 import { PendingBadge } from "@/components/PendingBadge";
 import { RedemptionEditModal } from "@/components/RedemptionEditModal";
 import { SortableTh } from "@/components/SortableTh";
@@ -19,7 +20,8 @@ import {
 import { downloadCsv } from "@/lib/exportCsv";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 
-const STATUSES = ["", "UnderReview", "Active", "Rejected", "Redeemed"];
+const STATUSES = ["", "UnderReview", "Active", "Rejected"];
+const STATUS_OPTIONS = ["UnderReview", "Active", "Rejected"];
 const PAGE_SIZE = 20;
 
 // AggregatePurchasePrice = principal + interest; Income (ProratedPreferredReturn) is the interest
@@ -84,6 +86,9 @@ function RedemptionsContent() {
   const [pendingMap, setPendingMap] = useState<
     Record<number, PendingChangeItem>
   >({});
+  const [statusUpdatingId, setStatusUpdatingId] = useState<number | null>(null);
+  const [statusErrorId, setStatusErrorId] = useState<number | null>(null);
+  const [statusError, setStatusError] = useState("");
   const [editingRedeemId, setEditingRedeemId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deletingOne, setDeletingOne] = useState(false);
@@ -213,6 +218,35 @@ function RedemptionsContent() {
       );
     }
   }, []);
+
+  const updateRowStatus = async (
+    redemption: RedemptionListItem,
+    nextStatus: string,
+  ) => {
+    if (nextStatus === redemption.status) return;
+    setStatusUpdatingId(redemption.id);
+    setStatusErrorId(null);
+    setStatusError("");
+    const r = await adminApi.updateRedemptionStatus(redemption.id, nextStatus);
+    if (r.success) {
+      setResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              items: prev.items.map((item) =>
+                item.id === redemption.id
+                  ? { ...item, status: nextStatus }
+                  : item,
+              ),
+            }
+          : prev,
+      );
+    } else {
+      setStatusErrorId(redemption.id);
+      setStatusError(r.message || "Failed to update status.");
+    }
+    setStatusUpdatingId(null);
+  };
 
   const openViewCreate = async (item: PendingChangeItem) => {
     setViewingCreateLoading(true);
@@ -609,9 +643,12 @@ function RedemptionsContent() {
             type="date"
             value={from}
             onChange={(e) => {
-              setFrom(e.target.value);
+              const nextFrom = e.target.value;
+              setFrom(nextFrom);
+              if (to && nextFrom && to < nextFrom) setTo(nextFrom);
               setPage(1);
             }}
+            max={to || undefined}
             style={{
               flex: "1 1 140px",
               padding: "10px 14px",
@@ -625,9 +662,12 @@ function RedemptionsContent() {
             type="date"
             value={to}
             onChange={(e) => {
-              setTo(e.target.value);
+              const nextTo = e.target.value;
+              setTo(nextTo);
+              if (from && nextTo && from > nextTo) setFrom(nextTo);
               setPage(1);
             }}
+            min={from || undefined}
             style={{
               flex: "1 1 140px",
               padding: "10px 14px",
@@ -654,9 +694,10 @@ function RedemptionsContent() {
           >
             {exporting ? "Exporting…" : "↓ Export"}
           </button>
-          {(search || from || to) && (
+          {(status || search || from || to) && (
             <button
               onClick={() => {
+                setStatus("");
                 setSearch("");
                 setFrom("");
                 setTo("");
@@ -672,7 +713,7 @@ function RedemptionsContent() {
                 color: "#64748b",
               }}
             >
-              Clear
+              Reset
             </button>
           )}
         </div>
@@ -805,10 +846,8 @@ function RedemptionsContent() {
                             <input
                               type="checkbox"
                               checked={selected.has(r.id)}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleOne(r.id);
-                              }}
+                              onChange={() => toggleOne(r.id)}
+                              onClick={(e) => e.stopPropagation()}
                               style={{ cursor: "pointer" }}
                             />
                           </td>
@@ -881,21 +920,61 @@ function RedemptionsContent() {
                               : "—"}
                           </td>
                           <td>
-                            <StatusBadge status={r.status} />
-                            {pendingMap[r.id] && (
-                              <PendingBadge item={pendingMap[r.id]} />
-                            )}
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "flex-start",
+                                gap: 6,
+                              }}
+                            >
+                              <EditableStatusBadge
+                                status={r.status}
+                                options={Array.from(
+                                  new Set([...STATUS_OPTIONS, r.status]),
+                                )}
+                                disabled={statusUpdatingId === r.id}
+                                onChange={(nextStatus) => {
+                                  if (statusErrorId === r.id) {
+                                    setStatusErrorId(null);
+                                    setStatusError("");
+                                  }
+                                  void updateRowStatus(r, nextStatus);
+                                }}
+                              />
+                              {statusUpdatingId === r.id && (
+                                <span
+                                  style={{ fontSize: 12, color: "#64748b" }}
+                                >
+                                  Saving...
+                                </span>
+                              )}
+                              {statusErrorId === r.id && (
+                                <span
+                                  style={{ fontSize: 12, color: "#b91c1c" }}
+                                >
+                                  {statusError}
+                                </span>
+                              )}
+                              {pendingMap[r.id] && (
+                                <PendingBadge item={pendingMap[r.id]} />
+                              )}
+                            </div>
                           </td>
                           <td>
                             <div
                               style={{
                                 display: "flex",
+                                flexDirection: "column",
                                 gap: 10,
-                                alignItems: "center",
+                                alignItems: "flex-start",
                               }}
                             >
                               <button
-                                onClick={() => setConfirmDeleteId(r.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setConfirmDeleteId(r.id);
+                                }}
                                 style={{
                                   fontSize: 13,
                                   color: "#b91c1c",
@@ -916,51 +995,33 @@ function RedemptionsContent() {
                 </table>
               </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
+              <PaginationControls
+                page={page}
+                totalPages={result.totalPages}
+                onPageChange={setPage}
+                summary={
+                  <>
+                    {result.totalCount} requests
+                    {selected.size > 0 && (
+                      <span
+                        style={{
+                          marginLeft: 12,
+                          color: "#b8923a",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {selected.size} selected
+                      </span>
+                    )}
+                  </>
+                }
+                containerStyle={{
                   padding: "16px 20px",
                   borderTop: "1px solid #f1f5f9",
-                  flexWrap: "wrap",
-                  gap: 8,
                 }}
-              >
-                <span style={{ fontSize: 13, color: "#64748b" }}>
-                  {result.totalCount} requests · Page {result.page} of{" "}
-                  {result.totalPages}
-                  {selected.size > 0 && (
-                    <span
-                      style={{
-                        marginLeft: 12,
-                        color: "#b8923a",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {selected.size} selected
-                    </span>
-                  )}
-                </span>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    className="btn-secondary"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    style={{ padding: "8px 16px", fontSize: 13 }}
-                  >
-                    ← Prev
-                  </button>
-                  <button
-                    className="btn-secondary"
-                    onClick={() => setPage((p) => p + 1)}
-                    disabled={page >= result.totalPages}
-                    style={{ padding: "8px 16px", fontSize: 13 }}
-                  >
-                    Next →
-                  </button>
-                </div>
-              </div>
+                buttonClassName="btn-secondary"
+                buttonStyle={{ padding: "8px 16px", fontSize: 13 }}
+              />
             </>
           ) : (
             <div style={{ padding: 32, color: "#ef4444" }}>

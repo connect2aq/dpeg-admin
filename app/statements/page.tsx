@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/components/AdminLayout';
+import { PaginationControls } from '@/components/PaginationControls';
 import { SortableTh } from '@/components/SortableTh';
 import { adminApi, type StatementListItem, type PagedResult } from '@/lib/api';
 
@@ -91,6 +92,18 @@ export default function StatementsPage() {
             style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
             {TYPES.map(t => <option key={t} value={t}>{t ? (TYPE_LABELS[t] ?? t) : 'All Types'}</option>)}
           </select>
+          {(search || type) && (
+            <button
+              onClick={() => {
+                setSearch('');
+                setType('');
+                setPage(1);
+              }}
+              style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white', color: '#475569', cursor: 'pointer' }}
+            >
+              Reset
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -157,21 +170,14 @@ export default function StatementsPage() {
               </table>
             </div>
 
-            {totalPages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 20 }}>
-                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                  style={{ padding: '6px 14px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.5 : 1 }}>
-                  ← Prev
-                </button>
-                <span style={{ padding: '6px 12px', fontSize: 13, color: '#64748b' }}>
-                  {page} / {totalPages}
-                </span>
-                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                  style={{ padding: '6px 14px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.5 : 1 }}>
-                  Next →
-                </button>
-              </div>
-            )}
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              containerStyle={{ justifyContent: 'center', marginTop: 20 }}
+              buttonStyle={{ padding: '6px 14px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13 }}
+              inputStyle={{ width: 64, padding: '6px 8px' }}
+            />
 
             <p style={{ marginTop: 12, fontSize: 13, color: '#94a3b8' }}>
               {result?.totalCount ?? 0} total statement{result?.totalCount !== 1 ? 's' : ''}

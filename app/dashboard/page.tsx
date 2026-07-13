@@ -326,7 +326,7 @@ export default function DashboardPage() {
                   onClick={clearDateRange}
                   style={{ fontSize: 12, padding: "6px 12px", border: "1px solid #cbd5e1", borderRadius: 6, background: "#f8fafc", color: "#64748b", cursor: "pointer" }}
                 >
-                  Clear
+                  Reset
                 </button>
               )}
             </div>

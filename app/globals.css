@@ -183,6 +183,34 @@ body {
   letter-spacing: 0.05em;
 }
 
+.status-badge-select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.status-badge-select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  cursor: pointer;
+  padding-right: 24px;
+}
+
+.status-badge-select:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+
+.status-badge-select-caret {
+  position: absolute;
+  right: 10px;
+  font-size: 10px;
+  line-height: 1;
+  pointer-events: none;
+  opacity: 0.75;
+}
+
 .status-active {
   background: #d6ede0;
   color: #155c30;

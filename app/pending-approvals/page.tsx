@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/components/AdminLayout';
+import { PaginationControls } from '@/components/PaginationControls';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { SortableTh } from '@/components/SortableTh';
 import { adminApi, type PendingChangeItem, type PendingChangeDetail, type PagedResult, type ApplicationDetail, type RedemptionDetail } from '@/lib/api';
@@ -547,7 +548,7 @@ export default function PendingApprovalsPage() {
           </select>
           {(status || entityType) && (
             <button onClick={() => { setStatus(''); setEntityType(''); setPage(1); }}
-              style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white', cursor: 'pointer', color: '#64748b' }}>Clear</button>
+              style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white', cursor: 'pointer', color: '#64748b' }}>Reset</button>
           )}
         </div>
 
@@ -602,13 +603,15 @@ export default function PendingApprovalsPage() {
                 </table>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap', gap: 8 }}>
-                <span style={{ fontSize: 13, color: '#64748b' }}>{result.totalCount} changes · Page {result.page} of {result.totalPages}</span>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn-secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ padding: '8px 16px', fontSize: 13 }}>← Prev</button>
-                  <button className="btn-secondary" onClick={() => setPage(p => p + 1)} disabled={page >= result.totalPages} style={{ padding: '8px 16px', fontSize: 13 }}>Next →</button>
-                </div>
-              </div>
+              <PaginationControls
+                page={page}
+                totalPages={result.totalPages}
+                onPageChange={setPage}
+                summary={`${result.totalCount} changes`}
+                containerStyle={{ padding: '16px 20px', borderTop: '1px solid #f1f5f9' }}
+                buttonClassName="btn-secondary"
+                buttonStyle={{ padding: '8px 16px', fontSize: 13 }}
+              />
             </>
           ) : (
             <div style={{ padding: 32, color: '#ef4444' }}>Failed to load pending changes.</div>

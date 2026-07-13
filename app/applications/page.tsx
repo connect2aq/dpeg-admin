@@ -3,7 +3,8 @@ import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AdminLayout from "@/components/AdminLayout";
-import { StatusBadge } from "@/components/StatusBadge";
+import { PaginationControls } from "@/components/PaginationControls";
+import { EditableStatusBadge } from "@/components/StatusBadge";
 import { PendingBadge } from "@/components/PendingBadge";
 import { InvestmentEditModal } from "@/components/InvestmentEditModal";
 import { SortableTh } from "@/components/SortableTh";
@@ -29,6 +30,7 @@ const STATUS_LABELS: Record<string, string> = {
   Deposited: "All Deposits (Active/Redeemed)",
 };
 const TYPES = ["", "Individual", "Entity", "IRA", "Trust"];
+const STATUS_OPTIONS = ["UnderReview", "Active", "Rejected"];
 const PAGE_SIZE = 20;
 
 export default function ApplicationsPage() {
@@ -86,6 +88,9 @@ function ApplicationsContent() {
   const [pendingMap, setPendingMap] = useState<
     Record<number, PendingChangeItem>
   >({});
+  const [statusUpdatingId, setStatusUpdatingId] = useState<number | null>(null);
+  const [statusErrorId, setStatusErrorId] = useState<number | null>(null);
+  const [statusError, setStatusError] = useState("");
   const [editingAppId, setEditingAppId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deletingOne, setDeletingOne] = useState(false);
@@ -188,6 +193,33 @@ function ApplicationsContent() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const updateRowStatus = async (
+    app: ApplicationListItem,
+    nextStatus: string,
+  ) => {
+    if (nextStatus === app.status) return;
+    setStatusUpdatingId(app.id);
+    setStatusErrorId(null);
+    setStatusError("");
+    const r = await adminApi.updateApplicationStatus(app.id, nextStatus);
+    if (r.success) {
+      setResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              items: prev.items.map((item) =>
+                item.id === app.id ? { ...item, status: nextStatus } : item,
+              ),
+            }
+          : prev,
+      );
+    } else {
+      setStatusErrorId(app.id);
+      setStatusError(r.message || "Failed to update status.");
+    }
+    setStatusUpdatingId(null);
+  };
 
   // Keep select-all checkbox indeterminate state in sync
   useEffect(() => {
@@ -319,12 +351,7 @@ function ApplicationsContent() {
         )}
 
         {/* Filters */}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setPage(1);
-            load();
-          }}
+        <div
           style={{
             display: "flex",
             gap: 12,
@@ -403,9 +430,30 @@ function ApplicationsContent() {
               </option>
             ))}
           </select>
-          <button type="submit" className="btn-primary">
-            Search
-          </button>
+          {(appIdInput || search || status || investorType) && (
+            <button
+              type="button"
+              onClick={() => {
+                setAppIdInput("");
+                setSearch("");
+                setStatus("");
+                setInvestorType("");
+                setPage(1);
+                setSelected(new Set());
+              }}
+              style={{
+                padding: "10px 14px",
+                border: "1.5px solid #e2e8f0",
+                borderRadius: 8,
+                fontSize: 14,
+                background: "white",
+                color: "#475569",
+                cursor: "pointer",
+              }}
+            >
+              Reset
+            </button>
+          )}
           <button
             type="button"
             onClick={exportToExcel}
@@ -424,7 +472,7 @@ function ApplicationsContent() {
           >
             {exporting ? "Exporting…" : "↓ Export"}
           </button>
-        </form>
+        </div>
 
         <div className="card" style={{ padding: 0, overflow: "hidden" }}>
           {loading ? (
@@ -595,17 +643,54 @@ function ApplicationsContent() {
                               : "—"}
                           </td> */}
                           <td>
-                            <StatusBadge status={a.status} />
-                            {pendingMap[a.id] && (
-                              <PendingBadge item={pendingMap[a.id]} />
-                            )}
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "flex-start",
+                                gap: 6,
+                              }}
+                            >
+                              <EditableStatusBadge
+                                status={a.status}
+                                options={Array.from(
+                                  new Set([...STATUS_OPTIONS, a.status]),
+                                )}
+                                disabled={statusUpdatingId === a.id}
+                                onChange={(nextStatus) => {
+                                  if (statusErrorId === a.id) {
+                                    setStatusErrorId(null);
+                                    setStatusError("");
+                                  }
+                                  void updateRowStatus(a, nextStatus);
+                                }}
+                              />
+                              {statusUpdatingId === a.id && (
+                                <span
+                                  style={{ fontSize: 12, color: "#64748b" }}
+                                >
+                                  Saving...
+                                </span>
+                              )}
+                              {statusErrorId === a.id && (
+                                <span
+                                  style={{ fontSize: 12, color: "#b91c1c" }}
+                                >
+                                  {statusError}
+                                </span>
+                              )}
+                              {pendingMap[a.id] && (
+                                <PendingBadge item={pendingMap[a.id]} />
+                              )}
+                            </div>
                           </td>
                           <td>
                             <div
                               style={{
                                 display: "flex",
+                                flexDirection: "column",
                                 gap: 10,
-                                alignItems: "center",
+                                alignItems: "flex-start",
                               }}
                             >
                               {/* <Link
@@ -657,51 +742,33 @@ function ApplicationsContent() {
                 </table>
               </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
+              <PaginationControls
+                page={page}
+                totalPages={result.totalPages}
+                onPageChange={setPage}
+                summary={
+                  <>
+                    {result.totalCount} applications
+                    {selected.size > 0 && (
+                      <span
+                        style={{
+                          marginLeft: 12,
+                          color: "#b8923a",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {selected.size} selected
+                      </span>
+                    )}
+                  </>
+                }
+                containerStyle={{
                   padding: "16px 20px",
                   borderTop: "1px solid #f1f5f9",
-                  flexWrap: "wrap",
-                  gap: 8,
                 }}
-              >
-                <span style={{ fontSize: 13, color: "#64748b" }}>
-                  {result.totalCount} applications · Page {result.page} of{" "}
-                  {result.totalPages}
-                  {selected.size > 0 && (
-                    <span
-                      style={{
-                        marginLeft: 12,
-                        color: "#b8923a",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {selected.size} selected
-                    </span>
-                  )}
-                </span>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    className="btn-secondary"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    style={{ padding: "8px 16px", fontSize: 13 }}
-                  >
-                    ← Prev
-                  </button>
-                  <button
-                    className="btn-secondary"
-                    onClick={() => setPage((p) => p + 1)}
-                    disabled={page >= result.totalPages}
-                    style={{ padding: "8px 16px", fontSize: 13 }}
-                  >
-                    Next →
-                  </button>
-                </div>
-              </div>
+                buttonClassName="btn-secondary"
+                buttonStyle={{ padding: "8px 16px", fontSize: 13 }}
+              />
             </>
           ) : (
             <div style={{ padding: 32, color: "#ef4444" }}>

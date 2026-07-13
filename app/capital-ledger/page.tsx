@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import AdminLayout from "@/components/AdminLayout";
+import { PaginationControls } from "@/components/PaginationControls";
 import {
   adminApi,
   type CapitalLedger,
@@ -338,7 +339,7 @@ function CapitalLedgerContent() {
                 cursor: "pointer",
               }}
             >
-              × Clear Filter
+              Reset Filters
             </button>
           </div>
         )}
@@ -356,7 +357,12 @@ function CapitalLedgerContent() {
           <input
             type="date"
             value={from}
-            onChange={(e) => setFrom(e.target.value)}
+            onChange={(e) => {
+              const nextFrom = e.target.value;
+              setFrom(nextFrom);
+              if (to && nextFrom && to < nextFrom) setTo(nextFrom);
+            }}
+            max={to || undefined}
             style={{
               padding: "9px 12px",
               border: "1.5px solid #e2e8f0",
@@ -368,7 +374,12 @@ function CapitalLedgerContent() {
           <input
             type="date"
             value={to}
-            onChange={(e) => setTo(e.target.value)}
+            onChange={(e) => {
+              const nextTo = e.target.value;
+              setTo(nextTo);
+              if (from && nextTo && from > nextTo) setFrom(nextTo);
+            }}
+            min={from || undefined}
             style={{
               padding: "9px 12px",
               border: "1.5px solid #e2e8f0",
@@ -378,24 +389,12 @@ function CapitalLedgerContent() {
             title="To date"
           />
           <button
-            onClick={load}
-            style={{
-              padding: "9px 18px",
-              background: "#0e3416",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Apply
-          </button>
-          <button
             onClick={() => {
               setFrom("");
               setTo("");
+              setTypeFilter("");
+              setSearch("");
+              setAppIdFilter("");
             }}
             style={{
               padding: "9px 14px",
@@ -407,7 +406,7 @@ function CapitalLedgerContent() {
               cursor: "pointer",
             }}
           >
-            Clear
+            Reset
           </button>
           <select
             value={typeFilter}
@@ -956,38 +955,17 @@ function CapitalLedgerContent() {
         </div>
 
         {!loading && visibleEntries.length > 0 && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
+          <PaginationControls
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            summary={`${visibleEntries.length} visible entries`}
+            containerStyle={{
               padding: "16px 4px",
-              flexWrap: "wrap",
-              gap: 8,
             }}
-          >
-            <span style={{ fontSize: 13, color: "#64748b" }}>
-              Page {page} of {totalPages}
-            </span>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                className="btn-secondary"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                style={{ padding: "8px 16px", fontSize: 13 }}
-              >
-                ← Prev
-              </button>
-              <button
-                className="btn-secondary"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                style={{ padding: "8px 16px", fontSize: 13 }}
-              >
-                Next →
-              </button>
-            </div>
-          </div>
+            buttonClassName="btn-secondary"
+            buttonStyle={{ padding: "8px 16px", fontSize: 13 }}
+          />
         )}
       </div>
     </AdminLayout>

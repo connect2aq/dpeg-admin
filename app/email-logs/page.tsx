@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
 import AdminLayout from "@/components/AdminLayout";
+import { PaginationControls } from "@/components/PaginationControls";
 import { SortableTh } from "@/components/SortableTh";
 import {
   adminApi,
@@ -175,11 +176,6 @@ export default function EmailLogsPage() {
       .finally(() => setLoadingDetail(false));
   };
 
-  const applyFilters = () => {
-    setPage(1);
-    load();
-  };
-
   const containerStyle: React.CSSProperties = {
     padding: "24px 32px",
     fontFamily: "DM Sans, sans-serif",
@@ -232,55 +228,51 @@ export default function EmailLogsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ ...inputStyle, width: 240 }}
-            onKeyDown={(e) => e.key === "Enter" && applyFilters()}
           />
           <input
             type="date"
             value={from}
-            onChange={(e) => setFrom(e.target.value)}
+            onChange={(e) => {
+              const nextFrom = e.target.value;
+              setFrom(nextFrom);
+              if (to && nextFrom && to < nextFrom) setTo(nextFrom);
+            }}
+            max={to || undefined}
             style={inputStyle}
           />
           <input
             type="date"
             value={to}
-            onChange={(e) => setTo(e.target.value)}
+            onChange={(e) => {
+              const nextTo = e.target.value;
+              setTo(nextTo);
+              if (from && nextTo && from > nextTo) setFrom(nextTo);
+            }}
+            min={from || undefined}
             style={inputStyle}
           />
-          <button
-            onClick={applyFilters}
-            style={{
-              padding: "6px 16px",
-              background: "#0f2342",
-              color: "#fff",
-              border: "none",
-              borderRadius: 6,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Filter
-          </button>
-          <button
-            onClick={() => {
-              setSuccess("");
-              setSearch("");
-              setFrom("");
-              setTo("");
-              setPage(1);
-            }}
-            style={{
-              padding: "6px 12px",
-              background: "#f1f5f9",
-              color: "#475569",
-              border: "1px solid #cbd5e1",
-              borderRadius: 6,
-              fontSize: 13,
-              cursor: "pointer",
-            }}
-          >
-            Clear
-          </button>
+          {(success || search || from || to) && (
+            <button
+              onClick={() => {
+                setSuccess("");
+                setSearch("");
+                setFrom("");
+                setTo("");
+                setPage(1);
+              }}
+              style={{
+                padding: "6px 12px",
+                background: "#f1f5f9",
+                color: "#475569",
+                border: "1px solid #cbd5e1",
+                borderRadius: 6,
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            >
+              Reset
+            </button>
+          )}
         </div>
 
         {/* Table */}
@@ -491,52 +483,28 @@ export default function EmailLogsPage() {
               </table>
             </div>
 
-            {/* Pagination */}
-            {result && result.totalPages > 1 && (
-              <div
-                style={{
-                  display: "flex",
+            {result && (
+              <PaginationControls
+                page={page}
+                totalPages={result.totalPages}
+                onPageChange={setPage}
+                summary={`${result.totalCount} records`}
+                containerStyle={{
+                  justifyContent: "center",
                   gap: 8,
                   marginTop: 16,
-                  alignItems: "center",
                 }}
-              >
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  style={{
-                    padding: "5px 12px",
-                    border: "1px solid #cbd5e1",
-                    borderRadius: 6,
-                    background: "#fff",
-                    cursor: page === 1 ? "not-allowed" : "pointer",
-                    color: "#374151",
-                  }}
-                >
-                  ‹ Prev
-                </button>
-                <span style={{ fontSize: 13, color: "#475569" }}>
-                  Page {page} of {result.totalPages} ({result.totalCount}{" "}
-                  records)
-                </span>
-                <button
-                  onClick={() =>
-                    setPage((p) => Math.min(result.totalPages, p + 1))
-                  }
-                  disabled={page === result.totalPages}
-                  style={{
-                    padding: "5px 12px",
-                    border: "1px solid #cbd5e1",
-                    borderRadius: 6,
-                    background: "#fff",
-                    cursor:
-                      page === result.totalPages ? "not-allowed" : "pointer",
-                    color: "#374151",
-                  }}
-                >
-                  Next ›
-                </button>
-              </div>
+                controlsStyle={{ justifyContent: "center" }}
+                summaryStyle={{ width: "100%", textAlign: "center" }}
+                buttonStyle={{
+                  padding: "5px 12px",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 6,
+                  background: "#fff",
+                  color: "#374151",
+                }}
+                inputStyle={{ width: 64, padding: "5px 8px", borderColor: "#cbd5e1" }}
+              />
             )}
           </>
         )}

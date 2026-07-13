@@ -2,7 +2,8 @@
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AdminLayout from "@/components/AdminLayout";
-import { StatusBadge } from "@/components/StatusBadge";
+import { PaginationControls } from "@/components/PaginationControls";
+import { EditableStatusBadge } from "@/components/StatusBadge";
 import { SortableTh } from "@/components/SortableTh";
 import {
   adminApi,
@@ -14,6 +15,7 @@ import { downloadCsv } from "@/lib/exportCsv";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 
 const STATUSES = ["", "InProgress", "UnderReview", "Active", "Inactive"];
+const STATUS_OPTIONS = ["InProgress", "UnderReview", "Active", "Inactive"];
 const STATUS_LABELS: Record<string, string> = {
   "": "All Statuses",
   NeverApplied: "Never Applied",
@@ -81,6 +83,9 @@ function UsersContent() {
     setPage(1);
   };
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<number | null>(null);
+  const [statusErrorId, setStatusErrorId] = useState<number | null>(null);
+  const [statusError, setStatusError] = useState("");
   const [viewMode, setViewMode] = useState<"investors" | "admins">("investors");
   const [exporting, setExporting] = useState(false);
 
@@ -226,10 +231,28 @@ function UsersContent() {
     setSelected(new Set());
   };
 
-  const onSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(1);
-    load();
+  const updateRowStatus = async (u: UserListItem, nextStatus: string) => {
+    if (nextStatus === u.status) return;
+    setStatusUpdatingId(u.id);
+    setStatusErrorId(null);
+    setStatusError("");
+    const r = await adminApi.updateUserStatus(u.id, nextStatus);
+    if (r.success) {
+      setResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              items: prev.items.map((item) =>
+                item.id === u.id ? { ...item, status: nextStatus } : item,
+              ),
+            }
+          : prev,
+      );
+    } else {
+      setStatusErrorId(u.id);
+      setStatusError(r.message || "Failed to update status.");
+    }
+    setStatusUpdatingId(null);
   };
 
   const toggleTestUser = async (u: UserListItem) => {
@@ -355,8 +378,7 @@ function UsersContent() {
         </div>
 
         {/* Filters */}
-        <form
-          onSubmit={onSearch}
+        <div
           style={{
             display: "flex",
             gap: 12,
@@ -382,9 +404,12 @@ function UsersContent() {
             type="date"
             value={from}
             onChange={(e) => {
-              setFrom(e.target.value);
+              const nextFrom = e.target.value;
+              setFrom(nextFrom);
+              if (to && nextFrom && to < nextFrom) setTo(nextFrom);
               setPage(1);
             }}
+            max={to || undefined}
             style={{
               flex: "1 1 140px",
               padding: "10px 14px",
@@ -398,9 +423,12 @@ function UsersContent() {
             type="date"
             value={to}
             onChange={(e) => {
-              setTo(e.target.value);
+              const nextTo = e.target.value;
+              setTo(nextTo);
+              if (from && nextTo && from > nextTo) setFrom(nextTo);
               setPage(1);
             }}
+            min={from || undefined}
             style={{
               flex: "1 1 140px",
               padding: "10px 14px",
@@ -430,9 +458,30 @@ function UsersContent() {
               </option>
             ))}
           </select>
-          <button type="submit" className="btn-primary">
-            Search
-          </button>
+          {(search || from || to || status) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("");
+                setFrom("");
+                setTo("");
+                setStatus("");
+                setPage(1);
+                setSelected(new Set());
+              }}
+              style={{
+                padding: "10px 14px",
+                border: "1.5px solid #e2e8f0",
+                borderRadius: 8,
+                fontSize: 14,
+                background: "white",
+                color: "#475569",
+                cursor: "pointer",
+              }}
+            >
+              Reset
+            </button>
+          )}
           <button
             type="button"
             onClick={exportToExcel}
@@ -451,7 +500,7 @@ function UsersContent() {
           >
             {exporting ? "Exporting…" : "↓ Export"}
           </button>
-        </form>
+        </div>
 
         {/* Action toolbar */}
         {viewMode === "investors" && (
@@ -679,7 +728,41 @@ function UsersContent() {
                           </td>
                           <td style={{ color: "#64748b" }}>{u.email}</td>
                           <td>
-                            <StatusBadge status={u.status} />
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "flex-start",
+                                gap: 6,
+                              }}
+                            >
+                              <EditableStatusBadge
+                                status={u.status}
+                                options={STATUS_OPTIONS}
+                                disabled={statusUpdatingId === u.id}
+                                onChange={(nextStatus) => {
+                                  if (statusErrorId === u.id) {
+                                    setStatusErrorId(null);
+                                    setStatusError("");
+                                  }
+                                  void updateRowStatus(u, nextStatus);
+                                }}
+                              />
+                              {statusUpdatingId === u.id && (
+                                <span
+                                  style={{ fontSize: 12, color: "#64748b" }}
+                                >
+                                  Saving...
+                                </span>
+                              )}
+                              {statusErrorId === u.id && (
+                                <span
+                                  style={{ fontSize: 12, color: "#b91c1c" }}
+                                >
+                                  {statusError}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           {viewMode === "investors" ? (
                             <>
@@ -724,11 +807,12 @@ function UsersContent() {
                             <div
                               style={{
                                 display: "flex",
-                                alignItems: "center",
+                                flexDirection: "column",
                                 gap: 8,
+                                alignItems: "flex-start",
                               }}
                             >
-                              {viewMode === "investors" && (
+                              {viewMode === "investors" && u.isTestUser && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -797,39 +881,18 @@ function UsersContent() {
                 </table>
               </div>
 
-              {/* Pagination */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
+              <PaginationControls
+                page={page}
+                totalPages={result.totalPages}
+                onPageChange={setPage}
+                summary={`${result.totalCount} users`}
+                containerStyle={{
                   padding: "16px 20px",
                   borderTop: "1px solid #f1f5f9",
                 }}
-              >
-                <span style={{ fontSize: 13, color: "#64748b" }}>
-                  {result.totalCount} users · Page {result.page} of{" "}
-                  {result.totalPages}
-                </span>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    className="btn-secondary"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    style={{ padding: "8px 16px", fontSize: 13 }}
-                  >
-                    ← Prev
-                  </button>
-                  <button
-                    className="btn-secondary"
-                    onClick={() => setPage((p) => p + 1)}
-                    disabled={page >= result.totalPages}
-                    style={{ padding: "8px 16px", fontSize: 13 }}
-                  >
-                    Next →
-                  </button>
-                </div>
-              </div>
+                buttonClassName="btn-secondary"
+                buttonStyle={{ padding: "8px 16px", fontSize: 13 }}
+              />
             </>
           ) : (
             <div style={{ padding: 32, color: "#ef4444" }}>

@@ -224,6 +224,7 @@ export default function InvestorStatementsPage() {
 
 function InvestorStatementsContent() {
   const searchParams = useSearchParams();
+  const openedFromInvestorLink = searchParams.has("userId");
   const [investors, setInvestors] = useState<UserListItem[]>([]);
   // Deep-link support (e.g. from the Executive Copilot's investor citations): reading the
   // URL directly into the initial state, same pattern already used by
@@ -418,12 +419,15 @@ function InvestorStatementsContent() {
             Investor Statements
           </h1>
           <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>
-            View and export Capital Account Statements for any investor.
+            {openedFromInvestorLink
+              ? "View and export the selected investor's Capital Account Statement."
+              : "View and export Capital Account Statements for any investor."}
           </p>
         </div>
 
         {/* Investor combobox */}
-        <div style={{ marginBottom: 28, maxWidth: 480, position: "relative" }}>
+        {!openedFromInvestorLink && (
+          <div style={{ marginBottom: 28, maxWidth: 480, position: "relative" }}>
           <label
             style={{
               display: "block",
@@ -618,7 +622,8 @@ function InvestorStatementsContent() {
                 No investors found for &ldquo;{inputValue}&rdquo;
               </div>
             )}
-        </div>
+          </div>
+        )}
 
         {/* Empty state */}
         {!selectedUserId && (
@@ -907,7 +912,11 @@ function InvestorStatementsContent() {
                   type="date"
                   value={fromDate}
                   max={toDate || undefined}
-                  onChange={(e) => setFromDate(e.target.value)}
+                  onChange={(e) => {
+                    const nextFrom = e.target.value;
+                    setFromDate(nextFrom);
+                    if (toDate && nextFrom && toDate < nextFrom) setToDate(nextFrom);
+                  }}
                   title="From date"
                   style={{
                     padding: "7px 10px",
@@ -923,7 +932,11 @@ function InvestorStatementsContent() {
                   type="date"
                   value={toDate}
                   min={fromDate || undefined}
-                  onChange={(e) => setToDate(e.target.value)}
+                  onChange={(e) => {
+                    const nextTo = e.target.value;
+                    setToDate(nextTo);
+                    if (fromDate && nextTo && fromDate > nextTo) setFromDate(nextTo);
+                  }}
                   title="To date"
                   style={{
                     padding: "7px 10px",
@@ -934,9 +947,10 @@ function InvestorStatementsContent() {
                     color: "var(--text-primary)",
                   }}
                 />
-                {(fromDate || toDate) && (
+                {(typeFilter || fromDate || toDate) && (
                   <button
                     onClick={() => {
+                      setTypeFilter("");
                       setFromDate("");
                       setToDate("");
                     }}
@@ -949,7 +963,7 @@ function InvestorStatementsContent() {
                       textDecoration: "underline",
                     }}
                   >
-                    Clear dates
+                    Reset
                   </button>
                 )}
                 <span style={{ fontSize: 12, color: "var(--muted)" }}>

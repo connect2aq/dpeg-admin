@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import AdminLayout from "@/components/AdminLayout";
+import { PaginationControls } from "@/components/PaginationControls";
 import { SortableTh } from "@/components/SortableTh";
 import {
   adminApi,
@@ -310,9 +311,12 @@ export default function DailyInterestPage() {
             type="date"
             value={from}
             onChange={(e) => {
-              setFrom(e.target.value);
+              const nextFrom = e.target.value;
+              setFrom(nextFrom);
+              if (to && nextFrom && to < nextFrom) setTo(nextFrom);
               setPage(1);
             }}
+            max={to || undefined}
             style={{
               padding: "9px 12px",
               border: "1.5px solid #e2e8f0",
@@ -324,9 +328,12 @@ export default function DailyInterestPage() {
             type="date"
             value={to}
             onChange={(e) => {
-              setTo(e.target.value);
+              const nextTo = e.target.value;
+              setTo(nextTo);
+              if (from && nextTo && from > nextTo) setFrom(nextTo);
               setPage(1);
             }}
+            min={from || undefined}
             style={{
               padding: "9px 12px",
               border: "1.5px solid #e2e8f0",
@@ -369,6 +376,29 @@ export default function DailyInterestPage() {
           >
             {exporting ? "Exporting…" : "↓ Export"}
           </button>
+          {(appId || from || to || included) && (
+            <button
+              onClick={() => {
+                setAppId("");
+                setFrom("");
+                setTo("");
+                setIncluded("");
+                setPage(1);
+                setSelectedIds(new Set());
+              }}
+              style={{
+                padding: "9px 14px",
+                border: "1.5px solid #e2e8f0",
+                borderRadius: 8,
+                fontSize: 13,
+                background: "white",
+                color: "#475569",
+                cursor: "pointer",
+              }}
+            >
+              Reset
+            </button>
+          )}
         </div>
 
         {/* Summary bar */}
@@ -872,54 +902,19 @@ export default function DailyInterestPage() {
               </table>
             </div>
 
-            {totalPages > 1 && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  gap: 8,
-                  marginTop: 20,
-                }}
-              >
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  style={{
-                    padding: "6px 14px",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: 6,
-                    fontSize: 13,
-                    cursor: page === 1 ? "not-allowed" : "pointer",
-                    opacity: page === 1 ? 0.5 : 1,
-                  }}
-                >
-                  ← Prev
-                </button>
-                <span
-                  style={{
-                    padding: "6px 12px",
-                    fontSize: 13,
-                    color: "#64748b",
-                  }}
-                >
-                  {page} / {totalPages}
-                </span>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  style={{
-                    padding: "6px 14px",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: 6,
-                    fontSize: 13,
-                    cursor: page === totalPages ? "not-allowed" : "pointer",
-                    opacity: page === totalPages ? 0.5 : 1,
-                  }}
-                >
-                  Next →
-                </button>
-              </div>
-            )}
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              containerStyle={{ justifyContent: "center", marginTop: 20 }}
+              buttonStyle={{
+                padding: "6px 14px",
+                border: "1px solid #e2e8f0",
+                borderRadius: 6,
+                fontSize: 13,
+              }}
+              inputStyle={{ width: 64, padding: "6px 8px" }}
+            />
             <p style={{ marginTop: 10, fontSize: 13, color: "#94a3b8" }}>
               {result?.totalCount ?? 0} total record
               {result?.totalCount !== 1 ? "s" : ""}

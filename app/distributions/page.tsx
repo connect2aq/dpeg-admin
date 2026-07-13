@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import AdminLayout from "@/components/AdminLayout";
+import { PaginationControls } from "@/components/PaginationControls";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SortableTh } from "@/components/SortableTh";
 import {
@@ -86,6 +87,7 @@ function DistributionsContent() {
     useState<PagedResult<DistributionListItem> | null>(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState(() => searchParams.get("status") ?? "");
+  const [search, setSearch] = useState("");
   const [month, setMonth] = useState("");
   const [year, setYear] = useState("");
   const [appIdFilter, setAppIdFilter] = useState("");
@@ -124,6 +126,9 @@ function DistributionsContent() {
   const [historyBulkMarkingPaid, setHistoryBulkMarkingPaid] = useState(false);
   const [historyBulkResult, setHistoryBulkResult] = useState<string | null>(
     null,
+  );
+  const [expandedBankRows, setExpandedBankRows] = useState<Set<string>>(
+    new Set(),
   );
 
   // Catch-up state
@@ -169,6 +174,7 @@ function DistributionsContent() {
       pageSize: 100000,
     };
     if (status) params.status = status;
+    if (search) params.search = search;
     if (month) params.month = month;
     if (year) params.year = year;
     const parsedAppId = parseInt(appIdFilter, 10);
@@ -221,6 +227,7 @@ function DistributionsContent() {
       sortDirection,
     };
     if (status) params.status = status;
+    if (search) params.search = search;
     if (month) params.month = month;
     if (year) params.year = year;
     const parsedAppId = parseInt(appIdFilter, 10);
@@ -232,7 +239,7 @@ function DistributionsContent() {
         if (r.success) setResult(r.data);
       })
       .finally(() => setLoading(false));
-  }, [page, status, month, year, appIdFilter, sortOn, sortDirection]);
+  }, [page, status, search, month, year, appIdFilter, sortOn, sortDirection]);
 
   useEffect(() => {
     load();
@@ -412,6 +419,85 @@ function DistributionsContent() {
     color: "#374151",
     borderBottom: "1px solid #f1f5f9",
     whiteSpace: "nowrap",
+  };
+
+  const toggleBankDetails = (key: string) => {
+    setExpandedBankRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const renderBankCell = (
+    key: string,
+    bankName?: string | null,
+    bankAccountNumber?: string | null,
+  ) => {
+    if (!bankName && !bankAccountNumber) {
+      return <span style={{ color: "#9ca3af" }}>—</span>;
+    }
+
+    const isExpanded = expandedBankRows.has(key);
+    const maskedAccount =
+      bankAccountNumber && bankAccountNumber.length >= 4
+        ? `••••${bankAccountNumber.slice(-4)}`
+        : bankAccountNumber;
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <button
+          type="button"
+          onClick={() => toggleBankDetails(key)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: 0,
+            border: "none",
+            background: "transparent",
+            color: "#0f2342",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            textAlign: "left",
+          }}
+        >
+          <div style={{ fontSize: 11, color: "#64748b", fontWeight: 500 }}>
+            <div>{bankName ?? "Bank"}</div>
+            <div>{maskedAccount ? `${maskedAccount}` : ""}</div>
+          </div>
+        </button>
+        {isExpanded && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 3,
+              padding: "8px 10px",
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              whiteSpace: "normal",
+            }}
+          >
+            {bankName && (
+              <div>
+                <span style={{ fontSize: 11, color: "#64748b" }}>Bank:</span>{" "}
+                {bankName}
+              </div>
+            )}
+            {bankAccountNumber && (
+              <div>
+                <span style={{ fontSize: 11, color: "#64748b" }}>Account:</span>{" "}
+                {bankAccountNumber}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -877,11 +963,10 @@ function DistributionsContent() {
                             : `$${r.recalculatedAmount.toFixed(2)}`}
                         </td>
                         <td style={colStyle}>
-                          {r.bankName && <div>{r.bankName}</div>}
-                          {r.bankAccountNumber && (
-                            <div style={{ fontSize: 12, color: "#6b7280" }}>
-                              {r.bankAccountNumber}
-                            </div>
+                          {renderBankCell(
+                            `run-${r.distributionLogId ?? r.applicationId}-${i}`,
+                            r.bankName,
+                            r.bankAccountNumber,
                           )}
                         </td>
                         <td style={colStyle}>
@@ -1085,6 +1170,23 @@ function DistributionsContent() {
               </option>
             ))}
           </select>
+          <input
+            type="text"
+            placeholder="Search investor name"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+              setSelectedHistoryIds(new Set());
+            }}
+            style={{
+              padding: "10px 14px",
+              border: "1.5px solid #e2e8f0",
+              borderRadius: 8,
+              fontSize: 14,
+              minWidth: 150,
+            }}
+          />
           <select
             value={month}
             onChange={(e) => {
@@ -1157,6 +1259,30 @@ function DistributionsContent() {
           >
             {exporting ? "Exporting…" : "↓ Export"}
           </button>
+          {(status || search || month || year || appIdFilter) && (
+            <button
+              onClick={() => {
+                setStatus("");
+                setSearch("");
+                setMonth("");
+                setYear("");
+                setAppIdFilter("");
+                setPage(1);
+                setSelectedHistoryIds(new Set());
+              }}
+              style={{
+                padding: "10px 14px",
+                border: "1.5px solid #e2e8f0",
+                borderRadius: 8,
+                fontSize: 14,
+                background: "white",
+                color: "#475569",
+                cursor: "pointer",
+              }}
+            >
+              Reset
+            </button>
+          )}
         </div>
 
         {/* Bulk action bar */}
@@ -1375,10 +1501,6 @@ function DistributionsContent() {
                       month: "short",
                       year: "numeric",
                     });
-                    const maskedAcct =
-                      d.bankAccountNumber && d.bankAccountNumber.length >= 4
-                        ? "••••" + d.bankAccountNumber.slice(-4)
-                        : d.bankAccountNumber;
                     const canMarkPaid = d.paymentStatus !== "Paid";
                     const canPushOdoo =
                       d.paymentStatus !== "Sent" && d.paymentStatus !== "Paid";
@@ -1465,11 +1587,10 @@ function DistributionsContent() {
                           <StatusBadge status={d.paymentStatus} />
                         </td>
                         <td style={colStyle}>
-                          {d.bankName && <div>{d.bankName}</div>}
-                          {maskedAcct && (
-                            <div style={{ fontSize: 12, color: "#6b7280" }}>
-                              {maskedAcct}
-                            </div>
+                          {renderBankCell(
+                            `history-${d.id}`,
+                            d.bankName,
+                            d.bankAccountNumber,
                           )}
                         </td>
                         <td style={{ ...colStyle, minWidth: 240 }}>
@@ -1665,55 +1786,19 @@ function DistributionsContent() {
               </table>
             </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  gap: 8,
-                  marginTop: 20,
-                }}
-              >
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  style={{
-                    padding: "6px 14px",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: 6,
-                    fontSize: 13,
-                    cursor: page === 1 ? "not-allowed" : "pointer",
-                    opacity: page === 1 ? 0.5 : 1,
-                  }}
-                >
-                  ← Prev
-                </button>
-                <span
-                  style={{
-                    padding: "6px 12px",
-                    fontSize: 13,
-                    color: "#64748b",
-                  }}
-                >
-                  {page} / {totalPages}
-                </span>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  style={{
-                    padding: "6px 14px",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: 6,
-                    fontSize: 13,
-                    cursor: page === totalPages ? "not-allowed" : "pointer",
-                    opacity: page === totalPages ? 0.5 : 1,
-                  }}
-                >
-                  Next →
-                </button>
-              </div>
-            )}
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              containerStyle={{ justifyContent: "center", marginTop: 20 }}
+              buttonStyle={{
+                padding: "6px 14px",
+                border: "1px solid #e2e8f0",
+                borderRadius: 6,
+                fontSize: 13,
+              }}
+              inputStyle={{ width: 64, padding: "6px 8px" }}
+            />
 
             <p style={{ marginTop: 12, fontSize: 13, color: "#94a3b8" }}>
               {result?.totalCount ?? 0} total distribution

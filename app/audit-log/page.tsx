@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import AdminLayout from "@/components/AdminLayout";
+import { PaginationControls } from "@/components/PaginationControls";
 import { adminApi, type AuditLogItem, type PagedResult } from "@/lib/api";
 import { SortableTh } from "@/components/SortableTh";
 
@@ -144,11 +145,6 @@ export default function AuditLogPage() {
     load();
   }, [load]);
 
-  const onSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(1);
-    load();
-  };
   const onReset = () => {
     setCategory("");
     setEventType("");
@@ -189,8 +185,7 @@ export default function AuditLogPage() {
         </p>
 
         {/* Filters */}
-        <form
-          onSubmit={onSearch}
+        <div
           style={{
             display: "flex",
             gap: 10,
@@ -357,7 +352,12 @@ export default function AuditLogPage() {
             <input
               type="datetime-local"
               value={from}
-              onChange={(e) => setFrom(e.target.value)}
+              onChange={(e) => {
+                const nextFrom = e.target.value;
+                setFrom(nextFrom);
+                if (to && nextFrom && to < nextFrom) setTo(nextFrom);
+              }}
+              max={to || undefined}
               style={{
                 padding: "8px 12px",
                 border: "1.5px solid #e2e8f0",
@@ -382,7 +382,12 @@ export default function AuditLogPage() {
             <input
               type="datetime-local"
               value={to}
-              onChange={(e) => setTo(e.target.value)}
+              onChange={(e) => {
+                const nextTo = e.target.value;
+                setTo(nextTo);
+                if (from && nextTo && from > nextTo) setFrom(nextTo);
+              }}
+              min={from || undefined}
               style={{
                 padding: "8px 12px",
                 border: "1.5px solid #e2e8f0",
@@ -426,9 +431,6 @@ export default function AuditLogPage() {
           </div>
 
           <div style={{ display: "flex", gap: 8, alignSelf: "flex-end" }}>
-            <button type="submit" className="btn-primary">
-              Filter
-            </button>
             <button
               type="button"
               onClick={onReset}
@@ -444,7 +446,7 @@ export default function AuditLogPage() {
               Reset
             </button>
           </div>
-        </form>
+        </div>
 
         {/* Table */}
         <div className="card" style={{ padding: 0, overflow: "hidden" }}>
@@ -655,70 +657,24 @@ export default function AuditLogPage() {
                 </table>
               </div>
 
-              {/* Pagination */}
-              {result.totalPages > 1 && (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "14px 20px",
-                    borderTop: "1px solid #f1f5f9",
-                  }}
-                >
-                  <span style={{ fontSize: 13, color: "#64748b" }}>
-                    Showing {(page - 1) * PAGE_SIZE + 1}–
-                    {Math.min(page * PAGE_SIZE, result.totalCount)} of{" "}
-                    {result.totalCount.toLocaleString()} events
-                  </span>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      style={{
-                        padding: "6px 14px",
-                        border: "1.5px solid #e2e8f0",
-                        borderRadius: 7,
-                        fontSize: 13,
-                        background: page === 1 ? "#f8fafc" : "white",
-                        cursor: page === 1 ? "default" : "pointer",
-                        color: page === 1 ? "#cbd5e1" : "#0e3416",
-                      }}
-                    >
-                      ← Prev
-                    </button>
-                    <span
-                      style={{
-                        padding: "6px 12px",
-                        fontSize: 13,
-                        color: "#475569",
-                      }}
-                    >
-                      Page {page} of {result.totalPages}
-                    </span>
-                    <button
-                      onClick={() =>
-                        setPage((p) => Math.min(result.totalPages, p + 1))
-                      }
-                      disabled={page === result.totalPages}
-                      style={{
-                        padding: "6px 14px",
-                        border: "1.5px solid #e2e8f0",
-                        borderRadius: 7,
-                        fontSize: 13,
-                        background:
-                          page === result.totalPages ? "#f8fafc" : "white",
-                        cursor:
-                          page === result.totalPages ? "default" : "pointer",
-                        color:
-                          page === result.totalPages ? "#cbd5e1" : "#0e3416",
-                      }}
-                    >
-                      Next →
-                    </button>
-                  </div>
-                </div>
-              )}
+              <PaginationControls
+                page={page}
+                totalPages={result.totalPages}
+                onPageChange={setPage}
+                summary={`Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, result.totalCount)} of ${result.totalCount.toLocaleString()} events`}
+                containerStyle={{
+                  padding: "14px 20px",
+                  borderTop: "1px solid #f1f5f9",
+                }}
+                buttonStyle={{
+                  padding: "6px 14px",
+                  border: "1.5px solid #e2e8f0",
+                  borderRadius: 7,
+                  fontSize: 13,
+                  background: "white",
+                  color: "#0e3416",
+                }}
+              />
             </>
           ) : (
             <div style={{ padding: 32, color: "#94a3b8" }}>
