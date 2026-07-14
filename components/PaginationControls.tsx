@@ -6,12 +6,16 @@ type PaginationControlsProps = {
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  pageSize?: number;
+  onPageSizeChange?: (pageSize: number) => void;
+  pageSizeOptions?: number[];
   summary?: ReactNode;
   containerStyle?: CSSProperties;
   controlsStyle?: CSSProperties;
   summaryStyle?: CSSProperties;
   buttonStyle?: CSSProperties;
   inputStyle?: CSSProperties;
+  selectStyle?: CSSProperties;
   buttonClassName?: string;
 };
 
@@ -29,26 +33,41 @@ const baseInputStyle: CSSProperties = {
   textAlign: "center",
 };
 
+const baseSelectStyle: CSSProperties = {
+  padding: "6px 10px",
+  border: "1px solid #e2e8f0",
+  borderRadius: 6,
+  fontSize: 13,
+  background: "#fff",
+  color: "#0f172a",
+};
+
 export function PaginationControls({
   page,
   totalPages,
   onPageChange,
+  pageSize,
+  onPageSizeChange,
+  pageSizeOptions,
   summary,
   containerStyle,
   controlsStyle,
   summaryStyle,
   buttonStyle,
   inputStyle,
+  selectStyle,
   buttonClassName,
 }: PaginationControlsProps) {
   const [pageInput, setPageInput] = useState(String(page));
+  const canChangePageSize =
+    typeof pageSize === "number" && typeof onPageSizeChange === "function";
 
   useEffect(() => {
     setPageInput(String(page));
   }, [page]);
 
   if (totalPages <= 1) {
-    if (!summary) return null;
+    if (!summary && !canChangePageSize) return null;
     return (
       <div
         style={{
@@ -60,15 +79,41 @@ export function PaginationControls({
           ...containerStyle,
         }}
       >
-        <span
-          style={{
-            fontSize: 13,
-            color: "#64748b",
-            ...summaryStyle,
-          }}
-        >
-          {summary}
-        </span>
+        {summary && (
+          <span
+            style={{
+              fontSize: 13,
+              color: "#64748b",
+              ...summaryStyle,
+            }}
+          >
+            {summary}
+          </span>
+        )}
+        {canChangePageSize && (
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 13,
+              color: "#64748b",
+            }}
+          >
+            Rows
+            <select
+              value={pageSize}
+              onChange={(e) => onPageSizeChange(parseInt(e.target.value, 10))}
+              style={{ ...baseSelectStyle, ...selectStyle }}
+            >
+              {(pageSizeOptions ?? []).map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
     );
   }
@@ -115,6 +160,30 @@ export function PaginationControls({
           ...controlsStyle,
         }}
       >
+        {canChangePageSize && (
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 13,
+              color: "#64748b",
+            }}
+          >
+            Rows
+            <select
+              value={pageSize}
+              onChange={(e) => onPageSizeChange(parseInt(e.target.value, 10))}
+              style={{ ...baseSelectStyle, ...selectStyle }}
+            >
+              {(pageSizeOptions ?? []).map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <button
           type="button"
           className={buttonClassName}
