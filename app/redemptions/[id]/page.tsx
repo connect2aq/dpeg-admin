@@ -12,6 +12,7 @@ import {
 } from "@/lib/api";
 import { RedemptionEditModal } from "@/components/RedemptionEditModal";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { formatShortDate, formatShortDateTime } from "@/lib/dateFormat";
 
 const STATUSES = ["UnderReview", "Active", "Rejected"];
 
@@ -439,16 +440,7 @@ export default function RedemptionDetailPage() {
             <span style={{ fontSize: 16 }}>✓</span>
             <span style={{ fontSize: 13, fontWeight: 600, color: "#065f46" }}>
               Investor notified on{" "}
-              {new Date(asUtc(redemption.investorNotifiedAt)!).toLocaleString(
-                "en-US",
-                {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                },
-              )}
+              {formatShortDateTime(asUtc(redemption.investorNotifiedAt)!)}
             </span>
           </div>
         )}
@@ -534,15 +526,23 @@ export default function RedemptionDetailPage() {
             />
             <InfoRow
               label="Original Purchase Date"
-              value={redemption.originalPurchaseDate}
+              value={
+                redemption.originalPurchaseDate
+                  ? formatShortDate(redemption.originalPurchaseDate)
+                  : undefined
+              }
             />
-            <InfoRow label="Effective Date" value={redemption.effectiveDate} />
+            <InfoRow
+              label="Effective Date"
+              value={
+                redemption.effectiveDate
+                  ? formatShortDate(redemption.effectiveDate)
+                  : undefined
+              }
+            />
             <InfoRow
               label="Submitted"
-              value={new Date(redemption.createdOn).toLocaleDateString(
-                "en-US",
-                { month: "short", day: "numeric", year: "numeric" },
-              )}
+              value={formatShortDate(redemption.createdOn)}
             />
             {redemption.trancheApplicationId && (
               <div>
@@ -1016,18 +1016,12 @@ export default function RedemptionDetailPage() {
                     }}
                   >
                     Completed:{" "}
-                    {new Date(
+                    {formatShortDateTime(
                       asUtc(
                         dsStatus?.lastSignerDate ??
                           redemption.docuSignCompletedAt,
                       )!,
-                    ).toLocaleString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    )}
                   </span>
                 )}
                 {redemption.docuSignSentAt && (
@@ -1043,16 +1037,7 @@ export default function RedemptionDetailPage() {
                     }}
                   >
                     Sent:{" "}
-                    {new Date(asUtc(redemption.docuSignSentAt)!).toLocaleString(
-                      "en-US",
-                      {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      },
-                    )}
+                    {formatShortDateTime(asUtc(redemption.docuSignSentAt)!)}
                   </span>
                 )}
                 {dsStatus && (
@@ -1171,9 +1156,9 @@ export default function RedemptionDetailPage() {
                         }}
                       >
                         {signed && r.signedAt
-                          ? `Signed ${new Date(asUtc(r.signedAt)!).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}`
-                          : r.sentAt
-                            ? `Sent ${new Date(asUtc(r.sentAt)!).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}`
+                          ? `Signed ${formatShortDateTime(asUtc(r.signedAt)!)}`
+                            : r.sentAt
+                            ? `Sent ${formatShortDateTime(asUtc(r.sentAt)!)}`
                             : r.status.charAt(0).toUpperCase() +
                               r.status.slice(1)}
                       </div>

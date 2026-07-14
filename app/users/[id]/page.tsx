@@ -19,6 +19,7 @@ import {
   type CreateDistributionRequest,
   type PendingChangeItem,
 } from '@/lib/api';
+import { formatShortDate } from '@/lib/dateFormat';
 
 type InvestmentSortField = 'id' | 'ppmRefNO' | 'investorType' | 'numUnits' | 'totalAmount' | 'status' | 'submittedAt';
 const investmentSortValue = (a: ApplicationSummary, field: InvestmentSortField): string | number => {
@@ -772,7 +773,7 @@ export default function UserDetailPage() {
               ['Email Verified', user.emailVerified ? '✓ Yes' : '✗ No'],
               ['Onboarding Step', `${user.currentOnboardingStep} / 7`],
               ['Applications', String(user.applicationCount)],
-              ['Registered', new Date(user.createdOn).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })],
+              ['Registered', formatShortDate(user.createdOn)],
             ].map(([k, v]) => (
               <div key={k}>
                 <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94a3b8', marginBottom: 4 }}>{k}</div>
@@ -818,7 +819,7 @@ export default function UserDetailPage() {
                     <tr key={a.id}>
                       <td style={{ fontFamily: 'monospace', fontWeight: 600, color: '#64748b' }}>#{a.id}</td>
                       <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{a.ppmRefNO ?? '—'}</td>
-                      <td style={{ color: '#64748b', fontSize: 13 }}>{a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : '—'}</td>
+                      <td style={{ color: '#64748b', fontSize: 13 }}>{a.submittedAt ? formatShortDate(a.submittedAt) : '—'}</td>
                       <td>{a.investorType}</td>
                       <td>{a.numUnits ?? '—'}</td>
                       <td>{a.totalAmount ? `$${a.totalAmount.toLocaleString()}` : '—'}</td>
@@ -930,8 +931,8 @@ export default function UserDetailPage() {
                   }).map(d => (
                     <tr key={d.id}>
                       <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{d.ppmRefNO ?? '—'}</td>
-                      <td style={{ fontSize: 13 }}>{new Date(d.distributionMonth).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</td>
-                      <td style={{ fontSize: 13, color: '#64748b' }}>{d.paidAt ? new Date(d.paidAt).toLocaleDateString() : '—'}</td>
+                      <td style={{ fontSize: 13 }}>{formatShortDate(d.distributionMonth)}</td>
+                      <td style={{ fontSize: 13, color: '#64748b' }}>{d.paidAt ? formatShortDate(d.paidAt) : '—'}</td>
                       <td style={{ fontWeight: 600 }}>${d.totalNetAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td><StatusBadge status={d.paymentStatus} /></td>
                       <td>

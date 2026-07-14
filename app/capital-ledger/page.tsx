@@ -11,6 +11,8 @@ import {
 } from "@/lib/api";
 import { downloadCsv } from "@/lib/exportCsv";
 import { parseMultiFilterValue } from "@/lib/filterUtils";
+import { formatShortDate } from "@/lib/dateFormat";
+import { PAGE_SIZE_OPTIONS } from "@/lib/pagination";
 import Link from "next/link";
 
 const TYPE_COLORS: Record<string, { bg: string; text: string; badge: string }> =
@@ -43,7 +45,7 @@ const fmt = (n: number) =>
 const fmtFull = (n: number) =>
   `${n < 0 ? "−$" : "$"}${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 50;
 
 const TYPE_LABELS: Record<string, string> = {
   Contribution: "Contributions",
@@ -108,6 +110,7 @@ function CapitalLedgerContent() {
   const [appIdFilter, setAppIdFilter] = useState("");
   const [exporting, setExporting] = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -165,10 +168,10 @@ function CapitalLedgerContent() {
     return 0;
   });
 
-  const totalPages = Math.max(1, Math.ceil(visibleEntries.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(visibleEntries.length / pageSize));
   const pageEntries = sortedEntries.slice(
-    (page - 1) * PAGE_SIZE,
-    page * PAGE_SIZE,
+    (page - 1) * pageSize,
+    page * pageSize,
   );
 
   // Running Balance is only meaningful when rows are shown in true chronological order:
@@ -195,7 +198,7 @@ function CapitalLedgerContent() {
         .map((e) => [
           entryLabel(e),
           e.applicationId ? `#${e.applicationId}` : "",
-          new Date(e.date).toLocaleDateString(),
+          formatShortDate(e.date),
           e.entryType,
           e.investmentType === "ShortTerm"
             ? "Short Term"
@@ -735,11 +738,7 @@ function CapitalLedgerContent() {
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {new Date(e.date).toLocaleDateString("en-US", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })}
+                          {formatShortDate(e.date)}
                         </td>
                         <td style={{ padding: "11px 16px" }}>
                           {e.accountUserId ? (
@@ -893,8 +892,8 @@ function CapitalLedgerContent() {
                           fontSize: 13,
                         }}
                       >
-                        Showing {(page - 1) * PAGE_SIZE + 1}–
-                        {Math.min(page * PAGE_SIZE, visibleEntries.length)} of{" "}
+                        Showing {(page - 1) * pageSize + 1}–
+                        {Math.min(page * pageSize, visibleEntries.length)} of{" "}
                         {visibleEntries.length} entries
                       </td>
                       <td
@@ -954,6 +953,12 @@ function CapitalLedgerContent() {
             page={page}
             totalPages={totalPages}
             onPageChange={setPage}
+            pageSize={pageSize}
+            onPageSizeChange={(next) => {
+              setPage(1);
+              setPageSize(next);
+            }}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
             summary={`${visibleEntries.length} visible entries`}
             containerStyle={{
               padding: "16px 4px",

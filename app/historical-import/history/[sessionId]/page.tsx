@@ -11,6 +11,7 @@ import {
   type WelcomeEmailRowResult,
   type OdooSyncRowResult,
 } from '@/lib/api';
+import { formatShortDate, formatShortDateTime } from '@/lib/dateFormat';
 
 type SortField = 'rowNumber' | 'investorName' | 'userEmail' | 'success' | 'ppmRefNo';
 
@@ -156,7 +157,7 @@ export default function SessionDetailPage() {
     const transient = row.userId ? emailResults[row.userId] : undefined;
     if (!row.success) return <span style={{ color: '#94a3b8' }}>—</span>;
     if (row.welcomeEmailSentAt)
-      return <Badge ok={true} label={`Sent ${new Date(row.welcomeEmailSentAt).toLocaleDateString()}`} />;
+      return <Badge ok={true} label={`Sent ${formatShortDate(row.welcomeEmailSentAt)}`} />;
     if (transient?.sent)        return <Badge ok={true} label="Sent" />;
     if (transient?.alreadySent) return <Badge ok={true} label="Already Sent" />;
     if (transient?.errorMessage) return <Badge ok={false} label="Failed" />;
@@ -172,7 +173,7 @@ export default function SessionDetailPage() {
     if (!row.success) return <span style={{ color: '#94a3b8' }}>—</span>;
     const syncedAt = field === 'investor' ? row.odooInvestorSyncedAt : row.odooInvestmentSyncedAt;
     if (syncedAt)
-      return <Badge ok={true} label={`Synced ${new Date(syncedAt).toLocaleDateString()}`} />;
+      return <Badge ok={true} label={`Synced ${formatShortDate(syncedAt)}`} />;
     if (transient) {
       const ok = field === 'investor' ? transient.odooInvestorSynced : transient.odooInvestmentSynced;
       return <Badge ok={ok} label={ok ? 'Synced' : 'Failed'} />;
@@ -213,7 +214,7 @@ export default function SessionDetailPage() {
         {session && (
           <>
             <p style={s.sub}>
-              {session.fileName} &nbsp;·&nbsp; {new Date(session.importedAt).toLocaleString()} &nbsp;·&nbsp;
+              {session.fileName} &nbsp;·&nbsp; {formatShortDateTime(session.importedAt)} &nbsp;·&nbsp;
               <span style={{ color: '#166534' }}>{session.succeeded} succeeded</span>
               {session.failed > 0 && <span style={{ color: '#991b1b' }}>&nbsp;·&nbsp;{session.failed} failed</span>}
             </p>

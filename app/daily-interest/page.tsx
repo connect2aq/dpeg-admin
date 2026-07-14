@@ -14,9 +14,11 @@ import {
 import { downloadCsv } from "@/lib/exportCsv";
 import { hasMultiFilterValue } from "@/lib/filterUtils";
 import type { QueryParams } from "@/lib/apiContracts";
+import { formatShortDate } from "@/lib/dateFormat";
+import { PAGE_SIZE_OPTIONS } from "@/lib/pagination";
 import Link from "next/link";
 
-const PAGE_SIZE = 25;
+const DEFAULT_PAGE_SIZE = 25;
 
 function OdooStatus({ status }: { status?: string | null }) {
   if (!status) return <span style={{ color: "#9ca3af", fontSize: 12 }}>—</span>;
@@ -70,6 +72,7 @@ export default function DailyInterestPage() {
   const [to, setTo] = useState("");
   const [included, setIncluded] = useState<string[]>([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortOn, setSortOn] = useState("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const toggleSort = (key: string) => {
@@ -123,14 +126,14 @@ export default function DailyInterestPage() {
         d.applicationId,
         d.investorName,
         d.investorEmail ?? "",
-        new Date(d.date).toLocaleDateString(),
+        formatShortDate(d.date),
         d.units,
         d.capital,
         d.annualRate,
         d.netInterest,
         d.includedInMonthlyDistribution ? "Yes" : "No",
         d.odooStatus ?? "",
-        new Date(d.createdOn).toLocaleDateString(),
+        formatShortDate(d.createdOn),
       ]);
       downloadCsv([headers, ...rows], "daily-interest.csv");
     }
@@ -141,7 +144,7 @@ export default function DailyInterestPage() {
     setLoading(true);
     const params: QueryParams = {
       page,
-      pageSize: PAGE_SIZE,
+      pageSize,
       sortOn,
       sortDirection,
     };
@@ -156,7 +159,7 @@ export default function DailyInterestPage() {
         if (r.success) setResult(r.data);
       })
       .finally(() => setLoading(false));
-  }, [page, appId, from, to, included, sortOn, sortDirection]);
+  }, [page, pageSize, appId, from, to, included, sortOn, sortDirection]);
 
   useEffect(() => {
     load();
@@ -241,7 +244,7 @@ export default function DailyInterestPage() {
     }
   };
 
-  const totalPages = result ? Math.ceil(result.totalCount / PAGE_SIZE) : 1;
+  const totalPages = result ? Math.ceil(result.totalCount / pageSize) : 1;
   const totalInterest =
     result?.items.reduce((s, i) => s + i.netInterest, 0) ?? 0;
 
@@ -789,7 +792,7 @@ export default function DailyInterestPage() {
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {new Date(row.date).toLocaleDateString()}
+                          {formatShortDate(row.date)}
                         </td>
                         <td style={td}>
                           <div style={{ fontWeight: 500 }}>
@@ -905,6 +908,12 @@ export default function DailyInterestPage() {
               page={page}
               totalPages={totalPages}
               onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={(next) => {
+                setPage(1);
+                setPageSize(next);
+              }}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
               containerStyle={{ justifyContent: "center", marginTop: 20 }}
               buttonStyle={{
                 padding: "6px 14px",
@@ -958,14 +967,9 @@ export default function DailyInterestPage() {
 
             {resetModal.phase === "confirm" &&
               (() => {
-                const monthLabel = new Date(
-                  resetModal.year,
-                  resetModal.month - 1,
-                  1,
-                ).toLocaleDateString("en-US", {
-                  month: "long",
-                  year: "numeric",
-                });
+                const monthLabel = formatShortDate(
+                  new Date(resetModal.year, resetModal.month - 1, 1),
+                );
                 return (
                   <>
                     <div
@@ -1196,12 +1200,7 @@ export default function DailyInterestPage() {
                                 <div style={{ color: "#6b7280", marginTop: 2 }}>
                                   Month:{" "}
                                   <strong>
-                                    {new Date(
-                                      d.distributionMonth,
-                                    ).toLocaleDateString("en-US", {
-                                      month: "long",
-                                      year: "numeric",
-                                    })}
+                                    {formatShortDate(d.distributionMonth)}
                                   </strong>
                                   {" · "}Amount:{" "}
                                   <strong>

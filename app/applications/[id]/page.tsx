@@ -12,6 +12,7 @@ import {
   type ApplicationDetail,
   type DocuSignEnvelopeStatus,
 } from "@/lib/api";
+import { formatShortDate, formatShortDateTime } from "@/lib/dateFormat";
 
 const STATUSES = ["UnderReview", "Active", "Rejected"];
 
@@ -552,7 +553,7 @@ export default function ApplicationDetailPage() {
                       }}
                     >
                       {app.submittedAt
-                        ? new Date(app.submittedAt).toLocaleDateString()
+                        ? formatShortDate(app.submittedAt)
                         : "—"}
                     </span>
                     <button
@@ -673,7 +674,7 @@ export default function ApplicationDetailPage() {
                       }}
                     >
                       {app.effectiveDate
-                        ? new Date(app.effectiveDate).toLocaleDateString()
+                        ? formatShortDate(app.effectiveDate)
                         : "—"}
                     </span>
                     <button
@@ -792,7 +793,11 @@ export default function ApplicationDetailPage() {
               />
               <InfoRow
                 label="Date of Birth"
-                value={app.investorProfile.dateOfBirth}
+                value={
+                  app.investorProfile.dateOfBirth
+                    ? formatShortDate(app.investorProfile.dateOfBirth)
+                    : undefined
+                }
               />
               <InfoRow
                 label="Citizenship"
@@ -874,7 +879,11 @@ export default function ApplicationDetailPage() {
                   />
                   <InfoRow
                     label="Spouse DOB"
-                    value={app.investorProfile.spouseDateOfBirth}
+                    value={
+                      app.investorProfile.spouseDateOfBirth
+                        ? formatShortDate(app.investorProfile.spouseDateOfBirth)
+                        : undefined
+                    }
                   />
                   <InfoRow
                     label="Ownership Type"
@@ -1274,21 +1283,15 @@ export default function ApplicationDetailPage() {
                           color: "#0369a1",
                           border: "1px solid #bae6fd",
                         }}
-                      >
-                        Completed:{" "}
-                        {new Date(
-                          asUtc(
-                            dsStatus?.lastSignerDate ?? app.docuSignCompletedAt,
-                          )!,
-                        ).toLocaleString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    )}
+                    >
+                      Completed:{" "}
+                      {formatShortDateTime(
+                        asUtc(
+                          dsStatus?.lastSignerDate ?? app.docuSignCompletedAt,
+                        )!,
+                      )}
+                    </span>
+                  )}
                     {app.docuSignSentAt && (
                       <span
                         style={{
@@ -1302,16 +1305,7 @@ export default function ApplicationDetailPage() {
                         }}
                       >
                         Sent:{" "}
-                        {new Date(asUtc(app.docuSignSentAt)!).toLocaleString(
-                          "en-US",
-                          {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          },
-                        )}
+                        {formatShortDateTime(asUtc(app.docuSignSentAt)!)}
                       </span>
                     )}
                     {dsStatus && (
@@ -1432,9 +1426,9 @@ export default function ApplicationDetailPage() {
                             }}
                           >
                             {signed && r.signedAt
-                              ? `Signed ${new Date(asUtc(r.signedAt)!).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}`
-                              : r.sentAt
-                                ? `Sent ${new Date(asUtc(r.sentAt)!).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}`
+                              ? `Signed ${formatShortDateTime(asUtc(r.signedAt)!)}`
+                                : r.sentAt
+                                ? `Sent ${formatShortDateTime(asUtc(r.sentAt)!)}`
                                 : r.status.charAt(0).toUpperCase() +
                                   r.status.slice(1)}
                           </div>
