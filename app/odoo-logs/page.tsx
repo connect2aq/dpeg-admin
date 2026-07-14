@@ -1,10 +1,16 @@
 'use client';
 import React, { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/components/AdminLayout';
+import { MultiSelectFilter } from '@/components/MultiSelectFilter';
+import { PaginationControls } from '@/components/PaginationControls';
 import { SortableTh } from '@/components/SortableTh';
 import { adminApi, type OdooLogItem, type OdooLogDetail, type PagedResult } from '@/lib/api';
+import { encodeMultiFilterValue, hasMultiFilterValue } from '@/lib/filterUtils';
+import type { QueryParams } from '@/lib/apiContracts';
+import { formatShortDateTime } from '@/lib/dateFormat';
+import { PAGE_SIZE_OPTIONS } from '@/lib/pagination';
 
-const PAGE_SIZE = 25;
+const DEFAULT_PAGE_SIZE = 25;
 
 function Badge({ ok }: { ok: boolean }) {
   return (
@@ -56,12 +62,13 @@ function PayloadViewer({ label, json }: { label: string; json?: string | null })
 export default function OdooLogsPage() {
   const [result, setResult] = useState<PagedResult<OdooLogItem> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [direction, setDirection] = useState('');
-  const [isSuccess, setIsSuccess] = useState('');
+  const [direction, setDirection] = useState<string[]>([]);
+  const [isSuccess, setIsSuccess] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortOn, setSortOn] = useState('createdon');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const toggleSort = (key: string) => {
@@ -74,16 +81,17 @@ export default function OdooLogsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
-    if (direction) params.direction = direction;
-    if (isSuccess !== '') params.isSuccess = isSuccess;
+    const params: QueryParams = { page, pageSize, sortOn, sortDirection };
+    const encodedDirection = encodeMultiFilterValue(direction);
+    if (encodedDirection) params.direction = encodedDirection;
+    if (isSuccess.length === 1) params.isSuccess = isSuccess[0];
     if (search) params.search = search;
     if (from) params.from = from;
     if (to) params.to = to;
     adminApi.odooLogs(params)
       .then(r => { if (r.success) setResult(r.data); })
       .finally(() => setLoading(false));
-  }, [page, direction, isSuccess, search, from, to, sortOn, sortDirection]);
+  }, [page, pageSize, direction, isSuccess, search, from, to, sortOn, sortDirection]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -95,7 +103,7 @@ export default function OdooLogsPage() {
     if (r.success && r.data) setDetail({ id, data: r.data });
   };
 
-  const totalPages = result ? Math.ceil(result.totalCount / PAGE_SIZE) : 1;
+  const totalPages = result ? Math.ceil(result.totalCount / pageSize) : 1;
 
   const th: React.CSSProperties = {
     padding: '10px 14px', fontSize: 11, fontWeight: 700, color: '#6b7280',
@@ -118,22 +126,49 @@ export default function OdooLogsPage() {
           <input type="text" placeholder="Search endpoint / entity…" value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
             style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, minWidth: 220 }} />
-          <select value={direction} onChange={e => { setDirection(e.target.value); setPage(1); }}
-            style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, background: 'white' }}>
-            <option value="">All Directions</option>
-            <option value="Outbound">Outbound</option>
-            <option value="Inbound">Inbound</option>
-          </select>
-          <select value={isSuccess} onChange={e => { setIsSuccess(e.target.value); setPage(1); }}
-            style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, background: 'white' }}>
-            <option value="">All Results</option>
-            <option value="true">Success</option>
-            <option value="false">Failed</option>
-          </select>
-          <input type="date" value={from} onChange={e => { setFrom(e.target.value); setPage(1); }}
+          <MultiSelectFilter
+            allLabel="All Directions"
+            buttonLabel="Direction"
+            options={[
+              { value: 'Outbound', label: 'Outbound' },
+              { value: 'Inbound', label: 'Inbound' },
+            ]}
+            selectedValues={direction}
+            onChange={next => { setDirection(next); setPage(1); }}
+            minWidth={190}
+          />
+          <MultiSelectFilter
+            allLabel="All Results"
+            buttonLabel="Result"
+            options={[
+              { value: 'true', label: 'Success' },
+              { value: 'false', label: 'Failed' },
+            ]}
+            selectedValues={isSuccess}
+            onChange={next => { setIsSuccess(next); setPage(1); }}
+            minWidth={170}
+          />
+          <input type="date" value={from} onChange={e => { const nextFrom = e.target.value; setFrom(nextFrom); if (to && nextFrom && to < nextFrom) setTo(nextFrom); setPage(1); }}
+            max={to || undefined}
             style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13 }} />
-          <input type="date" value={to} onChange={e => { setTo(e.target.value); setPage(1); }}
+          <input type="date" value={to} onChange={e => { const nextTo = e.target.value; setTo(nextTo); if (from && nextTo && from > nextTo) setFrom(nextTo); setPage(1); }}
+            min={from || undefined}
             style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13 }} />
+          {(search || hasMultiFilterValue(direction) || hasMultiFilterValue(isSuccess) || from || to) && (
+            <button
+              onClick={() => {
+                setSearch('');
+                setDirection([]);
+                setIsSuccess([]);
+                setFrom('');
+                setTo('');
+                setPage(1);
+              }}
+              style={{ padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, background: 'white', color: '#475569', cursor: 'pointer' }}
+            >
+              Reset
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -163,7 +198,7 @@ export default function OdooLogsPage() {
                     <React.Fragment key={log.id}>
                       <tr style={{ background: log.isSuccess ? undefined : '#fff8f8' }}>
                         <td style={{ ...td, whiteSpace: 'nowrap', fontSize: 12, color: '#6b7280' }}>
-                          {new Date(log.createdOn).toLocaleString()}
+                          {formatShortDateTime(log.createdOn)}
                         </td>
                         <td style={td}><DirectionBadge dir={log.direction} /></td>
                         <td style={{ ...td, maxWidth: 220 }}>
@@ -216,15 +251,20 @@ export default function OdooLogsPage() {
               </table>
             </div>
 
-            {totalPages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 20 }}>
-                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                  style={{ padding: '6px 14px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.5 : 1 }}>← Prev</button>
-                <span style={{ padding: '6px 12px', fontSize: 13, color: '#64748b' }}>{page} / {totalPages}</span>
-                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                  style={{ padding: '6px 14px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.5 : 1 }}>Next →</button>
-              </div>
-            )}
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={(next) => {
+                setPage(1);
+                setPageSize(next);
+              }}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+              containerStyle={{ justifyContent: 'center', marginTop: 20 }}
+              buttonStyle={{ padding: '6px 14px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13 }}
+              inputStyle={{ width: 64, padding: '6px 8px' }}
+            />
             <p style={{ marginTop: 10, fontSize: 13, color: '#94a3b8' }}>{result?.totalCount ?? 0} total log{result?.totalCount !== 1 ? 's' : ''}</p>
           </>
         )}

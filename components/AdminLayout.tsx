@@ -18,13 +18,13 @@ const NAV = [
   { href: "/daily-interest", label: "Daily Interest", icon: "%" },
   { href: "/distributions", label: "Distributions", icon: "$" },
   { href: "/pending-approvals", label: "Pending Approvals", icon: "⏳" },
-  { href: "/odoo-logs", label: "Odoo Logs", icon: "⇄" },
+  // { href: "/odoo-logs", label: "Odoo Logs", icon: "⇄" },
   { href: "/email-logs", label: "Email Logs", icon: "✉" },
   { href: "/docusign", label: "DocuSign", icon: "✍" },
   { href: "/audit-log", label: "Audit Log", icon: "🔍" },
   { href: "/settings", label: "Settings", icon: "⚙" },
   { href: "/historical-import", label: "Historical Import", icon: "⬆" },
-  { href: "/smtp-test", label: "SMTP Test", icon: "✉" },
+  // { href: "/smtp-test", label: "SMTP Test", icon: "✉" },
 ];
 
 export default function AdminLayout({
@@ -38,16 +38,21 @@ export default function AdminLayout({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pendingBadge, setPendingBadge] = useState(0);
 
-  const adminRole = user?.adminRole ?? 'SuperAdmin';
+  const adminRole = user?.adminRole ?? "SuperAdmin";
 
   useEffect(() => {
     if (!user) return;
-    adminApi.getPendingCounts().then(r => {
-      if (!r.success || !r.data) return;
-      if (adminRole === 'Checker') setPendingBadge(r.data.pendingForChecker);
-      else if (adminRole === 'Approver') setPendingBadge(r.data.checkedForApprover);
-      else if (adminRole === 'SuperAdmin') setPendingBadge(r.data.pendingForChecker + r.data.checkedForApprover);
-    }).catch(() => {});
+    adminApi
+      .getPendingCounts()
+      .then((r) => {
+        if (!r.success || !r.data) return;
+        if (adminRole === "Checker") setPendingBadge(r.data.pendingForChecker);
+        else if (adminRole === "Approver")
+          setPendingBadge(r.data.checkedForApprover);
+        else if (adminRole === "SuperAdmin")
+          setPendingBadge(r.data.pendingForChecker + r.data.checkedForApprover);
+      })
+      .catch(() => {});
   }, [user, adminRole]);
 
   useEffect(() => {
@@ -71,13 +76,13 @@ export default function AdminLayout({
     <div className="flex h-full overflow-hidden">
       {/* Mobile overlay — closes sidebar on tap */}
       <div
-        className={`sidebar-overlay${mobileOpen ? ' visible' : ''}`}
+        className={`sidebar-overlay${mobileOpen ? " visible" : ""}`}
         onClick={() => setMobileOpen(false)}
       />
 
       {/* ── Sidebar ───────────────────────────────────────── */}
       <aside
-        className={`sidebar-nav flex-shrink-0 flex flex-col min-h-0${mobileOpen ? ' open' : ''}`}
+        className={`sidebar-nav flex-shrink-0 flex flex-col min-h-0${mobileOpen ? " open" : ""}`}
         style={{
           width: "var(--sidebar-width)",
           background: "var(--forest)",
@@ -114,46 +119,71 @@ export default function AdminLayout({
         </div>
 
         {/* Navigation */}
-        <nav style={{ flex: 1, padding: "14px 12px", overflowY: "auto", minHeight: 0 }}>
+        <nav
+          style={{
+            flex: 1,
+            padding: "14px 12px",
+            overflowY: "auto",
+            minHeight: 0,
+          }}
+        >
           {NAV.map(({ href, label, icon }) => {
             // Pending Approvals — visible to Checker, Approver, SuperAdmin only
-            if (href === '/pending-approvals' && adminRole === 'Maker') return null;
+            if (href === "/pending-approvals" && adminRole === "Maker")
+              return null;
             // Executive Copilot — not ready for every admin yet, restricted to one account
-            if (href === '/executive-copilot' && !isExecutiveCopilotAllowed(user?.email)) return null;
+            if (
+              href === "/executive-copilot" &&
+              !isExecutiveCopilotAllowed(user?.email)
+            )
+              return null;
             return (
               <Link
                 key={href}
                 href={href}
                 className={`sidebar-link ${pathname.startsWith(href) ? "active" : ""}`}
                 onClick={() => setMobileOpen(false)}
-                style={{ position: 'relative' }}
+                style={{ position: "relative" }}
               >
                 <span style={{ fontSize: 15, width: 20, flexShrink: 0 }}>
                   {icon}
                 </span>
                 {label}
-                {href === '/pending-approvals' && pendingBadge > 0 && (
-                  <span style={{
-                    marginLeft: 'auto', background: '#b8923a', color: 'white',
-                    borderRadius: 10, fontSize: 10, fontWeight: 700,
-                    padding: '1px 6px', minWidth: 18, textAlign: 'center'
-                  }}>{pendingBadge}</span>
+                {href === "/pending-approvals" && pendingBadge > 0 && (
+                  <span
+                    style={{
+                      marginLeft: "auto",
+                      background: "#b8923a",
+                      color: "white",
+                      borderRadius: 10,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "1px 6px",
+                      minWidth: 18,
+                      textAlign: "center",
+                    }}
+                  >
+                    {pendingBadge}
+                  </span>
                 )}
               </Link>
             );
           })}
-          {adminRole === 'SuperAdmin' && process.env.NEXT_PUBLIC_HANGFIRE_URL && (
-            <a
-              href={process.env.NEXT_PUBLIC_HANGFIRE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="sidebar-link"
-              onClick={() => setMobileOpen(false)}
-            >
-              <span style={{ fontSize: 15, width: 20, flexShrink: 0 }}>⚙</span>
-              Job Monitor
-            </a>
-          )}
+          {adminRole === "SuperAdmin" &&
+            process.env.NEXT_PUBLIC_HANGFIRE_URL && (
+              <a
+                href={process.env.NEXT_PUBLIC_HANGFIRE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="sidebar-link"
+                onClick={() => setMobileOpen(false)}
+              >
+                <span style={{ fontSize: 15, width: 20, flexShrink: 0 }}>
+                  ⚙
+                </span>
+                Job Monitor
+              </a>
+            )}
         </nav>
 
         {/* User footer */}
@@ -190,7 +220,15 @@ export default function AdminLayout({
             >
               {user.firstName} {user.lastName}
             </div>
-            <div style={{ fontSize: 10.5, color: '#b8923a', fontWeight: 600, marginBottom: 8, letterSpacing: '0.04em' }}>
+            <div
+              style={{
+                fontSize: 10.5,
+                color: "#b8923a",
+                fontWeight: 600,
+                marginBottom: 8,
+                letterSpacing: "0.04em",
+              }}
+            >
               {adminRole} · My Account
             </div>
           </Link>
@@ -235,7 +273,11 @@ export default function AdminLayout({
           >
             ☰
           </button>
-          <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--forest)' }}>DPEG Admin</span>
+          <span
+            style={{ fontWeight: 700, fontSize: 15, color: "var(--forest)" }}
+          >
+            DPEG Admin
+          </span>
         </div>
         {children}
       </main>

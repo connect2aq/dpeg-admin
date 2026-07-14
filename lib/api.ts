@@ -14,6 +14,8 @@ import {
   bankDetailsPath,
   dailyBalancesPath,
   investorStatementPath,
+  buildQueryString,
+  type QueryParams,
 } from "./apiContracts";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL;
@@ -554,14 +556,14 @@ export const adminApi = {
   dashboard: (params?: { from?: string; to?: string }) =>
     api.get<ApiResponse<DashboardStats>>(dashboardPath(params)),
   dashboardTrends: () => api.get<ApiResponse<DashboardTrends>>(dashboardTrendsPath()),
-  users: (params: Record<string, string | number>) =>
+  users: (params: QueryParams) =>
     api.get<ApiResponse<PagedResult<UserListItem>>>(usersPath(params)),
   user: (id: number) => api.get<ApiResponse<UserDetail>>(`/users/${id}`),
   updateUserStatus: (id: number, status: string) =>
     api.put<ApiResponse<string>>(`/users/${id}/status`, { status }),
   setUserIsTest: (id: number, isTestUser: boolean) =>
     api.put<ApiResponse<string>>(`/users/${id}/is-test`, { isTestUser }),
-  applications: (params: Record<string, string | number>) =>
+  applications: (params: QueryParams) =>
     api.get<ApiResponse<PagedResult<ApplicationListItem>>>(applicationsPath(params)),
   application: (id: number) =>
     api.get<ApiResponse<ApplicationDetail>>(`/applications/${id}`),
@@ -628,7 +630,7 @@ export const adminApi = {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   },
-  redemptions: (params: Record<string, string | number>) =>
+  redemptions: (params: QueryParams) =>
     api.get<ApiResponse<PagedResult<RedemptionListItem>>>(redemptionsPath(params)),
   redemption: (id: number) =>
     api.get<ApiResponse<RedemptionDetail>>(redemptionPath(id)),
@@ -636,7 +638,7 @@ export const adminApi = {
     api.put<ApiResponse<string>>(`/redemptions/${id}/status`, { status, reviewNote, sendNotification }),
   sendRedemptionDocuSignEnvelope: (id: number) =>
     api.post<ApiResponse<string>>(`/redemptions/${id}/send-docusign`, {}),
-  auditLogs: (params: Record<string, string | number | boolean>) =>
+  auditLogs: (params: QueryParams) =>
     api.get<ApiResponse<PagedResult<AuditLogItem>>>(auditLogsPath(params)),
   getBankDetails: () =>
     api.get<ApiResponse<BankDetails>>(bankDetailsPath()),
@@ -652,27 +654,27 @@ export const adminApi = {
     api.post<ApiResponse<NotificationEmail>>('/notification-emails', { emailAddress, label }),
   deleteNotificationEmail: (id: number) =>
     api.delete<ApiResponse<string>>(`/notification-emails/${id}`),
-  distributions: (params: Record<string, string | number>) =>
+  distributions: (params: QueryParams) =>
     api.get<ApiResponse<PagedResult<DistributionListItem>>>(distributionsPath(params)),
   markDistributionPaid: (id: number, paidDate: string) =>
     api.post<ApiResponse<string>>(`/distributions/${id}/mark-paid`, { paidDate }),
-  statements: (params: Record<string, string | number>) => {
-    const q = new URLSearchParams(params as Record<string, string>).toString();
+  statements: (params: QueryParams) => {
+    const q = buildQueryString(params);
     return api.get<ApiResponse<PagedResult<StatementListItem>>>(`/statements?${q}`);
   },
   statementPdfUrl: (id: number) => `${BASE}/statements/${id}/pdf`,
-  odooLogs: (params: Record<string, string | number>) => {
-    const q = new URLSearchParams(params as Record<string, string>).toString();
+  odooLogs: (params: QueryParams) => {
+    const q = buildQueryString(params);
     return api.get<ApiResponse<PagedResult<OdooLogItem>>>(`/odoo-logs?${q}`);
   },
   odooLog: (id: number) => api.get<ApiResponse<OdooLogDetail>>(`/odoo-logs/${id}`),
-  emailLogs: (params: Record<string, string | number>) => {
-    const q = new URLSearchParams(params as Record<string, string>).toString();
+  emailLogs: (params: QueryParams) => {
+    const q = buildQueryString(params);
     return api.get<ApiResponse<PagedResult<EmailLogItem>>>(`/email-logs?${q}`);
   },
   emailLog: (id: number) => api.get<ApiResponse<EmailLogDetail>>(`/email-logs/${id}`),
-  dailyInterestLogs: (params: Record<string, string | number>) => {
-    const q = new URLSearchParams(params as Record<string, string>).toString();
+  dailyInterestLogs: (params: QueryParams) => {
+    const q = buildQueryString(params);
     return api.get<ApiResponse<PagedResult<DailyInterestItem>>>(`/daily-interest?${q}`);
   },
   pushDailyInterestToOdoo: (id: number) =>
@@ -752,7 +754,7 @@ export const adminApi = {
     api.get<ApiResponse<RedemptionListItem[]>>(`/users/${userId}/redemptions`),
 
   // ── Maker-Checker-Approver Workflow ────────────────────────────────────
-  getPendingChanges: (params: Record<string, string | number> = {}) =>
+  getPendingChanges: (params: QueryParams = {}) =>
     api.get<ApiResponse<PagedResult<PendingChangeItem>>>(pendingChangesPath(params)),
   getPendingCounts: () =>
     api.get<ApiResponse<PendingCounts>>(pendingCountsPath()),

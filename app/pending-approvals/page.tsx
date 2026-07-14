@@ -1,13 +1,19 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import AdminLayout from '@/components/AdminLayout';
+import { MultiSelectFilter } from '@/components/MultiSelectFilter';
+import { PaginationControls } from '@/components/PaginationControls';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { SortableTh } from '@/components/SortableTh';
 import { adminApi, type PendingChangeItem, type PendingChangeDetail, type PagedResult, type ApplicationDetail, type RedemptionDetail } from '@/lib/api';
+import { encodeMultiFilterValue, hasMultiFilterValue } from '@/lib/filterUtils';
+import type { QueryParams } from '@/lib/apiContracts';
+import { formatShortDate, formatShortDateTime } from '@/lib/dateFormat';
+import { PAGE_SIZE_OPTIONS } from '@/lib/pagination';
 
-const STATUSES = ['', 'Pending', 'Checked', 'Approved', 'Rejected', 'Cancelled'];
-const ENTITY_TYPES = ['', 'Investment', 'Redemption', 'Distribution', 'BulkUsers', 'BulkApplications', 'BulkRedemptions'];
-const PAGE_SIZE = 20;
+const STATUSES = ['Pending', 'Checked', 'Approved', 'Rejected', 'Cancelled'];
+const ENTITY_TYPES = ['Investment', 'Redemption', 'Distribution', 'BulkUsers', 'BulkApplications', 'BulkRedemptions'];
+const DEFAULT_PAGE_SIZE = 20;
 
 // ── Field definitions (payload keys are PascalCase — C# JsonSerializer default) ──
 
@@ -395,25 +401,25 @@ function DetailModal({ change, onClose, onAction, actingRole }: {
               <tr><td style={tdLabel}>Description</td><td style={tdVal}><strong>{change.description}</strong></td></tr>
               <tr><td style={tdLabel}>Operation</td><td style={tdVal}>{change.operationType} / {change.entityType}{change.entityId ? ` #${change.entityId}` : ''}</td></tr>
               <tr><td style={tdLabel}>Maker</td><td style={tdVal}>{change.makerName} <span style={{ color: '#94a3b8' }}>({change.makerEmail})</span></td></tr>
-              <tr><td style={tdLabel}>Submitted</td><td style={tdVal}>{new Date(change.createdOn).toLocaleString()}</td></tr>
+              <tr><td style={tdLabel}>Submitted</td><td style={tdVal}>{formatShortDateTime(change.createdOn)}</td></tr>
               {change.makerNote && <tr><td style={tdLabel}>Maker Note</td><td style={{ ...tdVal, fontStyle: 'italic' }}>{change.makerNote}</td></tr>}
               {change.checkerName && (
                 <tr><td style={tdLabel}>Checked By</td>
-                  <td style={tdVal}>{change.checkerName} @ {change.checkedAt ? new Date(change.checkedAt).toLocaleString() : '—'}
+                  <td style={tdVal}>{change.checkerName} @ {change.checkedAt ? formatShortDateTime(change.checkedAt) : '—'}
                     {change.checkerNote && <span style={{ display: 'block', fontStyle: 'italic', color: '#64748b', marginTop: 2 }}>{change.checkerNote}</span>}
                   </td>
                 </tr>
               )}
               {change.approverName && (
                 <tr><td style={tdLabel}>Approved By</td>
-                  <td style={tdVal}>{change.approverName} @ {change.approvedAt ? new Date(change.approvedAt).toLocaleString() : '—'}
+                  <td style={tdVal}>{change.approverName} @ {change.approvedAt ? formatShortDateTime(change.approvedAt) : '—'}
                     {change.approverNote && <span style={{ display: 'block', fontStyle: 'italic', color: '#64748b', marginTop: 2 }}>{change.approverNote}</span>}
                   </td>
                 </tr>
               )}
               {change.rejectedByName && (
                 <tr><td style={tdLabel}>Rejected By</td>
-                  <td style={tdVal}>{change.rejectedByName} @ {change.rejectedAt ? new Date(change.rejectedAt).toLocaleString() : '—'}
+                  <td style={tdVal}>{change.rejectedByName} @ {change.rejectedAt ? formatShortDateTime(change.rejectedAt) : '—'}
                     {change.rejectionReason && <span style={{ display: 'block', color: '#b91c1c', fontWeight: 600, marginTop: 2 }}>{change.rejectionReason}</span>}
                   </td>
                 </tr>
@@ -498,9 +504,10 @@ export default function PendingApprovalsPage() {
 
   const [result, setResult] = useState<PagedResult<PendingChangeItem> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState('');
-  const [entityType, setEntityType] = useState('');
+  const [status, setStatus] = useState<string[]>([]);
+  const [entityType, setEntityType] = useState<string[]>([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [detail, setDetail] = useState<PendingChangeDetail | null>(null);
   const [sortOn, setSortOn] = useState('createdOn');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -512,13 +519,15 @@ export default function PendingApprovalsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
-    if (status) params.status = status;
-    if (entityType) params.entityType = entityType;
+    const params: QueryParams = { page, pageSize, sortOn, sortDirection };
+    const encodedStatus = encodeMultiFilterValue(status);
+    if (encodedStatus) params.status = encodedStatus;
+    const encodedEntityType = encodeMultiFilterValue(entityType);
+    if (encodedEntityType) params.entityType = encodedEntityType;
     adminApi.getPendingChanges(params)
       .then(r => { if (r.success) setResult(r.data); })
       .finally(() => setLoading(false));
-  }, [page, status, entityType, sortOn, sortDirection]);
+  }, [page, pageSize, status, entityType, sortOn, sortDirection]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -537,17 +546,25 @@ export default function PendingApprovalsPage() {
 
         {/* Filters */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-          <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}
-            style={{ flex: '1 1 140px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
-            {STATUSES.map(s => <option key={s} value={s}>{s || 'All Statuses'}</option>)}
-          </select>
-          <select value={entityType} onChange={e => { setEntityType(e.target.value); setPage(1); }}
-            style={{ flex: '1 1 160px', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white' }}>
-            {ENTITY_TYPES.map(t => <option key={t} value={t}>{t || 'All Types'}</option>)}
-          </select>
-          {(status || entityType) && (
-            <button onClick={() => { setStatus(''); setEntityType(''); setPage(1); }}
-              style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white', cursor: 'pointer', color: '#64748b' }}>Clear</button>
+          <MultiSelectFilter
+            allLabel="All Statuses"
+            buttonLabel="Status"
+            options={STATUSES.map(s => ({ value: s, label: s }))}
+            selectedValues={status}
+            onChange={next => { setStatus(next); setPage(1); }}
+            minWidth={180}
+          />
+          <MultiSelectFilter
+            allLabel="All Types"
+            buttonLabel="Type"
+            options={ENTITY_TYPES.map(t => ({ value: t, label: t }))}
+            selectedValues={entityType}
+            onChange={next => { setEntityType(next); setPage(1); }}
+            minWidth={200}
+          />
+          {(hasMultiFilterValue(status) || hasMultiFilterValue(entityType)) && (
+            <button onClick={() => { setStatus([]); setEntityType([]); setPage(1); }}
+              style={{ padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: 'white', cursor: 'pointer', color: '#64748b' }}>Reset</button>
           )}
         </div>
 
@@ -576,7 +593,7 @@ export default function PendingApprovalsPage() {
                     ) : result.items.map(item => (
                       <tr key={item.id}>
                         <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#b8923a' }}>#{item.id}</td>
-                        <td style={{ fontSize: 12, color: '#64748b', whiteSpace: 'nowrap' }}>{new Date(item.createdOn).toLocaleDateString()}</td>
+                        <td style={{ fontSize: 12, color: '#64748b', whiteSpace: 'nowrap' }}>{formatShortDate(item.createdOn)}</td>
                         <td>
                           <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>{item.entityType}</div>
                           <div style={{ fontSize: 12, color: '#94a3b8' }}>{item.operationType}</div>
@@ -602,13 +619,21 @@ export default function PendingApprovalsPage() {
                 </table>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap', gap: 8 }}>
-                <span style={{ fontSize: 13, color: '#64748b' }}>{result.totalCount} changes · Page {result.page} of {result.totalPages}</span>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn-secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ padding: '8px 16px', fontSize: 13 }}>← Prev</button>
-                  <button className="btn-secondary" onClick={() => setPage(p => p + 1)} disabled={page >= result.totalPages} style={{ padding: '8px 16px', fontSize: 13 }}>Next →</button>
-                </div>
-              </div>
+              <PaginationControls
+                page={page}
+                totalPages={result.totalPages}
+                onPageChange={setPage}
+                pageSize={pageSize}
+                onPageSizeChange={(next) => {
+                  setPage(1);
+                  setPageSize(next);
+                }}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
+                summary={`${result.totalCount} changes`}
+                containerStyle={{ padding: '16px 20px', borderTop: '1px solid #f1f5f9' }}
+                buttonClassName="btn-secondary"
+                buttonStyle={{ padding: '8px 16px', fontSize: 13 }}
+              />
             </>
           ) : (
             <div style={{ padding: 32, color: '#ef4444' }}>Failed to load pending changes.</div>

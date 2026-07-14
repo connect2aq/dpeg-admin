@@ -4,6 +4,7 @@ import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { SortableTh } from '@/components/SortableTh';
 import { historicalImportApi, type ImportSessionListItem } from '@/lib/api';
+import { formatShortDateTime } from '@/lib/dateFormat';
 
 type SortField = 'id' | 'fileName' | 'importedAt' | 'totalRows' | 'succeeded' | 'failed';
 
@@ -91,7 +92,7 @@ export default function ImportHistoryPage() {
                   }).map(s2 => (
                     <tr key={s2.id}>
                       <td style={s.td}>{s2.id}</td>
-                      <td style={s.td}>{new Date(s2.importedAt).toLocaleString()}</td>
+                      <td style={s.td}>{formatShortDateTime(s2.importedAt)}</td>
                       <td style={s.td}>{s2.fileName}</td>
                       <td style={s.td}>{s2.totalRows}</td>
                       <td style={{ ...s.td, color: '#166534', fontWeight: 600 }}>{s2.succeeded}</td>
