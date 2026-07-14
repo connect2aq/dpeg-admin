@@ -7,8 +7,10 @@ import { SortableTh } from '@/components/SortableTh';
 import { adminApi, type OdooLogItem, type OdooLogDetail, type PagedResult } from '@/lib/api';
 import { encodeMultiFilterValue, hasMultiFilterValue } from '@/lib/filterUtils';
 import type { QueryParams } from '@/lib/apiContracts';
+import { formatShortDateTime } from '@/lib/dateFormat';
+import { PAGE_SIZE_OPTIONS } from '@/lib/pagination';
 
-const PAGE_SIZE = 25;
+const DEFAULT_PAGE_SIZE = 25;
 
 function Badge({ ok }: { ok: boolean }) {
   return (
@@ -66,6 +68,7 @@ export default function OdooLogsPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortOn, setSortOn] = useState('createdon');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const toggleSort = (key: string) => {
@@ -78,7 +81,7 @@ export default function OdooLogsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: QueryParams = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
+    const params: QueryParams = { page, pageSize, sortOn, sortDirection };
     const encodedDirection = encodeMultiFilterValue(direction);
     if (encodedDirection) params.direction = encodedDirection;
     if (isSuccess.length === 1) params.isSuccess = isSuccess[0];
@@ -88,7 +91,7 @@ export default function OdooLogsPage() {
     adminApi.odooLogs(params)
       .then(r => { if (r.success) setResult(r.data); })
       .finally(() => setLoading(false));
-  }, [page, direction, isSuccess, search, from, to, sortOn, sortDirection]);
+  }, [page, pageSize, direction, isSuccess, search, from, to, sortOn, sortDirection]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -100,7 +103,7 @@ export default function OdooLogsPage() {
     if (r.success && r.data) setDetail({ id, data: r.data });
   };
 
-  const totalPages = result ? Math.ceil(result.totalCount / PAGE_SIZE) : 1;
+  const totalPages = result ? Math.ceil(result.totalCount / pageSize) : 1;
 
   const th: React.CSSProperties = {
     padding: '10px 14px', fontSize: 11, fontWeight: 700, color: '#6b7280',
@@ -195,7 +198,7 @@ export default function OdooLogsPage() {
                     <React.Fragment key={log.id}>
                       <tr style={{ background: log.isSuccess ? undefined : '#fff8f8' }}>
                         <td style={{ ...td, whiteSpace: 'nowrap', fontSize: 12, color: '#6b7280' }}>
-                          {new Date(log.createdOn).toLocaleString()}
+                          {formatShortDateTime(log.createdOn)}
                         </td>
                         <td style={td}><DirectionBadge dir={log.direction} /></td>
                         <td style={{ ...td, maxWidth: 220 }}>
@@ -252,6 +255,12 @@ export default function OdooLogsPage() {
               page={page}
               totalPages={totalPages}
               onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={(next) => {
+                setPage(1);
+                setPageSize(next);
+              }}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
               containerStyle={{ justifyContent: 'center', marginTop: 20 }}
               buttonStyle={{ padding: '6px 14px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13 }}
               inputStyle={{ width: 64, padding: '6px 8px' }}

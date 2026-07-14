@@ -16,6 +16,8 @@ import {
   type PendingChangeItem,
 } from "@/lib/api";
 import { downloadCsv } from "@/lib/exportCsv";
+import { formatShortDate } from "@/lib/dateFormat";
+import { PAGE_SIZE_OPTIONS } from "@/lib/pagination";
 import {
   encodeMultiFilterValue,
   hasMultiFilterValue,
@@ -31,7 +33,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 const TYPES = ["Individual", "Entity", "IRA", "Trust"];
 const STATUS_OPTIONS = ["UnderReview", "Active", "Rejected"];
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
 
 export default function ApplicationsPage() {
   return (
@@ -71,6 +73,7 @@ function ApplicationsContent() {
     parseMultiFilterValue(searchParams.get("investorType")),
   );
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortOn, setSortOn] = useState("createdOn");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const toggleSort = (key: string) => {
@@ -152,8 +155,8 @@ function ApplicationsContent() {
         a.numUnits ?? "",
         a.totalAmount ?? "",
         a.status,
-        a.effectiveDate ? new Date(a.effectiveDate).toLocaleDateString() : "",
-        a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : "",
+        a.effectiveDate ? formatShortDate(a.effectiveDate) : "",
+        a.submittedAt ? formatShortDate(a.submittedAt) : "",
       ]);
       downloadCsv([headers, ...rows], "applications.csv");
     }
@@ -164,7 +167,7 @@ function ApplicationsContent() {
     setLoading(true);
     const params: QueryParams = {
       page,
-      pageSize: PAGE_SIZE,
+      pageSize,
       sortOn,
       sortDirection,
     };
@@ -203,7 +206,7 @@ function ApplicationsContent() {
         }
       })
       .finally(() => setLoading(false));
-  }, [page, search, appIdInput, status, investorType, sortOn, sortDirection]);
+  }, [page, pageSize, search, appIdInput, status, investorType, sortOn, sortDirection]);
 
   useEffect(() => {
     load();
@@ -625,12 +628,12 @@ function ApplicationsContent() {
                           </td>
                           <td style={{ color: "#64748b", fontSize: 13 }}>
                             {a.effectiveDate
-                              ? new Date(a.effectiveDate).toLocaleDateString()
+                              ? formatShortDate(a.effectiveDate)
                               : "—"}
                           </td>
                           {/* <td style={{ color: "#64748b", fontSize: 13 }}>
                             {a.submittedAt
-                              ? new Date(a.submittedAt).toLocaleDateString()
+                              ? formatShortDate(a.submittedAt)
                               : "—"}
                           </td> */}
                           <td>
@@ -771,6 +774,12 @@ function ApplicationsContent() {
                 page={page}
                 totalPages={result.totalPages}
                 onPageChange={setPage}
+                pageSize={pageSize}
+                onPageSizeChange={(next) => {
+                  setPage(1);
+                  setPageSize(next);
+                }}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
                 summary={
                   <>
                     {result.totalCount} applications

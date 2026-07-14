@@ -6,6 +6,7 @@ import Link from "next/link";
 import AdminLayout from "@/components/AdminLayout";
 import { MultiSelectFilter } from "@/components/MultiSelectFilter";
 import { SortableTh } from "@/components/SortableTh";
+import { formatShortDate } from "@/lib/dateFormat";
 import {
   adminApi,
   type UserListItem,
@@ -94,7 +95,7 @@ function exportCSV(data: InvestorCapitalAccount, investorName: string) {
     "Capital Balance",
   ];
   const rows = data.entries.map((e) => [
-    new Date(e.date).toLocaleDateString("en-US"),
+    formatShortDate(e.date),
     e.entryType,
     fmtInvType(e.investmentType),
     e.investorName ?? "",
@@ -127,7 +128,7 @@ function exportPDF(
     .map(
       (e) => `
     <tr>
-      <td>${new Date(e.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</td>
+      <td>${formatShortDate(e.date)}</td>
       <td>${e.entryType}</td>
       <td>${fmtInvType(e.investmentType) || "—"}</td>
       <td>${e.investorName || "—"}</td>
@@ -173,7 +174,7 @@ function exportPDF(
       <p>DPEG Real Estate Fund &nbsp;·&nbsp; <strong>${investorName}</strong></p>
     </div>
     <div class="meta">
-      <div>Generated: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>
+      <div>Generated: ${formatShortDate(new Date())}</div>
       <div style="margin-top:4px;color:#888;">For internal use</div>
     </div>
   </div>
@@ -1094,11 +1095,7 @@ function InvestorStatementsContent() {
                               whiteSpace: "nowrap",
                             }}
                           >
-                            {new Date(e.date).toLocaleDateString("en-US", {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                            })}
+                            {formatShortDate(e.date)}
                           </td>
                           <td
                             style={{

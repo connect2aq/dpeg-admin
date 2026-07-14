@@ -5,6 +5,7 @@ import AdminLayout from "@/components/AdminLayout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SortableTh } from "@/components/SortableTh";
 import { adminApi, type DashboardStats, type DashboardTrends, type ApplicationListItem } from "@/lib/api";
+import { formatShortDate } from "@/lib/dateFormat";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -164,7 +165,7 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
   return (
     <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "20px 24px", marginBottom: 4 }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: "#0e3416", marginBottom: 16 }}>
-        Balance Flow (Since Inception){stats.balanceAsAtDate && ` — Balance as at ${new Date(stats.balanceAsAtDate).toLocaleDateString()}`}
+        Balance Flow (Since Inception){stats.balanceAsAtDate && ` — Balance as at ${formatShortDate(stats.balanceAsAtDate)}`}
       </div>
       {/* Row 1–3: 4 columns; Row 4: Bank Account Balance full width */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, alignItems: "stretch" }}>
@@ -494,10 +495,10 @@ export default function DashboardPage() {
                           {a.ppmRefNO && <div style={{ fontSize: 11, color: "#94a3b8" }}>PPM {a.ppmRefNO}</div>}
                         </td>
                         <td style={{ color: "#64748b", fontSize: 13 }}>
-                          {a.effectiveDate ? new Date(a.effectiveDate).toLocaleDateString() : "—"}
+                          {a.effectiveDate ? formatShortDate(a.effectiveDate) : "—"}
                         </td>
                         <td style={{ color: "#64748b", fontSize: 13 }}>
-                          {a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : "—"}
+                          {a.submittedAt ? formatShortDate(a.submittedAt) : "—"}
                         </td>
                         <td>
                           {a.userId ? (

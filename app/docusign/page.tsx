@@ -3,17 +3,18 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AdminLayout from '@/components/AdminLayout';
 import { adminApi, type DocuSignEnvelopeItem, type DocuSignSigner } from '@/lib/api';
+import { formatShortDate, formatShortDateTime } from '@/lib/dateFormat';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmt(iso?: string): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return formatShortDate(iso);
 }
 
 function fmtTime(iso?: string): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return formatShortDateTime(iso);
 }
 
 function parseSigners(json?: string): DocuSignSigner[] {

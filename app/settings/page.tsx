@@ -8,6 +8,7 @@ import {
   type NotificationEmail,
   type DailyBalanceLog,
 } from "@/lib/api";
+import { formatShortDate } from "@/lib/dateFormat";
 
 type BalanceSortField =
   | "date"
@@ -594,7 +595,7 @@ export default function SettingsPage() {
                                 borderBottom: "1px solid #f1f5f9",
                               }}
                             >
-                              {new Date(b.date).toLocaleDateString()}
+                              {formatShortDate(b.date)}
                             </td>
                             <td
                               style={{

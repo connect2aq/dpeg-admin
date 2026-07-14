@@ -8,10 +8,12 @@ import { SortableTh } from '@/components/SortableTh';
 import { adminApi, type PendingChangeItem, type PendingChangeDetail, type PagedResult, type ApplicationDetail, type RedemptionDetail } from '@/lib/api';
 import { encodeMultiFilterValue, hasMultiFilterValue } from '@/lib/filterUtils';
 import type { QueryParams } from '@/lib/apiContracts';
+import { formatShortDate, formatShortDateTime } from '@/lib/dateFormat';
+import { PAGE_SIZE_OPTIONS } from '@/lib/pagination';
 
 const STATUSES = ['Pending', 'Checked', 'Approved', 'Rejected', 'Cancelled'];
 const ENTITY_TYPES = ['Investment', 'Redemption', 'Distribution', 'BulkUsers', 'BulkApplications', 'BulkRedemptions'];
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
 
 // ── Field definitions (payload keys are PascalCase — C# JsonSerializer default) ──
 
@@ -399,25 +401,25 @@ function DetailModal({ change, onClose, onAction, actingRole }: {
               <tr><td style={tdLabel}>Description</td><td style={tdVal}><strong>{change.description}</strong></td></tr>
               <tr><td style={tdLabel}>Operation</td><td style={tdVal}>{change.operationType} / {change.entityType}{change.entityId ? ` #${change.entityId}` : ''}</td></tr>
               <tr><td style={tdLabel}>Maker</td><td style={tdVal}>{change.makerName} <span style={{ color: '#94a3b8' }}>({change.makerEmail})</span></td></tr>
-              <tr><td style={tdLabel}>Submitted</td><td style={tdVal}>{new Date(change.createdOn).toLocaleString()}</td></tr>
+              <tr><td style={tdLabel}>Submitted</td><td style={tdVal}>{formatShortDateTime(change.createdOn)}</td></tr>
               {change.makerNote && <tr><td style={tdLabel}>Maker Note</td><td style={{ ...tdVal, fontStyle: 'italic' }}>{change.makerNote}</td></tr>}
               {change.checkerName && (
                 <tr><td style={tdLabel}>Checked By</td>
-                  <td style={tdVal}>{change.checkerName} @ {change.checkedAt ? new Date(change.checkedAt).toLocaleString() : '—'}
+                  <td style={tdVal}>{change.checkerName} @ {change.checkedAt ? formatShortDateTime(change.checkedAt) : '—'}
                     {change.checkerNote && <span style={{ display: 'block', fontStyle: 'italic', color: '#64748b', marginTop: 2 }}>{change.checkerNote}</span>}
                   </td>
                 </tr>
               )}
               {change.approverName && (
                 <tr><td style={tdLabel}>Approved By</td>
-                  <td style={tdVal}>{change.approverName} @ {change.approvedAt ? new Date(change.approvedAt).toLocaleString() : '—'}
+                  <td style={tdVal}>{change.approverName} @ {change.approvedAt ? formatShortDateTime(change.approvedAt) : '—'}
                     {change.approverNote && <span style={{ display: 'block', fontStyle: 'italic', color: '#64748b', marginTop: 2 }}>{change.approverNote}</span>}
                   </td>
                 </tr>
               )}
               {change.rejectedByName && (
                 <tr><td style={tdLabel}>Rejected By</td>
-                  <td style={tdVal}>{change.rejectedByName} @ {change.rejectedAt ? new Date(change.rejectedAt).toLocaleString() : '—'}
+                  <td style={tdVal}>{change.rejectedByName} @ {change.rejectedAt ? formatShortDateTime(change.rejectedAt) : '—'}
                     {change.rejectionReason && <span style={{ display: 'block', color: '#b91c1c', fontWeight: 600, marginTop: 2 }}>{change.rejectionReason}</span>}
                   </td>
                 </tr>
@@ -505,6 +507,7 @@ export default function PendingApprovalsPage() {
   const [status, setStatus] = useState<string[]>([]);
   const [entityType, setEntityType] = useState<string[]>([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [detail, setDetail] = useState<PendingChangeDetail | null>(null);
   const [sortOn, setSortOn] = useState('createdOn');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -516,7 +519,7 @@ export default function PendingApprovalsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params: QueryParams = { page, pageSize: PAGE_SIZE, sortOn, sortDirection };
+    const params: QueryParams = { page, pageSize, sortOn, sortDirection };
     const encodedStatus = encodeMultiFilterValue(status);
     if (encodedStatus) params.status = encodedStatus;
     const encodedEntityType = encodeMultiFilterValue(entityType);
@@ -524,7 +527,7 @@ export default function PendingApprovalsPage() {
     adminApi.getPendingChanges(params)
       .then(r => { if (r.success) setResult(r.data); })
       .finally(() => setLoading(false));
-  }, [page, status, entityType, sortOn, sortDirection]);
+  }, [page, pageSize, status, entityType, sortOn, sortDirection]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -590,7 +593,7 @@ export default function PendingApprovalsPage() {
                     ) : result.items.map(item => (
                       <tr key={item.id}>
                         <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#b8923a' }}>#{item.id}</td>
-                        <td style={{ fontSize: 12, color: '#64748b', whiteSpace: 'nowrap' }}>{new Date(item.createdOn).toLocaleDateString()}</td>
+                        <td style={{ fontSize: 12, color: '#64748b', whiteSpace: 'nowrap' }}>{formatShortDate(item.createdOn)}</td>
                         <td>
                           <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>{item.entityType}</div>
                           <div style={{ fontSize: 12, color: '#94a3b8' }}>{item.operationType}</div>
@@ -620,6 +623,12 @@ export default function PendingApprovalsPage() {
                 page={page}
                 totalPages={result.totalPages}
                 onPageChange={setPage}
+                pageSize={pageSize}
+                onPageSizeChange={(next) => {
+                  setPage(1);
+                  setPageSize(next);
+                }}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
                 summary={`${result.totalCount} changes`}
                 containerStyle={{ padding: '16px 20px', borderTop: '1px solid #f1f5f9' }}
                 buttonClassName="btn-secondary"

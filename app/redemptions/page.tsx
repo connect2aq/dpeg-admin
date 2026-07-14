@@ -19,6 +19,8 @@ import {
   type RedemptionCalculationPreview,
 } from "@/lib/api";
 import { downloadCsv } from "@/lib/exportCsv";
+import { formatShortDate, formatShortDateTime } from "@/lib/dateFormat";
+import { PAGE_SIZE_OPTIONS } from "@/lib/pagination";
 import {
   encodeMultiFilterValue,
   hasMultiFilterValue,
@@ -29,7 +31,7 @@ import { useAdminAuth } from "@/contexts/AdminAuthContext";
 
 const STATUSES = ["UnderReview", "Active", "Rejected"];
 const STATUS_OPTIONS = ["UnderReview", "Active", "Rejected"];
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
 
 // AggregatePurchasePrice = principal + interest; Income (ProratedPreferredReturn) is the interest
 // portion, so Capital Redeemed backs out the principal — mirrors the investor statement's
@@ -76,6 +78,7 @@ function RedemptionsContent() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortOn, setSortOn] = useState("createdOn");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
@@ -175,8 +178,8 @@ function RedemptionsContent() {
         income(a).toFixed(2),
         a.netAggregatePrice ?? "",
         a.status,
-        a.effectiveDate ? new Date(a.effectiveDate).toLocaleDateString() : "",
-        new Date(a.createdOn).toLocaleDateString(),
+        a.effectiveDate ? formatShortDate(a.effectiveDate) : "",
+        formatShortDate(a.createdOn),
       ]);
       downloadCsv([headers, ...rows], "redemptions.csv");
     }
@@ -187,7 +190,7 @@ function RedemptionsContent() {
     setLoading(true);
     const params: QueryParams = {
       page,
-      pageSize: PAGE_SIZE,
+      pageSize,
       sortOn,
       sortDirection,
     };
@@ -218,7 +221,7 @@ function RedemptionsContent() {
         }
       })
       .finally(() => setLoading(false));
-  }, [page, status, search, from, to, sortOn, sortDirection]);
+  }, [page, pageSize, status, search, from, to, sortOn, sortDirection]);
 
   const loadPendingCreates = useCallback(async () => {
     const r = await adminApi.getPendingChanges({
@@ -589,11 +592,7 @@ function RedemptionsContent() {
                     by <strong>{p.makerName}</strong>
                   </span>
                   <span style={{ fontSize: 12, color: "#94a3b8" }}>
-                    {new Date(p.createdOn).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
+                    {formatShortDate(p.createdOn)}
                   </span>
                   <button
                     onClick={() => openViewCreate(p)}
@@ -896,7 +895,7 @@ function RedemptionsContent() {
 
                           <td style={{ fontSize: 13, color: "#64748b" }}>
                             {r.effectiveDate
-                              ? new Date(r.effectiveDate).toLocaleDateString()
+                              ? formatShortDate(r.effectiveDate)
                               : "—"}
                           </td>
                           <td style={{ fontWeight: 600 }}>
@@ -1032,6 +1031,12 @@ function RedemptionsContent() {
                 page={page}
                 totalPages={result.totalPages}
                 onPageChange={setPage}
+                pageSize={pageSize}
+                onPageSizeChange={(next) => {
+                  setPage(1);
+                  setPageSize(next);
+                }}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
                 summary={
                   <>
                     {result.totalCount} requests
@@ -1433,16 +1438,7 @@ function RedemptionsContent() {
                   <span style={{ fontSize: 12, color: "#64748b" }}>
                     Submitted by <strong>{viewingCreate.item.makerName}</strong>{" "}
                     on{" "}
-                    {new Date(viewingCreate.item.createdOn).toLocaleString(
-                      "en-US",
-                      {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      },
-                    )}
+                    {formatShortDateTime(viewingCreate.item.createdOn)}
                   </span>
                   {viewingCreate.item.checkerName && (
                     <span style={{ fontSize: 12, color: "#64748b" }}>

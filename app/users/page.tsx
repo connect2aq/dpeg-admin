@@ -19,6 +19,8 @@ import {
   parseMultiFilterValue,
 } from "@/lib/filterUtils";
 import type { QueryParams } from "@/lib/apiContracts";
+import { formatShortDate } from "@/lib/dateFormat";
+import { PAGE_SIZE_OPTIONS } from "@/lib/pagination";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 
 const STATUSES = [
@@ -44,7 +46,7 @@ const STATUS_LABELS: Record<string, string> = {
   AwaitingApproval: "Awaiting Approval (Unconverted)",
   LatestRejected: "Latest App Rejected (Unconverted)",
 };
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
 
 const emptyCreateForm: CreateUserAdminRequest = {
   firstName: "",
@@ -79,6 +81,7 @@ function UsersContent() {
   const searchParams = useSearchParams();
   const [result, setResult] = useState<PagedResult<UserListItem> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string[]>(() => {
     const filter = searchParams.get("filter");
@@ -185,7 +188,7 @@ function UsersContent() {
           `${u.currentOnboardingStep}/7`,
           u.applicationCount,
           u.isTestUser ? "Yes" : "No",
-          new Date(u.createdOn).toLocaleDateString(),
+          formatShortDate(u.createdOn),
         ]);
         downloadCsv([headers, ...rows], "users.csv");
       } else {
@@ -205,7 +208,7 @@ function UsersContent() {
           u.email,
           u.status,
           u.adminRole ?? "",
-          new Date(u.createdOn).toLocaleDateString(),
+          formatShortDate(u.createdOn),
         ]);
         downloadCsv([headers, ...rows], "admin-users.csv");
       }
@@ -217,7 +220,7 @@ function UsersContent() {
     setLoading(true);
     const params: QueryParams = {
       page,
-      pageSize: PAGE_SIZE,
+      pageSize,
       sortOn,
       sortDirection,
     };
@@ -253,7 +256,7 @@ function UsersContent() {
         }
       })
       .finally(() => setLoading(false));
-  }, [page, search, status, viewMode, sortOn, sortDirection]);
+  }, [page, pageSize, search, status, viewMode, sortOn, sortDirection]);
 
   useEffect(() => {
     load();
@@ -749,7 +752,7 @@ function UsersContent() {
                                 />
                               </td>
                               <td style={{ color: "#64748b", fontSize: 13 }}>
-                                {new Date(u.createdOn).toLocaleDateString()}
+                                {formatShortDate(u.createdOn)}
                               </td>
                             </>
                           )}
@@ -847,7 +850,7 @@ function UsersContent() {
                                 </span>
                               </td>
                               <td style={{ color: "#64748b", fontSize: 13 }}>
-                                {new Date(u.createdOn).toLocaleDateString()}
+                                {formatShortDate(u.createdOn)}
                               </td>
                             </>
                           )}
@@ -934,6 +937,12 @@ function UsersContent() {
                 page={page}
                 totalPages={result.totalPages}
                 onPageChange={setPage}
+                pageSize={pageSize}
+                onPageSizeChange={(next) => {
+                  setPage(1);
+                  setPageSize(next);
+                }}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
                 summary={`${result.totalCount} users`}
                 containerStyle={{
                   padding: "16px 20px",

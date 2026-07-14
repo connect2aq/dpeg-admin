@@ -6,6 +6,8 @@ import { PaginationControls } from "@/components/PaginationControls";
 import { adminApi, type AuditLogItem, type PagedResult } from "@/lib/api";
 import { encodeMultiFilterValue, hasMultiFilterValue } from "@/lib/filterUtils";
 import type { QueryParams } from "@/lib/apiContracts";
+import { formatShortDateTime } from "@/lib/dateFormat";
+import { PAGE_SIZE_OPTIONS } from "@/lib/pagination";
 import { SortableTh } from "@/components/SortableTh";
 
 const CATEGORIES = [
@@ -16,7 +18,7 @@ const CATEGORIES = [
   "Distribution",
   "File",
 ];
-const PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 50;
 
 function categoryColor(cat: string): { bg: string; color: string } {
   switch (cat) {
@@ -96,6 +98,7 @@ export default function AuditLogPage() {
   const [to, setTo] = useState("");
   const [successFilter, setSuccessFilter] = useState<string[]>([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortOn, setSortOn] = useState("timestamp");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const toggleSort = (key: string) => {
@@ -111,7 +114,7 @@ export default function AuditLogPage() {
     setLoading(true);
     const params: QueryParams = {
       page,
-      pageSize: PAGE_SIZE,
+      pageSize,
       sortOn,
       sortDirection,
     };
@@ -133,6 +136,7 @@ export default function AuditLogPage() {
       .finally(() => setLoading(false));
   }, [
     page,
+    pageSize,
     category,
     eventType,
     userId,
@@ -162,14 +166,7 @@ export default function AuditLogPage() {
   };
 
   const fmt = (ts: string) =>
-    new Date(ts).toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
+    formatShortDateTime(ts, { seconds: true });
 
   return (
     <AdminLayout>
@@ -650,7 +647,13 @@ export default function AuditLogPage() {
                 page={page}
                 totalPages={result.totalPages}
                 onPageChange={setPage}
-                summary={`Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, result.totalCount)} of ${result.totalCount.toLocaleString()} events`}
+                pageSize={pageSize}
+                onPageSizeChange={(next) => {
+                  setPage(1);
+                  setPageSize(next);
+                }}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
+                summary={`Showing ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, result.totalCount)} of ${result.totalCount.toLocaleString()} events`}
                 containerStyle={{
                   padding: "14px 20px",
                   borderTop: "1px solid #f1f5f9",

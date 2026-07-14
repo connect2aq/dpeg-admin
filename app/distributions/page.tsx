@@ -19,6 +19,8 @@ import {
   parseMultiFilterValue,
 } from "@/lib/filterUtils";
 import type { QueryParams } from "@/lib/apiContracts";
+import { formatShortDate } from "@/lib/dateFormat";
+import { PAGE_SIZE_OPTIONS } from "@/lib/pagination";
 import Link from "next/link";
 
 const STATUSES = ["Pending", "Sent", "Failed", "Paid"];
@@ -52,7 +54,7 @@ const MONTH_NAMES = [
   "Nov",
   "Dec",
 ];
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
 
 function todayStr() {
   return new Date().toISOString().split("T")[0];
@@ -101,6 +103,7 @@ function DistributionsContent() {
   const [year, setYear] = useState("");
   const [appIdFilter, setAppIdFilter] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortOn, setSortOn] = useState("month");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const toggleSort = (key: string) => {
@@ -210,18 +213,13 @@ function DistributionsContent() {
         d.applicationId,
         d.investorName,
         d.investorEmail ?? "",
-        d.distributionMonth
-          ? new Date(d.distributionMonth).toLocaleDateString("en-US", {
-              year: "numeric",
-              month: "short",
-            })
-          : "",
+        d.distributionMonth ? formatShortDate(d.distributionMonth) : "",
         d.totalNetAmount,
         d.paymentStatus,
-        d.paidAt ? new Date(d.paidAt).toLocaleDateString() : "",
+        d.paidAt ? formatShortDate(d.paidAt) : "",
         d.bankName ?? "",
         d.bankAccountNumber ?? "",
-        new Date(d.createdOn).toLocaleDateString(),
+        formatShortDate(d.createdOn),
       ]);
       downloadCsv([headers, ...rows], "distributions.csv");
     }
@@ -232,7 +230,7 @@ function DistributionsContent() {
     setLoading(true);
     const params: QueryParams = {
       page,
-      pageSize: PAGE_SIZE,
+      pageSize,
       sortOn,
       sortDirection,
     };
@@ -250,7 +248,7 @@ function DistributionsContent() {
         if (r.success) setResult(r.data);
       })
       .finally(() => setLoading(false));
-  }, [page, status, search, month, year, appIdFilter, sortOn, sortDirection]);
+  }, [page, pageSize, status, search, month, year, appIdFilter, sortOn, sortDirection]);
 
   useEffect(() => {
     load();
@@ -415,7 +413,7 @@ function DistributionsContent() {
     }
   };
 
-  const totalPages = result ? Math.ceil(result.totalCount / PAGE_SIZE) : 1;
+  const totalPages = result ? Math.ceil(result.totalCount / pageSize) : 1;
   const pendingPushCount = (runResults ?? []).filter(
     (r) =>
       !r.alreadyRan &&
@@ -952,10 +950,7 @@ function DistributionsContent() {
                           )}
                         </td>
                         <td style={{ ...colStyle, fontWeight: 500 }}>
-                          {new Date(r.distributionMonth).toLocaleDateString(
-                            "en-US",
-                            { month: "short", year: "numeric" },
-                          )}
+                          {formatShortDate(r.distributionMonth)}
                         </td>
                         <td style={{ ...colStyle, color: "#9ca3af" }}>
                           {r.ppmRefNo || "—"}
@@ -1499,10 +1494,7 @@ function DistributionsContent() {
                   )}
                   {result?.items.map((d) => {
                     const monthDate = new Date(d.distributionMonth);
-                    const monthLabel = monthDate.toLocaleDateString("en-US", {
-                      month: "short",
-                      year: "numeric",
-                    });
+                    const monthLabel = formatShortDate(monthDate);
                     const canMarkPaid = d.paymentStatus !== "Paid";
                     const canPushOdoo =
                       d.paymentStatus !== "Sent" && d.paymentStatus !== "Paid";
@@ -1550,9 +1542,7 @@ function DistributionsContent() {
                         </td>
                         <td style={colStyle}>{monthLabel}</td>
                         <td style={colStyle}>
-                          {d.paidAt
-                            ? new Date(d.paidAt).toLocaleDateString()
-                            : "—"}
+                          {d.paidAt ? formatShortDate(d.paidAt) : "—"}
                         </td>
                         <td style={colStyle}>
                           <Link
@@ -1792,6 +1782,12 @@ function DistributionsContent() {
               page={page}
               totalPages={totalPages}
               onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={(next) => {
+                setPage(1);
+                setPageSize(next);
+              }}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
               containerStyle={{ justifyContent: "center", marginTop: 20 }}
               buttonStyle={{
                 padding: "6px 14px",

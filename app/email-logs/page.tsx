@@ -12,8 +12,10 @@ import {
 } from "@/lib/api";
 import { hasMultiFilterValue } from "@/lib/filterUtils";
 import type { QueryParams } from "@/lib/apiContracts";
+import { formatShortDateTime } from "@/lib/dateFormat";
+import { PAGE_SIZE_OPTIONS } from "@/lib/pagination";
 
-const PAGE_SIZE = 25;
+const DEFAULT_PAGE_SIZE = 25;
 
 function Badge({ ok }: { ok: boolean }) {
   return (
@@ -106,15 +108,7 @@ function BodyViewer({ body }: { body?: string | null }) {
 }
 
 function fmt(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+  return formatShortDateTime(iso);
 }
 
 export default function EmailLogsPage() {
@@ -125,6 +119,7 @@ export default function EmailLogsPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortOn, setSortOn] = useState("sentat");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const toggleSort = (key: string) => {
@@ -145,7 +140,7 @@ export default function EmailLogsPage() {
     setLoading(true);
     const params: QueryParams = {
       page,
-      pageSize: PAGE_SIZE,
+      pageSize,
       sortOn,
       sortDirection,
     };
@@ -159,7 +154,7 @@ export default function EmailLogsPage() {
         if (r.success) setResult(r.data);
       })
       .finally(() => setLoading(false));
-  }, [page, success, search, from, to, sortOn, sortDirection]);
+  }, [page, pageSize, success, search, from, to, sortOn, sortDirection]);
 
   useEffect(() => {
     load();
@@ -496,6 +491,12 @@ export default function EmailLogsPage() {
                 page={page}
                 totalPages={result.totalPages}
                 onPageChange={setPage}
+                pageSize={pageSize}
+                onPageSizeChange={(next) => {
+                  setPage(1);
+                  setPageSize(next);
+                }}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
                 summary={`${result.totalCount} records`}
                 containerStyle={{
                   justifyContent: "center",
