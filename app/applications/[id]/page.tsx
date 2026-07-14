@@ -90,6 +90,10 @@ export default function ApplicationDetailPage() {
   const [signedDocFile, setSignedDocFile] = useState<File | null>(null);
   const [signedDocUploading, setSignedDocUploading] = useState(false);
   const [signedDocMsg, setSignedDocMsg] = useState('');
+  const [editingRecipientEmail, setEditingRecipientEmail] = useState(false);
+  const [recipientEmailValue, setRecipientEmailValue] = useState('');
+  const [recipientEmailUpdating, setRecipientEmailUpdating] = useState(false);
+  const [recipientEmailMsg, setRecipientEmailMsg] = useState('');
   const { user } = useAdminAuth();
   const isSuperAdmin = user?.adminRole === 'SuperAdmin';
 
@@ -211,6 +215,28 @@ export default function ApplicationDetailPage() {
     } finally {
       setSignedDocUploading(false);
       setTimeout(() => setSignedDocMsg(''), 5000);
+    }
+  };
+
+  const saveRecipientEmail = async () => {
+    if (!app || !recipientEmailValue.trim()) return;
+    setRecipientEmailUpdating(true); setRecipientEmailMsg('');
+    try {
+      const r = await adminApi.correctApplicationEmail(app.id, recipientEmailValue.trim());
+      if (r.success) {
+        setApp(a => a ? { ...a, investorProfile: a.investorProfile ? { ...a.investorProfile, email: recipientEmailValue.trim() } : a.investorProfile } : a);
+        setEditingRecipientEmail(false);
+        setRecipientEmailMsg('Email corrected and resent.');
+        setDsStatus(null);
+        await loadDsStatus();
+      } else {
+        setRecipientEmailMsg(r.message || 'Failed to correct email.');
+      }
+    } catch {
+      setRecipientEmailMsg('Network error. Please try again.');
+    } finally {
+      setRecipientEmailUpdating(false);
+      setTimeout(() => setRecipientEmailMsg(''), 6000);
     }
   };
 
@@ -568,7 +594,29 @@ export default function ApplicationDetailPage() {
                           </span>
                         </div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a2e' }}>{r.name || '—'}</div>
-                        <div style={{ fontSize: 11, color: '#64748b' }}>{r.email}</div>
+                        {r.roleName === 'Signer' && editingRecipientEmail ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                            <input
+                              type="email"
+                              value={recipientEmailValue}
+                              onChange={e => setRecipientEmailValue(e.target.value)}
+                              placeholder="Correct email address"
+                              style={{ padding: '4px 8px', border: '1.5px solid #b8923a', borderRadius: 6, fontSize: 12, color: '#1a1a2e' }}
+                            />
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button onClick={saveRecipientEmail} disabled={recipientEmailUpdating}
+                                style={{ padding: '4px 10px', background: '#b8923a', color: '#fff', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: recipientEmailUpdating ? 'default' : 'pointer' }}>
+                                {recipientEmailUpdating ? 'Updating…' : 'Update & Resend'}
+                              </button>
+                              <button onClick={() => setEditingRecipientEmail(false)} disabled={recipientEmailUpdating}
+                                style={{ padding: '4px 10px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 11, color: '#64748b' }}>{r.email}</div>
+                        )}
                         <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color }}>
                           {signed && r.signedAt
                             ? `Signed ${new Date(asUtc(r.signedAt)!).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
@@ -576,15 +624,29 @@ export default function ApplicationDetailPage() {
                               ? `Sent ${new Date(asUtc(r.sentAt)!).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
                               : r.status.charAt(0).toUpperCase() + r.status.slice(1)}
                         </div>
-                        {!signed && (
-                          <a href={`mailto:${r.email}`}
-                            style={{ display: 'inline-block', marginTop: 8, padding: '4px 10px', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 6, fontSize: 11, fontWeight: 600, color: '#92400e', textDecoration: 'none' }}>
-                            Send reminder
-                          </a>
+                        {!signed && !editingRecipientEmail && (
+                          <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                            <a href={`mailto:${r.email}`}
+                              style={{ display: 'inline-block', padding: '4px 10px', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 6, fontSize: 11, fontWeight: 600, color: '#92400e', textDecoration: 'none' }}>
+                              Send reminder
+                            </a>
+                            {r.roleName === 'Signer' && (
+                              <button onClick={() => { setEditingRecipientEmail(true); setRecipientEmailValue(r.email); setRecipientEmailMsg(''); }}
+                                style={{ padding: '4px 10px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
+                                Wrong email? Correct it
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {recipientEmailMsg && (
+                <div style={{ marginTop: 12, fontSize: 12, fontWeight: 600, color: recipientEmailMsg.includes('resent') ? '#10b981' : '#ef4444' }}>
+                  {recipientEmailMsg}
                 </div>
               )}
             </div>
