@@ -251,6 +251,8 @@ function InvestorStatementsContent() {
   >([]);
   const [inputValue, setInputValue] = useState("");
   const [open, setOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(50);
   const [data, setData] = useState<InvestorCapitalAccount | null>(null);
   const [accrued, setAccrued] = useState(0);
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
@@ -261,6 +263,10 @@ function InvestorStatementsContent() {
   const [error, setError] = useState("");
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   const toggleSort = (field: string) => {
     const f = field as SortField;
     if (sortField === f) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -276,13 +282,36 @@ function InvestorStatementsContent() {
 
   useEffect(() => {
     adminApi
-      .users({ page: 1, pageSize: 500 })
+      .users({ page: 1, pageSize: 100000 })
       .then((r) => {
         if (r.success) setInvestors(r.data.items);
       })
       .catch(() => {})
       .finally(() => setInvestorsLoading(false));
   }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      setVisibleCount(50);
+      setHighlightedIndex(0);
+      if (searchInputRef.current) {
+        const timer = setTimeout(() => {
+          searchInputRef.current?.focus();
+        }, 50);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!selectedUserId) {
@@ -351,15 +380,6 @@ function InvestorStatementsContent() {
       .finally(() => setLoading(false));
   }, [selectedUserId, selectedApplicationId]);
 
-  const suggestions = investors
-    .filter((u) => {
-      if (!inputValue || selectedUserId) return false;
-      const q = inputValue.toLowerCase();
-      const haystack = `${u.firstName} ${u.lastName} ${u.email} ${u.investorNames.join(" ")}`;
-      return haystack.toLowerCase().includes(q);
-    })
-    .slice(0, 8);
-
   const selectedInvestor = investors.find((u) => u.id === selectedUserId);
   const investorName = selectedInvestor
     ? `${selectedInvestor.firstName} ${selectedInvestor.lastName}`
@@ -371,10 +391,38 @@ function InvestorStatementsContent() {
   // scoped to one investment, otherwise the account holder's name.
   const exportLabel = scopedInvestment?.investorName || investorName;
 
+  const displayInvestors = investors.filter((u) => {
+    if (!inputValue) return true;
+    const q = inputValue.toLowerCase();
+    const haystack = `${u.firstName} ${u.lastName} ${u.email} ${u.investorNames.join(" ")}`;
+    return haystack.toLowerCase().includes(q);
+  });
+
+  const slicedDisplayInvestors = displayInvestors.slice(0, visibleCount);
+
+  useEffect(() => {
+    if (open && highlightedIndex >= 0) {
+      const container = dropdownRef.current?.querySelector(".dropdown-options-list");
+      const activeItem = container?.children[highlightedIndex] as HTMLElement;
+      if (activeItem && container) {
+        const containerTop = container.scrollTop;
+        const containerBottom = containerTop + container.clientHeight;
+        const elemTop = activeItem.offsetTop;
+        const elemBottom = elemTop + activeItem.clientHeight;
+
+        if (elemTop < containerTop) {
+          container.scrollTop = elemTop;
+        } else if (elemBottom > containerBottom) {
+          container.scrollTop = elemBottom - container.clientHeight;
+        }
+      }
+    }
+  }, [highlightedIndex, open]);
+
   function selectInvestor(u: UserListItem) {
     scopeQueryRef.current = inputValue;
     setSelectedUserId(u.id);
-    setInputValue(`${u.firstName} ${u.lastName}`);
+    setInputValue("");
     setOpen(false);
   }
 
@@ -386,6 +434,24 @@ function InvestorStatementsContent() {
     setData(null);
     setOpen(false);
   }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev + 1) % Math.max(1, slicedDisplayInvestors.length));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev - 1 + slicedDisplayInvestors.length) % Math.max(1, slicedDisplayInvestors.length));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (slicedDisplayInvestors[highlightedIndex]) {
+        selectInvestor(slicedDisplayInvestors[highlightedIndex]);
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+    }
+  };
 
   const visible: InvestorCapitalAccountEntry[] = (data?.entries ?? []).filter(
     (e) => {
@@ -430,183 +496,95 @@ function InvestorStatementsContent() {
 
         {/* Investor combobox */}
         {!openedFromInvestorLink && (
-          <div style={{ marginBottom: 28, maxWidth: 480, position: "relative" }}>
-          <label
-            style={{
-              display: "block",
-              fontSize: 11,
-              fontWeight: 700,
-              color: "var(--muted)",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              marginBottom: 6,
-            }}
-          >
-            Search Account User or Investor
-          </label>
-          <div style={{ position: "relative" }}>
-            <input
-              type="text"
-              placeholder={
-                investorsLoading
-                  ? "Loading investors…"
-                  : "Search Account User or Investor…"
-              }
-              value={inputValue || investorName}
-              disabled={investorsLoading}
-              onChange={(e) => {
-                setInputValue(e.target.value);
-                setOpen(true);
-                if (selectedUserId) clearSelection();
-              }}
-              onFocus={() => {
-                if (!selectedUserId && inputValue) setOpen(true);
-              }}
-              onBlur={() => setTimeout(() => setOpen(false), 150)}
+          <div ref={dropdownRef} style={{ marginBottom: 28, maxWidth: 480, position: "relative" }}>
+            <label
               style={{
-                width: "100%",
-                padding: "10px 36px 10px 14px",
-                fontSize: 13,
-                border: `1.5px solid ${open ? "var(--forest)" : "var(--border)"}`,
-                borderRadius: 8,
-                background: "var(--bg-card)",
-                color: "var(--text-primary)",
-                boxSizing: "border-box",
-                outline: "none",
-              }}
-            />
-            {selectedUserId ? (
-              <button
-                onClick={clearSelection}
-                style={{
-                  position: "absolute",
-                  right: 10,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "var(--muted)",
-                  fontSize: 16,
-                  lineHeight: 1,
-                  padding: 2,
-                }}
-                title="Clear"
-              >
-                ×
-              </button>
-            ) : (
-              <span
-                style={{
-                  position: "absolute",
-                  right: 12,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--muted)",
-                  fontSize: 12,
-                  pointerEvents: "none",
-                }}
-              >
-                ▾
-              </span>
-            )}
-          </div>
-          {open && suggestions.length > 0 && (
-            <div
-              style={{
-                position: "absolute",
-                zIndex: 50,
-                top: "calc(100% + 4px)",
-                left: 0,
-                right: 0,
-                background: "var(--bg-card)",
-                border: "1.5px solid var(--border)",
-                borderRadius: 8,
-                boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
-                overflow: "hidden",
+                display: "block",
+                fontSize: 11,
+                fontWeight: 700,
+                color: "var(--muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                marginBottom: 6,
               }}
             >
-              {suggestions.map((u) => (
-                <button
-                  key={u.id}
-                  onMouseDown={() => selectInvestor(u)}
+              Investor Account
+            </label>
+            <div style={{ position: "relative" }}>
+              <button
+                type="button"
+                onClick={() => !investorsLoading && setOpen(!open)}
+                disabled={investorsLoading}
+                style={{
+                  width: "100%",
+                  padding: "10px 36px 10px 14px",
+                  fontSize: 13,
+                  fontWeight: selectedInvestor ? 600 : 400,
+                  border: `1.5px solid ${open ? "var(--forest)" : "var(--border)"}`,
+                  borderRadius: 8,
+                  background: "var(--bg-card)",
+                  color: selectedInvestor ? "var(--text-primary)" : "var(--muted)",
+                  boxSizing: "border-box",
+                  outline: "none",
+                  textAlign: "left",
+                  cursor: investorsLoading ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  transition: "border-color 0.15s ease",
+                }}
+              >
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginRight: 8 }}>
+                  {investorsLoading
+                    ? "Loading investors…"
+                    : selectedInvestor
+                    ? `${selectedInvestor.firstName} ${selectedInvestor.lastName} (${selectedInvestor.email})`
+                    : "Select Account User or Investor…"}
+                </span>
+                <span
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    width: "100%",
-                    padding: "10px 14px",
+                    color: "var(--muted)",
+                    fontSize: 12,
+                    pointerEvents: "none",
+                    transform: open ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s ease",
+                  }}
+                >
+                  ▾
+                </span>
+              </button>
+
+              {selectedUserId && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    clearSelection();
+                  }}
+                  style={{
+                    position: "absolute",
+                    right: 32,
+                    top: "50%",
+                    transform: "translateY(-50%)",
                     background: "none",
                     border: "none",
                     cursor: "pointer",
-                    textAlign: "left",
-                    borderBottom: "1px solid var(--border)",
+                    color: "var(--muted)",
+                    fontSize: 16,
+                    lineHeight: 1,
+                    padding: 4,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = "var(--bg-section)")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = "none")
-                  }
+                  title="Clear selection"
                 >
-                  <div>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: "var(--text-primary)",
-                      }}
-                    >
-                      {u.firstName} {u.lastName}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: "var(--muted)",
-                        marginTop: 1,
-                      }}
-                    >
-                      {u.email}
-                    </div>
-                    {(() => {
-                      const accountName = `${u.firstName} ${u.lastName}`
-                        .trim()
-                        .toLowerCase();
-                      const otherInvestorNames = u.investorNames.filter(
-                        (n) => n.trim().toLowerCase() !== accountName,
-                      );
-                      return otherInvestorNames.length > 0 ? (
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: "var(--forest)",
-                            marginTop: 1,
-                          }}
-                        >
-                          Investor: {otherInvestorNames.join(", ")}
-                        </div>
-                      ) : null;
-                    })()}
-                  </div>
-                  <span
-                    style={{
-                      fontSize: 10,
-                      color: "var(--muted)",
-                      background: "var(--bg-section)",
-                      borderRadius: 4,
-                      padding: "2px 6px",
-                    }}
-                  >
-                    {u.status}
-                  </span>
+                  ×
                 </button>
-              ))}
+              )}
             </div>
-          )}
-          {open &&
-            !investorsLoading &&
-            inputValue.length > 0 &&
-            suggestions.length === 0 && (
+
+            {open && (
               <div
                 style={{
                   position: "absolute",
@@ -617,12 +595,173 @@ function InvestorStatementsContent() {
                   background: "var(--bg-card)",
                   border: "1.5px solid var(--border)",
                   borderRadius: 8,
-                  padding: "12px 14px",
-                  fontSize: 13,
-                  color: "var(--muted)",
+                  boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)",
+                  padding: "8px",
+                  boxSizing: "border-box",
                 }}
               >
-                No investors found for &ldquo;{inputValue}&rdquo;
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search name, email, or investor entity..."
+                  value={inputValue}
+                  onChange={(e) => {
+                    setInputValue(e.target.value);
+                    setHighlightedIndex(0);
+                    setVisibleCount(50);
+                  }}
+                  onKeyDown={handleKeyDown}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    fontSize: 13,
+                    border: "1.5px solid var(--border)",
+                    borderRadius: 6,
+                    background: "var(--bg-card)",
+                    color: "var(--text-primary)",
+                    boxSizing: "border-box",
+                    outline: "none",
+                    marginBottom: 8,
+                  }}
+                />
+
+                <div
+                  className="dropdown-options-list"
+                  onScroll={(e) => {
+                    const container = e.currentTarget;
+                    if (container.scrollHeight - container.scrollTop - container.clientHeight < 40) {
+                      setVisibleCount((prev) => Math.min(prev + 50, displayInvestors.length));
+                    }
+                  }}
+                  style={{
+                    maxHeight: 280,
+                    overflowY: "auto",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                >
+                  {slicedDisplayInvestors.length === 0 ? (
+                    <div
+                      style={{
+                        padding: "12px 14px",
+                        fontSize: 13,
+                        color: "var(--muted)",
+                        textAlign: "center",
+                      }}
+                    >
+                      No investors found for &ldquo;{inputValue}&rdquo;
+                    </div>
+                  ) : (
+                    slicedDisplayInvestors.map((u, index) => {
+                      const isHighlighted = index === highlightedIndex;
+                      const isSelected = u.id === selectedUserId;
+                      return (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => selectInvestor(u)}
+                          onMouseEnter={() => setHighlightedIndex(index)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            width: "100%",
+                            padding: "8px 12px",
+                            background: isSelected
+                              ? "var(--forest-light)"
+                              : isHighlighted
+                              ? "var(--bg-section)"
+                              : "none",
+                            border: "none",
+                            borderRadius: 6,
+                            cursor: "pointer",
+                            textAlign: "left",
+                            marginBottom: 2,
+                            outline: "none",
+                            borderLeft: isHighlighted ? "3px solid var(--forest)" : "3px solid transparent",
+                            paddingLeft: isHighlighted ? 9 : 12,
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: isSelected ? "var(--forest-mid)" : "var(--text-primary)",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              {u.firstName} {u.lastName}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: "var(--muted)",
+                                marginTop: 1,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              {u.email}
+                            </div>
+                            {(() => {
+                              const accountName = `${u.firstName} ${u.lastName}`
+                                .trim()
+                                .toLowerCase();
+                              const otherInvestorNames = u.investorNames.filter(
+                                (n) => n.trim().toLowerCase() !== accountName,
+                              );
+                              return otherInvestorNames.length > 0 ? (
+                                <div
+                                  style={{
+                                    fontSize: 10,
+                                    color: "var(--forest)",
+                                    marginTop: 2,
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                  }}
+                                >
+                                  Investor: {otherInvestorNames.join(", ")}
+                                </div>
+                              ) : null;
+                            })()}
+                          </div>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 600,
+                              color: "var(--muted)",
+                              background: "var(--bg-section)",
+                              borderRadius: 4,
+                              padding: "2px 6px",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {u.status}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                  {visibleCount < displayInvestors.length && (
+                    <div
+                      style={{
+                        padding: "8px 12px",
+                        fontSize: 11,
+                        color: "var(--muted)",
+                        textAlign: "center",
+                        borderTop: "1px solid var(--border-light)",
+                        marginTop: 4,
+                      }}
+                    >
+                      Scroll down to load more (showing {visibleCount} of {displayInvestors.length})
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

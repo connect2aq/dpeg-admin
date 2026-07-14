@@ -33,7 +33,7 @@ export function EditableStatusBadge({
   disabled = false,
 }: {
   status: string;
-  options: string[];
+  options: { value: string; label: string }[] | string[];
   onChange: (nextStatus: string) => void;
   disabled?: boolean;
 }) {
@@ -48,15 +48,20 @@ export function EditableStatusBadge({
         disabled={disabled}
         className={`status-badge status-badge-select ${getStatusBadgeClass(status)}`}
       >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {formatStatusLabel(option)}
+        {options?.map((option) => (
+          <option
+            key={typeof option === "string" ? option : option.value}
+            value={typeof option === "string" ? option : option.value}
+          >
+            {formatStatusLabel(
+              typeof option === "string" ? option : option.label,
+            )}
           </option>
         ))}
       </select>
-      {/* <span className="status-badge-select-caret" aria-hidden="true">
+      <span className="status-badge-select-caret" aria-hidden="true">
         ▾
-      </span> */}
+      </span>
     </span>
   );
 }

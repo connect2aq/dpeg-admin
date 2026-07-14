@@ -20,7 +20,10 @@ import {
 
 const BASE = process.env.NEXT_PUBLIC_API_URL;
 // Static files (wwwroot) are served from the app root, not under /api/admin
-export const STATIC_BASE = (BASE ?? '').replace(/\/api\/admin\/?$/, '').replace(/\/api\/?$/, '').replace(/\/$/, '');
+export const STATIC_BASE = (BASE ?? "")
+  .replace(/\/api\/admin\/?$/, "")
+  .replace(/\/api\/?$/, "")
+  .replace(/\/$/, "");
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token =
@@ -56,8 +59,7 @@ export const api = {
   get: <T>(path: string) => request<T>(path),
   put: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
-  delete: <T>(path: string) =>
-    request<T>(path, { method: "DELETE" }),
+  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
   deleteWithBody: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "DELETE", body: JSON.stringify(body) }),
 };
@@ -313,7 +315,7 @@ export interface DashboardTrends {
 
 export interface InvestorCapitalAccountEntry {
   date: string;
-  entryType: 'Contribution' | 'Redemption' | 'Dividend' | 'Clawback';
+  entryType: "Contribution" | "Redemption" | "Dividend" | "Clawback";
   investmentType?: string; // 'ShortTerm' | 'LongTerm'
   investorName?: string;
   accountUserName?: string;
@@ -322,7 +324,7 @@ export interface InvestorCapitalAccountEntry {
   ppmRefNo?: string;
   units?: number;
   amount: number;
-  income: number;   // positive = received; negative = clawback
+  income: number; // positive = received; negative = clawback
   runningBalance: number;
 }
 
@@ -340,7 +342,7 @@ export interface InvestorCapitalAccount {
 
 export interface CapitalLedgerEntry {
   date: string;
-  entryType: 'Contribution' | 'Redemption' | 'Dividend';
+  entryType: "Contribution" | "Redemption" | "Dividend";
   investmentType?: string; // 'ShortTerm' | 'LongTerm'
   investorName: string;
   accountUserId?: number;
@@ -421,14 +423,18 @@ export interface OdooSyncResult {
 
 export const historicalImportApi = {
   downloadTemplate: () => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("adminToken") : null;
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("adminToken") : null;
     return fetch(`${BASE}/historical-import/template`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
   },
 
-  upload: (file: File): Promise<{ success: boolean; data: ImportResult; message: string }> => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("adminToken") : null;
+  upload: (
+    file: File,
+  ): Promise<{ success: boolean; data: ImportResult; message: string }> => {
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("adminToken") : null;
     const form = new FormData();
     form.append("file", file);
     return fetch(`${BASE}/historical-import/upload`, {
@@ -439,7 +445,7 @@ export const historicalImportApi = {
   },
 
   sendWelcomeEmails: (
-    userIds: number[]
+    userIds: number[],
   ): Promise<{ success: boolean; data: WelcomeEmailResult; message: string }> =>
     request(`/historical-import/send-welcome-emails`, {
       method: "POST",
@@ -447,18 +453,26 @@ export const historicalImportApi = {
     }),
 
   syncToOdoo: (
-    applicationIds: number[]
+    applicationIds: number[],
   ): Promise<{ success: boolean; data: OdooSyncResult; message: string }> =>
     request(`/historical-import/sync-odoo`, {
       method: "POST",
       body: JSON.stringify({ applicationIds }),
     }),
 
-  getSessions: (): Promise<{ success: boolean; data: ImportSessionListItem[]; message: string }> =>
-    request(`/historical-import/sessions`),
+  getSessions: (): Promise<{
+    success: boolean;
+    data: ImportSessionListItem[];
+    message: string;
+  }> => request(`/historical-import/sessions`),
 
-  getSessionDetail: (sessionId: number): Promise<{ success: boolean; data: ImportSessionDetail; message: string }> =>
-    request(`/historical-import/sessions/${sessionId}`),
+  getSessionDetail: (
+    sessionId: number,
+  ): Promise<{
+    success: boolean;
+    data: ImportSessionDetail;
+    message: string;
+  }> => request(`/historical-import/sessions/${sessionId}`),
 };
 
 export interface ImportSessionListItem {
@@ -555,7 +569,8 @@ export const adminApi = {
     >("/login", { email, password }),
   dashboard: (params?: { from?: string; to?: string }) =>
     api.get<ApiResponse<DashboardStats>>(dashboardPath(params)),
-  dashboardTrends: () => api.get<ApiResponse<DashboardTrends>>(dashboardTrendsPath()),
+  dashboardTrends: () =>
+    api.get<ApiResponse<DashboardTrends>>(dashboardTrendsPath()),
   users: (params: QueryParams) =>
     api.get<ApiResponse<PagedResult<UserListItem>>>(usersPath(params)),
   user: (id: number) => api.get<ApiResponse<UserDetail>>(`/users/${id}`),
@@ -564,7 +579,9 @@ export const adminApi = {
   setUserIsTest: (id: number, isTestUser: boolean) =>
     api.put<ApiResponse<string>>(`/users/${id}/is-test`, { isTestUser }),
   applications: (params: QueryParams) =>
-    api.get<ApiResponse<PagedResult<ApplicationListItem>>>(applicationsPath(params)),
+    api.get<ApiResponse<PagedResult<ApplicationListItem>>>(
+      applicationsPath(params),
+    ),
   application: (id: number) =>
     api.get<ApiResponse<ApplicationDetail>>(`/applications/${id}`),
   updateApplicationStatus: (id: number, status: string, reviewNote?: string) =>
@@ -590,39 +607,61 @@ export const adminApi = {
     api.get<ApiResponse<DocuSignEnvelopeStatus>>(
       `/docusign-envelopes/${envelopeId}/status`,
     ),
-  uploadRedemptionSignedDocument: async (redemptionId: number, file: File): Promise<ApiResponse<string>> => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+  uploadRedemptionSignedDocument: async (
+    redemptionId: number,
+    file: File,
+  ): Promise<ApiResponse<string>> => {
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("adminToken") : null;
     const form = new FormData();
-    form.append('file', file);
-    const res = await fetch(`${BASE}/redemptions/${redemptionId}/upload-signed-document`, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: form,
-    });
+    form.append("file", file);
+    const res = await fetch(
+      `${BASE}/redemptions/${redemptionId}/upload-signed-document`,
+      {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      },
+    );
     const text = await res.text();
-    return text ? JSON.parse(text) : { success: false, data: '', message: 'Empty response' };
+    return text
+      ? JSON.parse(text)
+      : { success: false, data: "", message: "Empty response" };
   },
-  uploadSignedDocument: async (appId: number, file: File): Promise<ApiResponse<string>> => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
+  uploadSignedDocument: async (
+    appId: number,
+    file: File,
+  ): Promise<ApiResponse<string>> => {
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("adminToken") : null;
     const form = new FormData();
-    form.append('file', file);
-    const res = await fetch(`${BASE}/applications/${appId}/upload-signed-document`, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: form,
-    });
+    form.append("file", file);
+    const res = await fetch(
+      `${BASE}/applications/${appId}/upload-signed-document`,
+      {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      },
+    );
     const text = await res.text();
-    return text ? JSON.parse(text) : { success: false, data: '', message: 'Empty response' };
+    return text
+      ? JSON.parse(text)
+      : { success: false, data: "", message: "Empty response" };
   },
   downloadDocuSignDocument: async (envelopeId: string): Promise<void> => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null;
-    const res = await fetch(`${BASE}/docusign-envelopes/${envelopeId}/document`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!res.ok) throw new Error('Download failed');
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("adminToken") : null;
+    const res = await fetch(
+      `${BASE}/docusign-envelopes/${envelopeId}/document`,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      },
+    );
+    if (!res.ok) throw new Error("Download failed");
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = `docusign-${envelopeId}.pdf`;
     document.body.appendChild(a);
@@ -631,86 +670,135 @@ export const adminApi = {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   },
   redemptions: (params: QueryParams) =>
-    api.get<ApiResponse<PagedResult<RedemptionListItem>>>(redemptionsPath(params)),
+    api.get<ApiResponse<PagedResult<RedemptionListItem>>>(
+      redemptionsPath(params),
+    ),
   redemption: (id: number) =>
     api.get<ApiResponse<RedemptionDetail>>(redemptionPath(id)),
-  updateRedemptionStatus: (id: number, status: string, reviewNote?: string, sendNotification = false) =>
-    api.put<ApiResponse<string>>(`/redemptions/${id}/status`, { status, reviewNote, sendNotification }),
+  updateRedemptionStatus: (
+    id: number,
+    status: string,
+    reviewNote?: string,
+    sendNotification = false,
+  ) =>
+    api.put<ApiResponse<string>>(`/redemptions/${id}/status`, {
+      status,
+      reviewNote,
+      sendNotification,
+    }),
   sendRedemptionDocuSignEnvelope: (id: number) =>
     api.post<ApiResponse<string>>(`/redemptions/${id}/send-docusign`, {}),
   auditLogs: (params: QueryParams) =>
     api.get<ApiResponse<PagedResult<AuditLogItem>>>(auditLogsPath(params)),
-  getBankDetails: () =>
-    api.get<ApiResponse<BankDetails>>(bankDetailsPath()),
+  getBankDetails: () => api.get<ApiResponse<BankDetails>>(bankDetailsPath()),
   saveBankDetails: (dto: BankDetails) =>
-    api.put<ApiResponse<string>>('/bank-details', dto),
+    api.put<ApiResponse<string>>("/bank-details", dto),
   getDailyBalances: () =>
     api.get<ApiResponse<DailyBalanceLog[]>>(dailyBalancesPath()),
   saveDailyBalance: (dto: DailyBalanceLog) =>
-    api.put<ApiResponse<string>>('/daily-balances', dto),
+    api.put<ApiResponse<string>>("/daily-balances", dto),
   getNotificationEmails: () =>
-    api.get<ApiResponse<NotificationEmail[]>>('/notification-emails'),
+    api.get<ApiResponse<NotificationEmail[]>>("/notification-emails"),
   addNotificationEmail: (emailAddress: string, label?: string) =>
-    api.post<ApiResponse<NotificationEmail>>('/notification-emails', { emailAddress, label }),
+    api.post<ApiResponse<NotificationEmail>>("/notification-emails", {
+      emailAddress,
+      label,
+    }),
   deleteNotificationEmail: (id: number) =>
     api.delete<ApiResponse<string>>(`/notification-emails/${id}`),
   distributions: (params: QueryParams) =>
-    api.get<ApiResponse<PagedResult<DistributionListItem>>>(distributionsPath(params)),
+    api.get<ApiResponse<PagedResult<DistributionListItem>>>(
+      distributionsPath(params),
+    ),
   markDistributionPaid: (id: number, paidDate: string) =>
-    api.post<ApiResponse<string>>(`/distributions/${id}/mark-paid`, { paidDate }),
+    api.post<ApiResponse<string>>(`/distributions/${id}/mark-paid`, {
+      paidDate,
+    }),
   statements: (params: QueryParams) => {
     const q = buildQueryString(params);
-    return api.get<ApiResponse<PagedResult<StatementListItem>>>(`/statements?${q}`);
+    return api.get<ApiResponse<PagedResult<StatementListItem>>>(
+      `/statements?${q}`,
+    );
   },
   statementPdfUrl: (id: number) => `${BASE}/statements/${id}/pdf`,
   odooLogs: (params: QueryParams) => {
     const q = buildQueryString(params);
     return api.get<ApiResponse<PagedResult<OdooLogItem>>>(`/odoo-logs?${q}`);
   },
-  odooLog: (id: number) => api.get<ApiResponse<OdooLogDetail>>(`/odoo-logs/${id}`),
+  odooLog: (id: number) =>
+    api.get<ApiResponse<OdooLogDetail>>(`/odoo-logs/${id}`),
   emailLogs: (params: QueryParams) => {
     const q = buildQueryString(params);
     return api.get<ApiResponse<PagedResult<EmailLogItem>>>(`/email-logs?${q}`);
   },
-  emailLog: (id: number) => api.get<ApiResponse<EmailLogDetail>>(`/email-logs/${id}`),
+  emailLog: (id: number) =>
+    api.get<ApiResponse<EmailLogDetail>>(`/email-logs/${id}`),
   dailyInterestLogs: (params: QueryParams) => {
     const q = buildQueryString(params);
-    return api.get<ApiResponse<PagedResult<DailyInterestItem>>>(`/daily-interest?${q}`);
+    return api.get<ApiResponse<PagedResult<DailyInterestItem>>>(
+      `/daily-interest?${q}`,
+    );
   },
   pushDailyInterestToOdoo: (id: number) =>
-    api.post<ApiResponse<{ message: string }>>(`/daily-interest/${id}/push-to-odoo`, {}),
+    api.post<ApiResponse<{ message: string }>>(
+      `/daily-interest/${id}/push-to-odoo`,
+      {},
+    ),
   previewDeleteDailyInterest: (ids: number[]) =>
-    api.post<ApiResponse<DeleteDailyInterestPreviewResult>>('/daily-interest/delete-preview', { ids }),
+    api.post<ApiResponse<DeleteDailyInterestPreviewResult>>(
+      "/daily-interest/delete-preview",
+      { ids },
+    ),
   batchDeleteDailyInterest: (ids: number[], cascadeMonthly: boolean) =>
-    api.deleteWithBody<ApiResponse<DeleteDailyInterestResult>>('/daily-interest/batch', { ids, cascadeMonthly }),
-  resetMonthDistribution: (applicationId: number, year: number, month: number) =>
-    api.post<ApiResponse<ResetMonthResult>>('/daily-interest/reset-month', { applicationId, year, month }),
+    api.deleteWithBody<ApiResponse<DeleteDailyInterestResult>>(
+      "/daily-interest/batch",
+      { ids, cascadeMonthly },
+    ),
+  resetMonthDistribution: (
+    applicationId: number,
+    year: number,
+    month: number,
+  ) =>
+    api.post<ApiResponse<ResetMonthResult>>("/daily-interest/reset-month", {
+      applicationId,
+      year,
+      month,
+    }),
 
   // ── Admin CRUD: Bulk Delete ────────────────────────────────────────────
   bulkDeleteUsers: (userIds: number[]) =>
-    api.deleteWithBody<ApiResponse<string>>('/users', { userIds }),
+    api.deleteWithBody<ApiResponse<string>>("/users", { userIds }),
   bulkDeleteApplications: (applicationIds: number[]) =>
-    api.deleteWithBody<ApiResponse<string>>('/applications', { applicationIds }),
+    api.deleteWithBody<ApiResponse<string>>("/applications", {
+      applicationIds,
+    }),
   bulkDeleteRedemptions: (redemptionIds: number[]) =>
-    api.deleteWithBody<ApiResponse<string>>('/redemptions', { redemptionIds }),
+    api.deleteWithBody<ApiResponse<string>>("/redemptions", { redemptionIds }),
   createUser: (dto: CreateUserAdminRequest) =>
-    api.post<ApiResponse<UserDetail>>('/users', dto),
+    api.post<ApiResponse<UserDetail>>("/users", dto),
 
   // ── Admin CRUD: Investment (Application) ──────────────────────────────
   createApplication: (userId: number, dto: CreateApplicationRequest) =>
-    api.post<ApiResponse<ApplicationDetail>>(`/users/${userId}/applications`, dto),
+    api.post<ApiResponse<ApplicationDetail>>(
+      `/users/${userId}/applications`,
+      dto,
+    ),
   updateApplicationFull: (id: number, dto: CreateApplicationRequest) =>
     api.put<ApiResponse<string>>(`/applications/${id}/full`, dto),
   deleteApplication: (id: number) =>
     api.delete<ApiResponse<string>>(`/applications/${id}`),
 
   // ── Admin CRUD: Redemption ─────────────────────────────────────────────
-  getRedemptionPreview: (trancheApplicationId: number, unitsToRedeem: number, effectiveDate: string) =>
+  getRedemptionPreview: (
+    trancheApplicationId: number,
+    unitsToRedeem: number,
+    effectiveDate: string,
+  ) =>
     api.get<ApiResponse<RedemptionCalculationPreview>>(
       `/redemption-preview?trancheApplicationId=${trancheApplicationId}&unitsToRedeem=${unitsToRedeem}&effectiveDate=${effectiveDate}`,
     ),
   createRedemption: (dto: CreateRedemptionAdminRequest) =>
-    api.post<ApiResponse<RedemptionDetail>>('/redemptions', dto),
+    api.post<ApiResponse<RedemptionDetail>>("/redemptions", dto),
   updateRedemptionFull: (id: number, dto: CreateRedemptionAdminRequest) =>
     api.put<ApiResponse<string>>(`/redemptions/${id}/full`, dto),
   deleteRedemption: (id: number) =>
@@ -718,30 +806,58 @@ export const adminApi = {
 
   // ── Bulk catch-up ─────────────────────────────────────────────────────
   runBulkCatchUp: (from: string, to: string) =>
-    api.post<ApiResponse<{ appsProcessed: number; logsCreated: number; errors: string[] }>>('/distributions/catch-up', { from, to }),
+    api.post<
+      ApiResponse<{
+        appsProcessed: number;
+        logsCreated: number;
+        errors: string[];
+      }>
+    >("/distributions/catch-up", { from, to }),
 
   fixHistoricalCatchUp: () =>
-    api.post<ApiResponse<unknown[]>>('/distributions/fix-historical-catchup', {}),
+    api.post<ApiResponse<unknown[]>>(
+      "/distributions/fix-historical-catchup",
+      {},
+    ),
 
   // ── Manual distribution run ───────────────────────────────────────────
   simulateDistribution: (asOfDate: string) =>
-    api.post<ApiResponse<DistributionRunResult[]>>('/distributions/simulate', { asOfDate }),
+    api.post<ApiResponse<DistributionRunResult[]>>("/distributions/simulate", {
+      asOfDate,
+    }),
   executeDistribution: (asOfDate: string) =>
-    api.post<ApiResponse<DistributionRunResult[]>>('/distributions/execute', { asOfDate }),
+    api.post<ApiResponse<DistributionRunResult[]>>("/distributions/execute", {
+      asOfDate,
+    }),
   pushDistributionToOdoo: (id: number) =>
-    api.post<ApiResponse<{ ok: boolean; msg: string }>>(`/distributions/${id}/push-odoo`, {}),
+    api.post<ApiResponse<{ ok: boolean; msg: string }>>(
+      `/distributions/${id}/push-odoo`,
+      {},
+    ),
   batchPushToOdoo: (ids: number[]) =>
-    api.post<ApiResponse<{ pushed: number; failed: number }>>('/distributions/batch-push-odoo', { ids }),
+    api.post<ApiResponse<{ pushed: number; failed: number }>>(
+      "/distributions/batch-push-odoo",
+      { ids },
+    ),
   editDistributionPaidDate: (id: number, paidDate: string) =>
-    api.post<ApiResponse<{ status?: string }>>(`/distributions/${id}/edit-paid-date`, { paidDate }),
+    api.post<ApiResponse<{ status?: string }>>(
+      `/distributions/${id}/edit-paid-date`,
+      { paidDate },
+    ),
   bulkMarkDistributionPaid: (ids: number[], paidDate: string) =>
-    api.post<ApiResponse<{ marked: number; failed: number }>>('/distributions/bulk-mark-paid', { ids, paidDate }),
+    api.post<ApiResponse<{ marked: number; failed: number }>>(
+      "/distributions/bulk-mark-paid",
+      { ids, paidDate },
+    ),
   bulkPushDailyInterestToOdoo: (ids: number[]) =>
-    api.post<ApiResponse<{ pushed: number; failed: number }>>('/daily-interest/bulk-push-odoo', { ids }),
+    api.post<ApiResponse<{ pushed: number; failed: number }>>(
+      "/daily-interest/bulk-push-odoo",
+      { ids },
+    ),
 
   // ── Admin CRUD: Distribution ───────────────────────────────────────────
   createDistribution: (dto: CreateDistributionRequest) =>
-    api.post<ApiResponse<UserDistributionItem>>('/distributions', dto),
+    api.post<ApiResponse<UserDistributionItem>>("/distributions", dto),
   updateDistribution: (id: number, dto: CreateDistributionRequest) =>
     api.put<ApiResponse<string>>(`/distributions/${id}`, dto),
   deleteDistribution: (id: number) =>
@@ -749,21 +865,29 @@ export const adminApi = {
 
   // ── User-scoped reads ──────────────────────────────────────────────────
   getUserDistributions: (userId: number) =>
-    api.get<ApiResponse<UserDistributionItem[]>>(`/users/${userId}/distributions`),
+    api.get<ApiResponse<UserDistributionItem[]>>(
+      `/users/${userId}/distributions`,
+    ),
   getUserRedemptions: (userId: number) =>
     api.get<ApiResponse<RedemptionListItem[]>>(`/users/${userId}/redemptions`),
 
   // ── Maker-Checker-Approver Workflow ────────────────────────────────────
   getPendingChanges: (params: QueryParams = {}) =>
-    api.get<ApiResponse<PagedResult<PendingChangeItem>>>(pendingChangesPath(params)),
+    api.get<ApiResponse<PagedResult<PendingChangeItem>>>(
+      pendingChangesPath(params),
+    ),
   getPendingCounts: () =>
     api.get<ApiResponse<PendingCounts>>(pendingCountsPath()),
   getPendingChange: (id: number) =>
     api.get<ApiResponse<PendingChangeDetail>>(`/pending-changes/${id}`),
   getActivePendingForRecord: (entityType: string, entityId: number) =>
-    api.get<ApiResponse<PendingChangeItem | null>>(`/pending-changes/for-record?entityType=${entityType}&entityId=${entityId}`),
+    api.get<ApiResponse<PendingChangeItem | null>>(
+      `/pending-changes/for-record?entityType=${entityType}&entityId=${entityId}`,
+    ),
   getActivePendingForRecords: (entityType: string, entityIds: number[]) =>
-    api.get<ApiResponse<PendingChangeItem[]>>(`/pending-changes/for-records?entityType=${entityType}&entityIds=${entityIds.join(',')}`),
+    api.get<ApiResponse<PendingChangeItem[]>>(
+      `/pending-changes/for-records?entityType=${entityType}&entityIds=${entityIds.join(",")}`,
+    ),
   checkChange: (id: number, note?: string) =>
     api.post<ApiResponse<string>>(`/pending-changes/${id}/check`, { note }),
   approveChange: (id: number, note?: string) =>
@@ -773,15 +897,28 @@ export const adminApi = {
   cancelChange: (id: number) =>
     api.post<ApiResponse<string>>(`/pending-changes/${id}/cancel`, {}),
   setAdminRole: (userId: number, role: string | null) =>
-    api.put<ApiResponse<string>>(`/users/${userId}/admin-role`, { adminRole: role }),
-  changePassword: (userId: number, currentPassword: string, newPassword: string) =>
-    api.put<ApiResponse<string>>(`/users/${userId}/change-password`, { currentPassword, newPassword }),
+    api.put<ApiResponse<string>>(`/users/${userId}/admin-role`, {
+      adminRole: role,
+    }),
+  changePassword: (
+    userId: number,
+    currentPassword: string,
+    newPassword: string,
+  ) =>
+    api.put<ApiResponse<string>>(`/users/${userId}/change-password`, {
+      currentPassword,
+      newPassword,
+    }),
   resetPassword: (userId: number, newPassword: string) =>
-    api.put<ApiResponse<string>>(`/users/${userId}/reset-password`, { newPassword }),
+    api.put<ApiResponse<string>>(`/users/${userId}/reset-password`, {
+      newPassword,
+    }),
   capitalLedger: (params: { from?: string; to?: string } = {}) =>
     api.get<ApiResponse<CapitalLedger>>(capitalLedgerPath(params)),
   investorStatement: (userId: number, applicationId?: number) =>
-    api.get<ApiResponse<InvestorCapitalAccount>>(investorStatementPath(userId, applicationId)),
+    api.get<ApiResponse<InvestorCapitalAccount>>(
+      investorStatementPath(userId, applicationId),
+    ),
 };
 
 export interface NotificationEmail {
@@ -815,6 +952,7 @@ export interface DistributionListItem {
   id: number;
   applicationId: number;
   userId: number;
+  userName?: string;
   investorName: string;
   investorEmail?: string;
   distributionMonth: string;
@@ -824,6 +962,7 @@ export interface DistributionListItem {
   paidAt?: string;
   bankName?: string;
   bankAccountNumber?: string;
+  routingNumber?: string;
   createdOn: string;
 }
 

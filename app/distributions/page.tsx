@@ -198,6 +198,7 @@ function DistributionsContent() {
       const headers = [
         "ID",
         "App ID",
+        "Account User",
         "Investor Name",
         "Email",
         "Distribution Month",
@@ -211,6 +212,7 @@ function DistributionsContent() {
       const rows = r.data.items.map((d) => [
         d.id,
         d.applicationId,
+        d.userName,
         d.investorName,
         d.investorEmail ?? "",
         d.distributionMonth ? formatShortDate(d.distributionMonth) : "",
@@ -248,7 +250,17 @@ function DistributionsContent() {
         if (r.success) setResult(r.data);
       })
       .finally(() => setLoading(false));
-  }, [page, pageSize, status, search, month, year, appIdFilter, sortOn, sortDirection]);
+  }, [
+    page,
+    pageSize,
+    status,
+    search,
+    month,
+    year,
+    appIdFilter,
+    sortOn,
+    sortDirection,
+  ]);
 
   useEffect(() => {
     load();
@@ -443,6 +455,7 @@ function DistributionsContent() {
     key: string,
     bankName?: string | null,
     bankAccountNumber?: string | null,
+    routingNumber?: string | null,
   ) => {
     if (!bankName && !bankAccountNumber) {
       return <span style={{ color: "#9ca3af" }}>—</span>;
@@ -501,6 +514,12 @@ function DistributionsContent() {
               <div>
                 <span style={{ fontSize: 11, color: "#64748b" }}>Account:</span>{" "}
                 {bankAccountNumber}
+              </div>
+            )}
+            {routingNumber && (
+              <div>
+                <span style={{ fontSize: 11, color: "#64748b" }}>Routing:</span>{" "}
+                {routingNumber}
               </div>
             )}
           </div>
@@ -1256,7 +1275,11 @@ function DistributionsContent() {
           >
             {exporting ? "Exporting…" : "↓ Export"}
           </button>
-          {(hasMultiFilterValue(status) || search || month || year || appIdFilter) && (
+          {(hasMultiFilterValue(status) ||
+            search ||
+            month ||
+            year ||
+            appIdFilter) && (
             <button
               onClick={() => {
                 setStatus([]);
@@ -1447,11 +1470,19 @@ function DistributionsContent() {
                     />
                     <SortableTh
                       label="Account User"
+                      sortKey="userName"
+                      sortOn={sortOn}
+                      sortDirection={sortDirection}
+                      onSort={toggleSort}
+                    />
+                    <SortableTh
+                      label="Investor Name"
                       sortKey="investorname"
                       sortOn={sortOn}
                       sortDirection={sortDirection}
                       onSort={toggleSort}
                     />
+
                     <SortableTh
                       label="Amount"
                       sortKey="amount"
@@ -1544,6 +1575,9 @@ function DistributionsContent() {
                         <td style={colStyle}>
                           {d.paidAt ? formatShortDate(d.paidAt) : "—"}
                         </td>
+                        <td style={{ ...colStyle, fontWeight: 600 }}>
+                          {d.userName || "—"}
+                        </td>
                         <td style={colStyle}>
                           <Link
                             href={`/investor-statements?userId=${d.userId}`}
@@ -1583,6 +1617,7 @@ function DistributionsContent() {
                             `history-${d.id}`,
                             d.bankName,
                             d.bankAccountNumber,
+                            d.routingNumber,
                           )}
                         </td>
                         <td style={{ ...colStyle, minWidth: 240 }}>

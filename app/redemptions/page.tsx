@@ -29,8 +29,16 @@ import {
 import type { QueryParams } from "@/lib/apiContracts";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 
-const STATUSES = ["UnderReview", "Active", "Rejected"];
-const STATUS_OPTIONS = ["UnderReview", "Active", "Rejected"];
+const STATUSES = [
+  { label: "UnderReview", value: "UnderReview" },
+  { label: "Active", value: "Redeemed" },
+  { label: "Rejected", value: "Rejected" },
+];
+const STATUS_OPTIONS = [
+  { label: "Under Review", value: "UnderReview" },
+  { label: "Redeemed", value: "Active" },
+  { label: "Rejected", value: "Rejected" },
+];
 const DEFAULT_PAGE_SIZE = 20;
 
 // AggregatePurchasePrice = principal + interest; Income (ProratedPreferredReturn) is the interest
@@ -663,7 +671,10 @@ function RedemptionsContent() {
           <MultiSelectFilter
             allLabel="All Statuses"
             buttonLabel="Status"
-            options={STATUSES.map((item) => ({ value: item, label: item }))}
+            options={STATUSES.map((item) => ({
+              value: item.label,
+              label: item.value,
+            }))}
             selectedValues={status}
             onChange={(next) => {
               setStatus(next);
@@ -963,7 +974,7 @@ function RedemptionsContent() {
                               <EditableStatusBadge
                                 status={r.status}
                                 options={Array.from(
-                                  new Set([...STATUS_OPTIONS, r.status]),
+                                  new Set([...STATUS_OPTIONS]),
                                 )}
                                 disabled={statusUpdatingId === r.id}
                                 onChange={(nextStatus) => {
@@ -1256,11 +1267,13 @@ function RedemptionsContent() {
               Change redemption status?
             </h2>
             <p style={{ fontSize: 14, color: "#64748b", marginBottom: 8 }}>
-              {pendingStatusChange.label || `Redemption #${pendingStatusChange.id}`}
+              {pendingStatusChange.label ||
+                `Redemption #${pendingStatusChange.id}`}
             </p>
             <p style={{ fontSize: 14, color: "#64748b", marginBottom: 20 }}>
-              Change status from <strong>{pendingStatusChange.currentStatus}</strong>{" "}
-              to <strong>{pendingStatusChange.nextStatus}</strong>?
+              Change status from{" "}
+              <strong>{pendingStatusChange.currentStatus}</strong> to{" "}
+              <strong>{pendingStatusChange.nextStatus}</strong>?
             </p>
             <div
               style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}
@@ -1287,7 +1300,8 @@ function RedemptionsContent() {
                     statusUpdatingId === pendingStatusChange.id
                       ? "not-allowed"
                       : "pointer",
-                  opacity: statusUpdatingId === pendingStatusChange.id ? 0.7 : 1,
+                  opacity:
+                    statusUpdatingId === pendingStatusChange.id ? 0.7 : 1,
                 }}
               >
                 {statusUpdatingId === pendingStatusChange.id
@@ -1437,8 +1451,7 @@ function RedemptionsContent() {
                   </span>
                   <span style={{ fontSize: 12, color: "#64748b" }}>
                     Submitted by <strong>{viewingCreate.item.makerName}</strong>{" "}
-                    on{" "}
-                    {formatShortDateTime(viewingCreate.item.createdOn)}
+                    on {formatShortDateTime(viewingCreate.item.createdOn)}
                   </span>
                   {viewingCreate.item.checkerName && (
                     <span style={{ fontSize: 12, color: "#64748b" }}>

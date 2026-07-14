@@ -14,7 +14,11 @@ import { RedemptionEditModal } from "@/components/RedemptionEditModal";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { formatShortDate, formatShortDateTime } from "@/lib/dateFormat";
 
-const STATUSES = ["UnderReview", "Active", "Rejected"];
+const STATUSES = [
+  { label: "UnderReview", value: "UnderReview" },
+  { label: "Redeemed", value: "Active" },
+  { label: "Rejected", value: "Rejected" },
+];
 
 // DB DateTime columns come back without timezone info; append Z so JS treats them as UTC
 const asUtc = (iso?: string | null) =>
@@ -605,12 +609,9 @@ export default function RedemptionDetailPage() {
                 background: "white",
               }}
             >
-              {(STATUSES.includes(redemption.status)
-                ? STATUSES
-                : [redemption.status, ...STATUSES]
-              ).map((s) => (
-                <option key={s} value={s}>
-                  {s}
+              {STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
                 </option>
               ))}
             </select>
@@ -1157,7 +1158,7 @@ export default function RedemptionDetailPage() {
                       >
                         {signed && r.signedAt
                           ? `Signed ${formatShortDateTime(asUtc(r.signedAt)!)}`
-                            : r.sentAt
+                          : r.sentAt
                             ? `Sent ${formatShortDateTime(asUtc(r.sentAt)!)}`
                             : r.status.charAt(0).toUpperCase() +
                               r.status.slice(1)}
