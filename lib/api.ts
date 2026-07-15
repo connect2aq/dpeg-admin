@@ -62,12 +62,14 @@ export const api = {
     request<T>(path, { method: "DELETE", body: JSON.stringify(body) }),
 };
 
+export type AdminRole = "Maker" | "Approver" | "Management" | "SuperAdmin";
+
 export interface AdminUser {
   userId: number;
   email: string;
   firstName: string;
   lastName: string;
-  adminRole: string; // Maker | Checker | Approver | SuperAdmin
+  adminRole: AdminRole;
 }
 
 export interface PagedResult<T> {
@@ -138,7 +140,7 @@ export interface UserListItem {
   distributionCount: number;
   isTestUser: boolean;
   isAdmin: boolean;
-  adminRole?: string;
+  adminRole?: AdminRole;
   investorNames: string[];
 }
 
@@ -763,8 +765,6 @@ export const adminApi = {
     api.get<ApiResponse<PendingChangeItem | null>>(`/pending-changes/for-record?entityType=${entityType}&entityId=${entityId}`),
   getActivePendingForRecords: (entityType: string, entityIds: number[]) =>
     api.get<ApiResponse<PendingChangeItem[]>>(`/pending-changes/for-records?entityType=${entityType}&entityIds=${entityIds.join(',')}`),
-  checkChange: (id: number, note?: string) =>
-    api.post<ApiResponse<string>>(`/pending-changes/${id}/check`, { note }),
   approveChange: (id: number, note?: string) =>
     api.post<ApiResponse<string>>(`/pending-changes/${id}/approve`, { note }),
   rejectChange: (id: number, reason: string) =>
@@ -1071,7 +1071,7 @@ export interface PendingChangeItem {
   entityId?: number;
   targetUserId?: number;
   description: string;
-  status: string; // Pending | Checked | Approved | Rejected | Cancelled
+  status: string; // Pending | Approved | Rejected | Cancelled (legacy rows may still read "Checked")
   makerUserId: number;
   makerName: string;
   makerEmail: string;
@@ -1096,6 +1096,5 @@ export interface PendingChangeDetail extends PendingChangeItem {
 }
 
 export interface PendingCounts {
-  pendingForChecker: number;
-  checkedForApprover: number;
+  pendingForApprover: number;
 }

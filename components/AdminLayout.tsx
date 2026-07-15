@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { adminApi } from "@/lib/api";
 import { isExecutiveCopilotAllowed } from "@/lib/executiveCopilot/accessControl";
+import { canDecidePendingChange, canSeeNav } from "@/lib/permissions";
 import Image from "next/image";
 
 const NAV = [
@@ -38,19 +39,15 @@ export default function AdminLayout({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pendingBadge, setPendingBadge] = useState(0);
 
-  const adminRole = user?.adminRole ?? "SuperAdmin";
+  const adminRole = user?.adminRole;
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !canDecidePendingChange(adminRole)) return;
     adminApi
       .getPendingCounts()
       .then((r) => {
         if (!r.success || !r.data) return;
-        if (adminRole === "Checker") setPendingBadge(r.data.pendingForChecker);
-        else if (adminRole === "Approver")
-          setPendingBadge(r.data.checkedForApprover);
-        else if (adminRole === "SuperAdmin")
-          setPendingBadge(r.data.pendingForChecker + r.data.checkedForApprover);
+        setPendingBadge(r.data.pendingForApprover);
       })
       .catch(() => {});
   }, [user, adminRole]);
@@ -128,10 +125,8 @@ export default function AdminLayout({
           }}
         >
           {NAV.map(({ href, label, icon }) => {
-            // Pending Approvals — visible to Checker, Approver, SuperAdmin only
-            if (href === "/pending-approvals" && adminRole === "Maker")
-              return null;
-            // Executive Copilot — not ready for every admin yet, restricted to one account
+            if (!canSeeNav(adminRole, href)) return null;
+            // Executive Copilot — additionally restricted to an explicit account allowlist
             if (
               href === "/executive-copilot" &&
               !isExecutiveCopilotAllowed(user?.email)

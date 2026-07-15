@@ -15,6 +15,8 @@ import { downloadCsv } from "@/lib/exportCsv";
 import { hasMultiFilterValue } from "@/lib/filterUtils";
 import type { QueryParams } from "@/lib/apiContracts";
 import Link from "next/link";
+import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { canEdit } from "@/lib/permissions";
 
 const PAGE_SIZE = 25;
 
@@ -61,6 +63,8 @@ type ResetMonthModalState =
   | { phase: "done"; result: ResetMonthResult };
 
 export default function DailyInterestPage() {
+  const { user: authUser } = useAdminAuth();
+  const canEditDailyInterest = canEdit(authUser?.adminRole);
   const [result, setResult] = useState<PagedResult<DailyInterestItem> | null>(
     null,
   );
@@ -465,7 +469,7 @@ export default function DailyInterestPage() {
             </span>
             <button
               onClick={handleBulkPushDailyInterest}
-              disabled={diBulkPushing}
+              disabled={!canEditDailyInterest || diBulkPushing}
               style={{
                 padding: "7px 16px",
                 background: "#b8923a",
@@ -485,6 +489,7 @@ export default function DailyInterestPage() {
             <button
               onClick={handleDeleteClick}
               disabled={
+                !canEditDailyInterest ||
                 deleteModal.phase === "loading" ||
                 deleteModal.phase === "deleting"
               }
@@ -734,7 +739,7 @@ export default function DailyInterestPage() {
                     </tr>
                   )}
                   {result?.items.map((row) => {
-                    const canPush = row.odooStatus !== "Success";
+                    const canPush = canEditDailyInterest && row.odooStatus !== "Success";
                     const isSelected = selectedIds.has(row.id);
                     return (
                       <tr
@@ -873,7 +878,7 @@ export default function DailyInterestPage() {
                                 {pushingDIId === row.id ? "…" : "Push to Odoo"}
                               </button>
                             )}
-                            {row.includedInMonthlyDistribution && (
+                            {canEditDailyInterest && row.includedInMonthlyDistribution && (
                               <button
                                 onClick={() => handleResetMonth(row)}
                                 title="Unmark this month's distribution so it can be re-run with corrected daily logs"

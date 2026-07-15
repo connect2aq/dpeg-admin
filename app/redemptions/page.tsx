@@ -26,6 +26,7 @@ import {
 } from "@/lib/filterUtils";
 import type { QueryParams } from "@/lib/apiContracts";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { canEdit, isSuperAdmin as isSuperAdminRole } from "@/lib/permissions";
 
 const STATUSES = ["UnderReview", "Active", "Rejected"];
 const STATUS_OPTIONS = ["UnderReview", "Active", "Rejected"];
@@ -63,7 +64,8 @@ export default function RedemptionsPage() {
 function RedemptionsContent() {
   const route = useRouter();
   const { user: authUser } = useAdminAuth();
-  const isSuperAdmin = (authUser?.adminRole ?? "SuperAdmin") === "SuperAdmin";
+  const isSuperAdmin = isSuperAdminRole(authUser?.adminRole);
+  const canEditRedemptions = canEdit(authUser?.adminRole);
   const searchParams = useSearchParams();
   const [result, setResult] = useState<PagedResult<RedemptionListItem> | null>(
     null,
@@ -461,7 +463,7 @@ function RedemptionsContent() {
           <h1 style={{ fontSize: 24, fontWeight: 700, color: "#0e3416" }}>
             Redemption Requests
           </h1>
-          {selected.size > 0 && (
+          {canEditRedemptions && selected.size > 0 && (
             <button
               onClick={() => setShowDeleteConfirm(true)}
               style={{
@@ -966,7 +968,7 @@ function RedemptionsContent() {
                                 options={Array.from(
                                   new Set([...STATUS_OPTIONS, r.status]),
                                 )}
-                                disabled={statusUpdatingId === r.id}
+                                disabled={!canEditRedemptions || statusUpdatingId === r.id}
                                 onChange={(nextStatus) => {
                                   if (statusErrorId === r.id) {
                                     setStatusErrorId(null);
@@ -1003,22 +1005,24 @@ function RedemptionsContent() {
                                 alignItems: "flex-start",
                               }}
                             >
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setConfirmDeleteId(r.id);
-                                }}
-                                style={{
-                                  fontSize: 13,
-                                  color: "#b91c1c",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                Delete
-                              </button>
+                              {canEditRedemptions && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConfirmDeleteId(r.id);
+                                  }}
+                                  style={{
+                                    fontSize: 13,
+                                    color: "#b91c1c",
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>

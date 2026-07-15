@@ -8,6 +8,8 @@ import {
   type NotificationEmail,
   type DailyBalanceLog,
 } from "@/lib/api";
+import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { canEdit } from "@/lib/permissions";
 
 type BalanceSortField =
   | "date"
@@ -61,6 +63,8 @@ const EMPTY_BALANCE: DailyBalanceLog = {
 };
 
 export default function SettingsPage() {
+  const { user: authUser } = useAdminAuth();
+  const canEditSettings = canEdit(authUser?.adminRole);
   const [form, setForm] = useState<BankDetails>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -313,7 +317,7 @@ export default function SettingsPage() {
               <div style={{ marginTop: 20 }}>
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={!canEditSettings || saving}
                   style={{
                     background: "#0f2342",
                     color: "#fff",
@@ -478,7 +482,7 @@ export default function SettingsPage() {
                 </div>
                 <button
                   type="submit"
-                  disabled={balanceSaving}
+                  disabled={!canEditSettings || balanceSaving}
                   style={{
                     padding: "9px 18px",
                     background: "#0f2342",
@@ -758,6 +762,7 @@ export default function SettingsPage() {
                       )}
                       <button
                         onClick={() => removeEmail(e.id)}
+                        disabled={!canEditSettings}
                         style={{
                           padding: "3px 10px",
                           background: "#fef2f2",
@@ -800,7 +805,7 @@ export default function SettingsPage() {
                 />
                 <button
                   type="submit"
-                  disabled={addingEmail}
+                  disabled={!canEditSettings || addingEmail}
                   style={{
                     padding: "9px 18px",
                     background: "#0f2342",

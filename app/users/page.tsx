@@ -20,6 +20,7 @@ import {
 } from "@/lib/filterUtils";
 import type { QueryParams } from "@/lib/apiContracts";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { canEdit, isSuperAdmin as isSuperAdminRole } from "@/lib/permissions";
 
 const STATUSES = [
   "InProgress",
@@ -75,7 +76,8 @@ export default function UsersPage() {
 function UsersContent() {
   const route = useRouter();
   const { user: authUser } = useAdminAuth();
-  const isSuperAdmin = (authUser?.adminRole ?? "SuperAdmin") === "SuperAdmin";
+  const isSuperAdmin = isSuperAdminRole(authUser?.adminRole);
+  const canEditUsers = canEdit(authUser?.adminRole);
   const searchParams = useSearchParams();
   const [result, setResult] = useState<PagedResult<UserListItem> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -561,18 +563,20 @@ function UsersContent() {
               alignItems: "center",
             }}
           >
-            <button
-              className="btn-primary"
-              onClick={() => {
-                setCreateForm(emptyCreateForm);
-                setCreateMsg("");
-                setShowCreateModal(true);
-              }}
-              style={{ fontSize: 13 }}
-            >
-              + Create User
-            </button>
-            {selected.size > 0 && (
+            {canEditUsers && (
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  setCreateForm(emptyCreateForm);
+                  setCreateMsg("");
+                  setShowCreateModal(true);
+                }}
+                style={{ fontSize: 13 }}
+              >
+                + Create User
+              </button>
+            )}
+            {canEditUsers && selected.size > 0 && (
               <button
                 onClick={() => {
                   setDeleteMsg("");
@@ -596,8 +600,8 @@ function UsersContent() {
         )}
         {viewMode === "admins" && (
           <p style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>
-            Admin accounts manage the portal itself (Maker / Checker / Approver
-            / SuperAdmin). Click into a row to change role or reset password.
+            Admin accounts manage the portal itself (Maker / Approver /
+            Management / SuperAdmin). Click into a row to change role or reset password.
           </p>
         )}
 
@@ -616,16 +620,18 @@ function UsersContent() {
                       {viewMode === "investors" && (
                         <>
                           <th style={{ width: 40, textAlign: "center" }}>
-                            <input
-                              type="checkbox"
-                              checked={allOnPageSelected}
-                              ref={(el) => {
-                                if (el)
-                                  el.indeterminate =
-                                    someOnPageSelected && !allOnPageSelected;
-                              }}
-                              onChange={toggleSelectAll}
-                            />
+                            {canEditUsers && (
+                              <input
+                                type="checkbox"
+                                checked={allOnPageSelected}
+                                ref={(el) => {
+                                  if (el)
+                                    el.indeterminate =
+                                      someOnPageSelected && !allOnPageSelected;
+                                }}
+                                onChange={toggleSelectAll}
+                              />
+                            )}
                           </th>
                           <SortableTh
                             label="Registered"
@@ -788,7 +794,7 @@ function UsersContent() {
                               <EditableStatusBadge
                                 status={u.status}
                                 options={STATUS_OPTIONS}
-                                disabled={statusUpdatingId === u.id}
+                                disabled={!canEditUsers || statusUpdatingId === u.id}
                                 onChange={(nextStatus) => {
                                   if (statusErrorId === u.id) {
                                     setStatusErrorId(null);

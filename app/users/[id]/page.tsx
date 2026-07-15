@@ -7,6 +7,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { PendingBadge } from '@/components/PendingBadge';
 import { SortableTh } from '@/components/SortableTh';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
+import { canEdit, isSuperAdmin as isSuperAdminRole } from '@/lib/permissions';
 import {
   adminApi,
   type UserDetail,
@@ -145,8 +146,9 @@ export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
   const userId = Number(id);
   const { user: authUser } = useAdminAuth();
-  const adminRole = authUser?.adminRole ?? 'SuperAdmin';
-  const isSuperAdmin = adminRole === 'SuperAdmin';
+  const adminRole = authUser?.adminRole;
+  const isSuperAdmin = isSuperAdminRole(adminRole);
+  const canEditUser = canEdit(adminRole);
 
   const [user, setUser] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -617,6 +619,7 @@ export default function UserDetailPage() {
         </div>
 
         {/* Status update */}
+        {canEditUser && (
         <div className="card" style={{ marginBottom: 24 }}>
           <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 16 }}>Update Status</h2>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -629,8 +632,10 @@ export default function UserDetailPage() {
             {msg && <span style={{ fontSize: 13, color: msg.includes('updated') ? '#10b981' : '#ef4444' }}>{msg}</span>}
           </div>
         </div>
+        )}
 
         {/* Test user flag */}
+        {canEditUser && (
         <div className="card" style={{ marginBottom: 24 }}>
           <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 8 }}>Test User</h2>
           <p style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>Test users are excluded from dashboard statistics, reports, and Excel exports.</p>
@@ -641,6 +646,7 @@ export default function UserDetailPage() {
             {testMsg && <span style={{ fontSize: 13, color: '#10b981' }}>{testMsg}</span>}
           </div>
         </div>
+        )}
 
         {/* Pending change toast */}
         {pendingMsg && (
@@ -665,8 +671,8 @@ export default function UserDetailPage() {
               >
                 <option value="">No admin role</option>
                 <option value="Maker">Maker</option>
-                <option value="Checker">Checker</option>
                 <option value="Approver">Approver</option>
+                <option value="Management">Management</option>
                 <option value="SuperAdmin">SuperAdmin</option>
               </select>
               <button
@@ -829,8 +835,8 @@ export default function UserDetailPage() {
                       <td>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                           <Link href={`/applications/${a.id}`} style={{ color: '#b8923a', fontWeight: 600, fontSize: 12, textDecoration: 'none' }}>View</Link>
-                          <button onClick={() => openEditInvestment(a.id)} style={{ fontSize: 12, color: '#0f2342', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Edit</button>
-                          <button onClick={() => setConfirmDeleteInvId(a.id)} style={{ fontSize: 12, color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Delete</button>
+                          {canEditUser && <button onClick={() => openEditInvestment(a.id)} style={{ fontSize: 12, color: '#0f2342', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Edit</button>}
+                          {canEditUser && <button onClick={() => setConfirmDeleteInvId(a.id)} style={{ fontSize: 12, color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Delete</button>}
                         </div>
                       </td>
                     </tr>
@@ -845,9 +851,11 @@ export default function UserDetailPage() {
         <div className="card" style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342' }}>Redemptions ({userRedemptions.length})</h2>
-            <button onClick={openCreateRedemption} style={{ padding: '7px 14px', background: '#0f2342', color: 'white', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-              + Add Redemption
-            </button>
+            {canEditUser && (
+              <button onClick={openCreateRedemption} style={{ padding: '7px 14px', background: '#0f2342', color: 'white', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                + Add Redemption
+              </button>
+            )}
           </div>
           {userRedemptions.length === 0 ? (
             <p style={{ color: '#94a3b8', fontSize: 14 }}>No redemptions yet.</p>
@@ -885,8 +893,8 @@ export default function UserDetailPage() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 8 }}>
-                          <button onClick={() => openEditRedemption(r.id)} style={{ fontSize: 12, color: '#0f2342', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Edit</button>
-                          <button onClick={() => deleteRedemption(r.id)} disabled={deletingRedeemId === r.id} style={{ fontSize: 12, color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Delete</button>
+                          {canEditUser && <button onClick={() => openEditRedemption(r.id)} style={{ fontSize: 12, color: '#0f2342', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Edit</button>}
+                          {canEditUser && <button onClick={() => deleteRedemption(r.id)} disabled={deletingRedeemId === r.id} style={{ fontSize: 12, color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Delete</button>}
                         </div>
                       </td>
                     </tr>
@@ -901,9 +909,11 @@ export default function UserDetailPage() {
         <div className="card" style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342' }}>Distributions ({userDistributions.length})</h2>
-            <button onClick={openCreateDistribution} style={{ padding: '7px 14px', background: '#0f2342', color: 'white', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-              + Add Distribution
-            </button>
+            {canEditUser && (
+              <button onClick={openCreateDistribution} style={{ padding: '7px 14px', background: '#0f2342', color: 'white', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                + Add Distribution
+              </button>
+            )}
           </div>
           {userDistributions.length === 0 ? (
             <p style={{ color: '#94a3b8', fontSize: 14 }}>No distributions yet.</p>
@@ -936,8 +946,8 @@ export default function UserDetailPage() {
                       <td><StatusBadge status={d.paymentStatus} /></td>
                       <td>
                         <div style={{ display: 'flex', gap: 8 }}>
-                          <button onClick={() => openEditDistribution(d)} style={{ fontSize: 12, color: '#0f2342', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Edit</button>
-                          <button onClick={() => deleteDistribution(d.id)} disabled={deletingDistId === d.id} style={{ fontSize: 12, color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Delete</button>
+                          {canEditUser && <button onClick={() => openEditDistribution(d)} style={{ fontSize: 12, color: '#0f2342', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Edit</button>}
+                          {canEditUser && <button onClick={() => deleteDistribution(d.id)} disabled={deletingDistId === d.id} style={{ fontSize: 12, color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Delete</button>}
                         </div>
                       </td>
                     </tr>

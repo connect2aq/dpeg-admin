@@ -5,11 +5,12 @@ import { MultiSelectFilter } from '@/components/MultiSelectFilter';
 import { PaginationControls } from '@/components/PaginationControls';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { SortableTh } from '@/components/SortableTh';
-import { adminApi, type PendingChangeItem, type PendingChangeDetail, type PagedResult, type ApplicationDetail, type RedemptionDetail } from '@/lib/api';
+import { adminApi, type AdminRole, type PendingChangeItem, type PendingChangeDetail, type PagedResult, type ApplicationDetail, type RedemptionDetail } from '@/lib/api';
+import { canDecidePendingChange } from '@/lib/permissions';
 import { encodeMultiFilterValue, hasMultiFilterValue } from '@/lib/filterUtils';
 import type { QueryParams } from '@/lib/apiContracts';
 
-const STATUSES = ['Pending', 'Checked', 'Approved', 'Rejected', 'Cancelled'];
+const STATUSES = ['Pending', 'Approved', 'Rejected', 'Cancelled'];
 const ENTITY_TYPES = ['Investment', 'Redemption', 'Distribution', 'BulkUsers', 'BulkApplications', 'BulkRedemptions'];
 const PAGE_SIZE = 20;
 
@@ -100,7 +101,6 @@ function isBlank(v: string): boolean {
 function StatusChip({ status }: { status: string }) {
   const colors: Record<string, { bg: string; color: string }> = {
     Pending:   { bg: '#fef3c7', color: '#92400e' },
-    Checked:   { bg: '#dbeafe', color: '#1d4ed8' },
     Approved:  { bg: '#d1fae5', color: '#065f46' },
     Rejected:  { bg: '#fee2e2', color: '#b91c1c' },
     Cancelled: { bg: '#f1f5f9', color: '#64748b' },
@@ -316,11 +316,12 @@ function PayloadDiff({ change, currentRecord, fetchingRecord }: {
 
 // ── DetailModal ─────────────────────────────────────────────────────────────
 
-function DetailModal({ change, onClose, onAction, actingRole }: {
+function DetailModal({ change, onClose, onAction, actingRole, currentUserId }: {
   change: PendingChangeDetail;
   onClose: () => void;
   onAction: () => void;
-  actingRole: string;
+  actingRole: AdminRole | undefined;
+  currentUserId: number | undefined;
 }) {
   const [note, setNote] = useState('');
   const [reason, setReason] = useState('');
@@ -345,16 +346,10 @@ function DetailModal({ change, onClose, onAction, actingRole }: {
       .finally(() => setFetchingRecord(false));
   }, [change.entityId, change.entityType, change.operationType, needsCurrentRecord]);
 
-  const canCheck   = actingRole === 'Checker'  || actingRole === 'SuperAdmin';
-  const canApprove = actingRole === 'Approver' || actingRole === 'SuperAdmin';
-  const canReject  = canCheck || canApprove;
+  const canApprove = canDecidePendingChange(actingRole);
+  const canReject  = canApprove;
+  const canCancel  = change.makerUserId === currentUserId;
 
-  const doCheck = async () => {
-    setBusy(true);
-    const r = await adminApi.checkChange(change.id, note || undefined);
-    if (r.success) { onAction(); onClose(); } else setMsg(r.message);
-    setBusy(false);
-  };
   const doApprove = async () => {
     setBusy(true);
     const r = await adminApi.approveChange(change.id, note || undefined);
@@ -431,11 +426,11 @@ function DetailModal({ change, onClose, onAction, actingRole }: {
           </div>
 
           {/* Action area */}
-          {(change.status === 'Pending' || change.status === 'Checked') && (
+          {change.status === 'Pending' && (canApprove || canCancel) && (
             <div style={{ marginTop: 20, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
               <div style={{ marginBottom: 12 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Note (optional for Check / Approve — required for Reject)
+                  Note (optional for Approve — required for Reject)
                 </label>
                 <textarea
                   value={note}
@@ -460,13 +455,7 @@ function DetailModal({ change, onClose, onAction, actingRole }: {
               )}
 
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                {change.status === 'Pending' && canCheck && (
-                  <button onClick={doCheck} disabled={busy}
-                    style={{ padding: '9px 20px', background: '#1d4ed8', color: 'white', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.7 : 1 }}>
-                    ✓ Check
-                  </button>
-                )}
-                {change.status === 'Checked' && canApprove && (
+                {canApprove && (
                   <button onClick={doApprove} disabled={busy}
                     style={{ padding: '9px 20px', background: '#065f46', color: 'white', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.7 : 1 }}>
                     ✓ Approve & Execute
@@ -478,7 +467,7 @@ function DetailModal({ change, onClose, onAction, actingRole }: {
                     ✗ Reject
                   </button>
                 )}
-                {change.status === 'Pending' && (
+                {canCancel && (
                   <button onClick={doCancel} disabled={busy}
                     style={{ padding: '9px 20px', background: 'white', color: '#64748b', border: '1.5px solid #e2e8f0', borderRadius: 6, fontWeight: 600, fontSize: 13, cursor: busy ? 'not-allowed' : 'pointer' }}>
                     Cancel Request
@@ -498,7 +487,7 @@ function DetailModal({ change, onClose, onAction, actingRole }: {
 
 export default function PendingApprovalsPage() {
   const { user: authUser } = useAdminAuth();
-  const adminRole = authUser?.adminRole ?? 'SuperAdmin';
+  const adminRole = authUser?.adminRole;
 
   const [result, setResult] = useState<PagedResult<PendingChangeItem> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -638,6 +627,7 @@ export default function PendingApprovalsPage() {
           onClose={() => setDetail(null)}
           onAction={load}
           actingRole={adminRole}
+          currentUserId={authUser?.userId}
         />
       )}
     </AdminLayout>

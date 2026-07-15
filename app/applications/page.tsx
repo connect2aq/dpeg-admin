@@ -23,6 +23,7 @@ import {
 } from "@/lib/filterUtils";
 import type { QueryParams } from "@/lib/apiContracts";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { canEdit, isSuperAdmin as isSuperAdminRole } from "@/lib/permissions";
 
 const STATUSES = ["Deposited", "UnderReview", "Active", "Redeemed", "Rejected"];
 const STATUS_LABELS: Record<string, string> = {
@@ -55,7 +56,8 @@ export default function ApplicationsPage() {
 function ApplicationsContent() {
   const route = useRouter();
   const { user: authUser } = useAdminAuth();
-  const isSuperAdmin = (authUser?.adminRole ?? "SuperAdmin") === "SuperAdmin";
+  const isSuperAdmin = isSuperAdminRole(authUser?.adminRole);
+  const canEditApplications = canEdit(authUser?.adminRole);
   const searchParams = useSearchParams();
   const [result, setResult] = useState<PagedResult<ApplicationListItem> | null>(
     null,
@@ -339,7 +341,7 @@ function ApplicationsContent() {
           <h1 style={{ fontSize: 24, fontWeight: 700, color: "#0e3416" }}>
             Applications
           </h1>
-          {selected.size > 0 && (
+          {canEditApplications && selected.size > 0 && (
             <button
               onClick={() => setShowDeleteConfirm(true)}
               style={{
@@ -509,13 +511,15 @@ function ApplicationsContent() {
                   <thead>
                     <tr>
                       <th style={{ width: 40, padding: "12px 8px 12px 16px" }}>
-                        <input
-                          type="checkbox"
-                          ref={selectAllRef}
-                          checked={allPageSelected}
-                          onChange={toggleSelectAll}
-                          style={{ cursor: "pointer" }}
-                        />
+                        {canEditApplications && (
+                          <input
+                            type="checkbox"
+                            ref={selectAllRef}
+                            checked={allPageSelected}
+                            onChange={toggleSelectAll}
+                            style={{ cursor: "pointer" }}
+                          />
+                        )}
                       </th>
                       <SortableTh
                         label="ID / Ref"
@@ -681,7 +685,7 @@ function ApplicationsContent() {
                                 options={Array.from(
                                   new Set([...STATUS_OPTIONS, a.status]),
                                 )}
-                                disabled={statusUpdatingId === a.id}
+                                disabled={!canEditApplications || statusUpdatingId === a.id}
                                 onChange={(nextStatus) => {
                                   if (statusErrorId === a.id) {
                                     setStatusErrorId(null);
@@ -742,22 +746,24 @@ function ApplicationsContent() {
                               >
                                 Edit
                               </button> */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setConfirmDeleteId(a.id);
-                                }}
-                                style={{
-                                  fontSize: 13,
-                                  color: "#b91c1c",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                Delete
-                              </button>
+                              {canEditApplications && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConfirmDeleteId(a.id);
+                                  }}
+                                  style={{
+                                    fontSize: 13,
+                                    color: "#b91c1c",
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>

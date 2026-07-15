@@ -20,6 +20,8 @@ import {
 } from "@/lib/filterUtils";
 import type { QueryParams } from "@/lib/apiContracts";
 import Link from "next/link";
+import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { canEdit } from "@/lib/permissions";
 
 const STATUSES = ["Pending", "Sent", "Failed", "Paid"];
 const MONTHS = [
@@ -89,6 +91,8 @@ export default function DistributionsPage() {
 }
 
 function DistributionsContent() {
+  const { user: authUser } = useAdminAuth();
+  const canEditDistributions = canEdit(authUser?.adminRole);
   const searchParams = useSearchParams();
   const [result, setResult] =
     useState<PagedResult<DistributionListItem> | null>(null);
@@ -596,7 +600,7 @@ function DistributionsContent() {
             />
             <button
               onClick={handleCatchUp}
-              disabled={catchUpLoading}
+              disabled={!canEditDistributions || catchUpLoading}
               style={{
                 padding: "9px 20px",
                 background: "#b45309",
@@ -750,7 +754,7 @@ function DistributionsContent() {
             </button>
             <button
               onClick={handleExecute}
-              disabled={runLoading}
+              disabled={!canEditDistributions || runLoading}
               style={{
                 padding: "9px 20px",
                 background: "#0f2342",
@@ -826,7 +830,7 @@ function DistributionsContent() {
               {runMode === "execute" && pendingPushCount > 0 && (
                 <button
                   onClick={handleBatchPush}
-                  disabled={batchPushing}
+                  disabled={!canEditDistributions || batchPushing}
                   style={{
                     padding: "8px 18px",
                     background: "#b8923a",
@@ -1307,7 +1311,7 @@ function DistributionsContent() {
             </span>
             <button
               onClick={handleHistoryBulkPush}
-              disabled={historyBulkPushing || historyBulkMarkingPaid}
+              disabled={!canEditDistributions || historyBulkPushing || historyBulkMarkingPaid}
               style={{
                 padding: "7px 16px",
                 background: "#b8923a",
@@ -1341,7 +1345,7 @@ function DistributionsContent() {
               />
               <button
                 onClick={handleHistoryBulkMarkPaid}
-                disabled={historyBulkMarkingPaid || historyBulkPushing}
+                disabled={!canEditDistributions || historyBulkMarkingPaid || historyBulkPushing}
                 style={{
                   padding: "7px 16px",
                   background: "#0f2342",
@@ -1503,8 +1507,9 @@ function DistributionsContent() {
                       month: "short",
                       year: "numeric",
                     });
-                    const canMarkPaid = d.paymentStatus !== "Paid";
+                    const canMarkPaid = canEditDistributions && d.paymentStatus !== "Paid";
                     const canPushOdoo =
+                      canEditDistributions &&
                       d.paymentStatus !== "Sent" && d.paymentStatus !== "Paid";
                     const isSelected = selectedHistoryIds.has(d.id);
                     return (
@@ -1669,7 +1674,8 @@ function DistributionsContent() {
                               </div>
                             )}
                             {/* Edit Paid Date */}
-                            {d.paidAt &&
+                            {canEditDistributions &&
+                              d.paidAt &&
                               editingPaidDateId !== d.id &&
                               (editPaidDatePendingIds.has(d.id) ? (
                                 <span
