@@ -30,7 +30,7 @@
   --charcoal: #646262;
 
   /* Layout */
-  --sidebar-width: 248px;
+  --sidebar-width: 216px;
 
   /* Surfaces */
   --bg-page: #f5f7f5;
@@ -74,11 +74,11 @@ body {
 .sidebar-link {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 16px;
+  gap: 8px;
+  padding: 9px 13px;
   border-radius: 7px;
   color: white;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
   transition:
     background 0.15s ease,
@@ -285,6 +285,10 @@ td {
 
 tr:last-child td {
   border-bottom: none;
+}
+
+.ledger-table td {
+  font-size: 11px;
 }
 tr:hover td {
   background: var(--bg-row-hover);

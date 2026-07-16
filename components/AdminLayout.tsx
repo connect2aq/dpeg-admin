@@ -14,7 +14,7 @@ const NAV = [
   { href: "/applications", label: "Applications", icon: "📋" },
   { href: "/redemptions", label: "Redemptions", icon: "↩" },
   { href: "/capital-ledger", label: "Fund Capital Ledger", icon: "⊞" },
-  // { href: "/investor-statements", label: "Investor Statements", icon: "📄" },
+  { href: "/investor-statements", label: "Investor Statements", icon: "📄" },
   { href: "/daily-interest", label: "Daily Interest", icon: "%" },
   { href: "/distributions", label: "Distributions", icon: "$" },
   { href: "/pending-approvals", label: "Pending Approvals", icon: "⏳" },
@@ -93,7 +93,7 @@ export default function AdminLayout({
         <div
           className="flex items-center gap-4"
           style={{
-            padding: "26px 20px 22px",
+            padding: "22px 16px 18px",
             borderBottom: "1px solid rgba(255,255,255,0.08)",
           }}
         >
@@ -115,6 +115,7 @@ export default function AdminLayout({
             alt="DPEG Logo"
             width={200}
             height={200}
+            style={{ width: "100%", height: "auto", maxWidth: 168 }}
           />
         </div>
 
@@ -122,7 +123,7 @@ export default function AdminLayout({
         <nav
           style={{
             flex: 1,
-            padding: "14px 12px",
+            padding: "14px 9px",
             overflowY: "auto",
             minHeight: 0,
           }}
@@ -145,7 +146,7 @@ export default function AdminLayout({
                 onClick={() => setMobileOpen(false)}
                 style={{ position: "relative" }}
               >
-                <span style={{ fontSize: 15, width: 20, flexShrink: 0 }}>
+                <span style={{ fontSize: 14, width: 17, flexShrink: 0 }}>
                   {icon}
                 </span>
                 {label}
@@ -178,7 +179,7 @@ export default function AdminLayout({
                 className="sidebar-link"
                 onClick={() => setMobileOpen(false)}
               >
-                <span style={{ fontSize: 15, width: 20, flexShrink: 0 }}>
+                <span style={{ fontSize: 14, width: 17, flexShrink: 0 }}>
                   ⚙
                 </span>
                 Job Monitor
@@ -189,7 +190,7 @@ export default function AdminLayout({
         {/* User footer */}
         <div
           style={{
-            padding: "14px 20px 18px",
+            padding: "14px 16px 18px",
             borderTop: "1px solid rgba(255,255,255,0.08)",
           }}
         >
