@@ -536,7 +536,7 @@ function InvestorStatementsContent() {
 
   return (
     <AdminLayout>
-      <div style={{ padding: "28px 32px", maxWidth: 1700 }}>
+      <div style={{ padding: "20px 20px", maxWidth: 1700 }}>
         {/* Header */}
         <div style={{ marginBottom: 24 }}>
           <h1
@@ -558,13 +558,13 @@ function InvestorStatementsContent() {
         <div
           style={{
             display: "flex",
-            gap: 24,
+            gap: 16,
             flexWrap: "wrap",
             alignItems: "flex-start",
           }}
         >
           {/* Left panel — search / recent / all investors */}
-          <div style={{ flex: "1 1 240px", maxWidth: 270 }}>
+          <div style={{ flex: "1 1 200px", maxWidth: 230 }}>
             <div
               style={{
                 background: "var(--bg-card)",
@@ -665,9 +665,8 @@ function InvestorStatementsContent() {
                 <div
                   style={{
                     display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 8,
+                    flexDirection: "column",
+                    gap: 6,
                   }}
                 >
                   <label
@@ -697,12 +696,14 @@ function InvestorStatementsContent() {
                       setListPage(1);
                     }}
                     style={{
+                      width: "100%",
                       fontSize: 11,
                       color: "var(--muted)",
                       border: "1px solid var(--border)",
                       borderRadius: 6,
                       background: "var(--bg-card)",
-                      padding: "3px 4px",
+                      padding: "4px 6px",
+                      boxSizing: "border-box",
                     }}
                   >
                     <option value="name_asc">Name (A–Z)</option>
@@ -806,7 +807,7 @@ function InvestorStatementsContent() {
           </div>
 
           {/* Right panel — selected investor's statement */}
-          <div style={{ flex: "3 1 600px", minWidth: 0 }}>
+          <div style={{ flex: "3 1 420px", minWidth: 0 }}>
             {!selectedUserId && (
               <div
                 style={{
