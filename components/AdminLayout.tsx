@@ -14,7 +14,7 @@ const NAV = [
   { href: "/applications", label: "Applications", icon: "📋" },
   { href: "/redemptions", label: "Redemptions", icon: "↩" },
   { href: "/capital-ledger", label: "Fund Capital Ledger", icon: "⊞" },
-  { href: "/investor-statements", label: "Investor Statements", icon: "📄" },
+  // { href: "/investor-statements", label: "Investor Statements", icon: "📄" },
   { href: "/daily-interest", label: "Daily Interest", icon: "%" },
   { href: "/distributions", label: "Distributions", icon: "$" },
   { href: "/pending-approvals", label: "Pending Approvals", icon: "⏳" },
