@@ -600,14 +600,14 @@ function ApplicationsContent() {
                           }}
                           onClick={() => route.push(`/applications/${a.id}`)}
                         >
-                          <td style={{ padding: "12px 8px 12px 16px" }}>
+                          <td
+                            style={{ padding: "12px 8px 12px 16px" }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <input
                               type="checkbox"
                               checked={selected.has(a.id)}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleOne(a.id);
-                              }}
+                              onChange={() => toggleOne(a.id)}
                               style={{ cursor: "pointer" }}
                             />
                           </td>

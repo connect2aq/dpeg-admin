@@ -837,13 +837,6 @@ export default function DashboardPage() {
                 href="/capital-ledger"
               />
               <KpiCard
-                label="Accrued & Unpaid"
-                value={fmt(stats.totalPendingAccruals)}
-                sub="Pending daily accruals, not yet distributed"
-                color="#7c3aed"
-                href="/capital-ledger"
-              />
-              <KpiCard
                 label="Sponsored Equity"
                 value={
                   stats.sponsoredEquity != null
@@ -927,18 +920,14 @@ export default function DashboardPage() {
                       Investor Type Breakdown
                     </div>
                     <ResponsiveContainer width="100%" height={200}>
-                      <PieChart>
+                      <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
                         <Pie
                           data={trends.investorTypeBreakdown}
                           dataKey="count"
                           nameKey="type"
-                          cx="40%"
+                          cx="35%"
                           cy="50%"
                           outerRadius={70}
-                          label={({ type, percent }: any) =>
-                            `${type} ${Math.round((percent ?? 0) * 100)}%`
-                          }
-                          labelLine={false}
                         >
                           {trends.investorTypeBreakdown.map((_, i) => (
                             <Cell
@@ -947,6 +936,27 @@ export default function DashboardPage() {
                             />
                           ))}
                         </Pie>
+                        <Legend
+                          layout="vertical"
+                          align="right"
+                          verticalAlign="middle"
+                          iconType="circle"
+                          wrapperStyle={{ fontSize: 12 }}
+                          formatter={(value: string) => {
+                            const total = trends.investorTypeBreakdown.reduce(
+                              (s, d) => s + d.count,
+                              0,
+                            );
+                            const item = trends.investorTypeBreakdown.find(
+                              (d) => d.type === value,
+                            );
+                            const pct =
+                              item && total > 0
+                                ? Math.round((item.count / total) * 100)
+                                : 0;
+                            return `${value} ${pct}%`;
+                          }}
+                        />
                         <Tooltip
                           contentStyle={{ fontSize: 12 }}
                           formatter={(val, name) => [val, name]}

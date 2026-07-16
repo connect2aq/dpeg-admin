@@ -741,14 +741,14 @@ function UsersContent() {
                         >
                           {viewMode === "investors" && (
                             <>
-                              <td style={{ textAlign: "center" }}>
+                              <td
+                                style={{ textAlign: "center" }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 <input
                                   type="checkbox"
                                   checked={selected.has(u.id)}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleSelect(u.id);
-                                  }}
+                                  onChange={() => toggleSelect(u.id)}
                                 />
                               </td>
                               <td style={{ color: "#64748b", fontSize: 13 }}>
