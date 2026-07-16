@@ -837,6 +837,13 @@ export default function DashboardPage() {
                 href="/capital-ledger"
               />
               <KpiCard
+                label="Accrued & Unpaid"
+                value={fmt(stats.totalPendingAccruals)}
+                sub="Pending daily accruals, not yet distributed"
+                color="#7c3aed"
+                href="/capital-ledger"
+              />
+              <KpiCard
                 label="Sponsored Equity"
                 value={
                   stats.sponsoredEquity != null
