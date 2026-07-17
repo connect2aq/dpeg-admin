@@ -13,6 +13,7 @@ import {
   usersPath,
   bankDetailsPath,
   dailyBalancesPath,
+  bankTransactionsPath,
   investorStatementPath,
   buildQueryString,
   type QueryParams,
@@ -1239,3 +1240,178 @@ export interface PendingCounts {
   pendingForChecker: number;
   checkedForApprover: number;
 }
+
+// ── Bank Transaction Import ───────────────────────────────────────────────
+
+export type LinkedEntityType = "Investment" | "Redemption" | "Distribution";
+
+export interface BankTransactionListItem {
+  id: number;
+  accountNumber: string;
+  postDate: string;
+  checkNumber?: string;
+  rawDescription: string;
+  adminDescription?: string;
+  debit?: number;
+  credit?: number;
+  amount: number;
+  balance: number;
+  status: string;
+  categoryId?: number;
+  categoryName?: string;
+  linkedCount: number;
+  linkedSummary?: string;
+  importSessionId: number;
+  createdOn: string;
+}
+
+export interface BankTransactionLinkItem {
+  id: number;
+  linkedEntityType: LinkedEntityType;
+  linkedEntityId: number;
+  linkedEntityLabel: string;
+  linkedAmount?: number;
+  notes?: string;
+}
+
+export interface BankTransactionDetail extends BankTransactionListItem {
+  links: BankTransactionLinkItem[];
+}
+
+export interface LinkCandidate {
+  entityType: LinkedEntityType;
+  entityId: number;
+  displayLabel: string;
+  amount?: number;
+  date?: string;
+  investorName?: string;
+}
+
+export interface TransactionCategoryItem {
+  id: number;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface BankTransactionImportRowResult {
+  rowNumber: number;
+  postDate?: string;
+  description?: string;
+  amount?: number;
+  outcome: "Imported" | "Skipped_Duplicate" | "Skipped_Pending" | "Failed";
+  errorMessage?: string;
+  bankTransactionId?: number;
+}
+
+export interface BankTransactionImportResult {
+  sessionId: number;
+  totalRows: number;
+  succeeded: number;
+  skipped: number;
+  failed: number;
+  rows: BankTransactionImportRowResult[];
+}
+
+export interface BankTxnImportSessionListItem {
+  id: number;
+  fileName: string;
+  importedAt: string;
+  importedByUserId: number;
+  totalRows: number;
+  succeeded: number;
+  skipped: number;
+  failed: number;
+}
+
+export interface BankTxnImportSessionDetail extends BankTxnImportSessionListItem {
+  rows: BankTransactionImportRowResult[];
+}
+
+export const bankTransactionsApi = {
+  upload: (
+    file: File,
+  ): Promise<{ success: boolean; data: BankTransactionImportResult; message: string }> => {
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("adminToken") : null;
+    const form = new FormData();
+    form.append("file", file);
+    return fetch(`${BASE}/bank-transactions/upload`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    }).then((r) => r.json());
+  },
+  list: (params: QueryParams) =>
+    api.get<ApiResponse<PagedResult<BankTransactionListItem>>>(
+      bankTransactionsPath(params),
+    ),
+  getById: (id: number) =>
+    api.get<ApiResponse<BankTransactionDetail>>(`/bank-transactions/${id}`),
+  update: (
+    id: number,
+    dto: {
+      postDate?: string;
+      checkNumber?: string;
+      adminDescription?: string;
+      debit?: number;
+      credit?: number;
+    },
+  ) => api.put<ApiResponse<string>>(`/bank-transactions/${id}`, dto),
+  setCategory: (id: number, categoryId: number | null) =>
+    api.put<ApiResponse<string>>(`/bank-transactions/${id}/category`, {
+      categoryId,
+    }),
+  remove: (id: number) =>
+    api.delete<ApiResponse<string>>(`/bank-transactions/${id}`),
+  searchLinkCandidates: (
+    type: LinkedEntityType,
+    search?: string,
+    nearAmount?: number,
+    nearDate?: string,
+  ) => {
+    const q = buildQueryString({ type, search, nearAmount, nearDate });
+    return api.get<ApiResponse<LinkCandidate[]>>(
+      `/bank-transactions/link-candidates?${q}`,
+    );
+  },
+  addLink: (
+    id: number,
+    dto: {
+      linkedEntityType: LinkedEntityType;
+      linkedEntityId: number;
+      linkedAmount?: number;
+      notes?: string;
+    },
+  ) => api.post<ApiResponse<string>>(`/bank-transactions/${id}/links`, dto),
+  bulkLink: (dto: {
+    bankTransactionIds: number[];
+    linkedEntityType: LinkedEntityType;
+    linkedEntityId: number;
+    linkedAmountPerTransaction?: number;
+    notes?: string;
+  }) => api.post<ApiResponse<string>>(`/bank-transactions/bulk-link`, dto),
+  removeLink: (linkId: number) =>
+    api.delete<ApiResponse<string>>(`/bank-transactions/links/${linkId}`),
+  getSessions: () =>
+    api.get<ApiResponse<BankTxnImportSessionListItem[]>>(
+      `/bank-transactions/import-sessions`,
+    ),
+  getSessionDetail: (id: number) =>
+    api.get<ApiResponse<BankTxnImportSessionDetail>>(
+      `/bank-transactions/import-sessions/${id}`,
+    ),
+  getCategories: (includeInactive = false) =>
+    api.get<ApiResponse<TransactionCategoryItem[]>>(
+      `/bank-transactions/categories?includeInactive=${includeInactive}`,
+    ),
+  createCategory: (name: string, sortOrder: number) =>
+    api.post<ApiResponse<string>>(`/bank-transactions/categories`, {
+      name,
+      sortOrder,
+    }),
+  updateCategory: (
+    id: number,
+    dto: { name: string; isActive: boolean; sortOrder: number },
+  ) => api.put<ApiResponse<string>>(`/bank-transactions/categories/${id}`, dto),
+};

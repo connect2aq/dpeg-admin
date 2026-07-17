@@ -4,9 +4,11 @@ import AdminLayout from "@/components/AdminLayout";
 import { SortableTh } from "@/components/SortableTh";
 import {
   adminApi,
+  bankTransactionsApi,
   type BankDetails,
   type NotificationEmail,
   type DailyBalanceLog,
+  type TransactionCategoryItem,
 } from "@/lib/api";
 import { formatShortDate } from "@/lib/dateFormat";
 
@@ -79,6 +81,15 @@ export default function SettingsPage() {
     ok: boolean;
   } | null>(null);
 
+  const [categories, setCategories] = useState<TransactionCategoryItem[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [categoryMsg, setCategoryMsg] = useState<{
+    text: string;
+    ok: boolean;
+  } | null>(null);
+
   const [balances, setBalances] = useState<DailyBalanceLog[]>([]);
   const [balanceForm, setBalanceForm] =
     useState<DailyBalanceLog>(EMPTY_BALANCE);
@@ -118,8 +129,48 @@ export default function SettingsPage() {
         if (r.success && r.data) setNotifEmails(r.data);
       })
       .finally(() => setNotifLoading(false));
+    bankTransactionsApi
+      .getCategories(true)
+      .then((r) => {
+        if (r.success && r.data) setCategories(r.data);
+      })
+      .finally(() => setCategoriesLoading(false));
     loadBalances().finally(() => setBalanceLoading(false));
   }, []);
+
+  const addCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    setAddingCategory(true);
+    setCategoryMsg(null);
+    const nextSortOrder =
+      categories.reduce((max, c) => Math.max(max, c.sortOrder), 0) + 1;
+    const r = await bankTransactionsApi.createCategory(
+      newCategoryName.trim(),
+      nextSortOrder,
+    );
+    if (r.success) {
+      const listRes = await bankTransactionsApi.getCategories(true);
+      if (listRes.success && listRes.data) setCategories(listRes.data);
+      setNewCategoryName("");
+      setCategoryMsg({ text: "Category added.", ok: true });
+    } else {
+      setCategoryMsg({ text: r.message || "Failed to add category.", ok: false });
+    }
+    setAddingCategory(false);
+  };
+
+  const toggleCategoryActive = async (c: TransactionCategoryItem) => {
+    const r = await bankTransactionsApi.updateCategory(c.id, {
+      name: c.name,
+      isActive: !c.isActive,
+      sortOrder: c.sortOrder,
+    });
+    if (r.success)
+      setCategories((prev) =>
+        prev.map((x) => (x.id === c.id ? { ...x, isActive: !x.isActive } : x)),
+      );
+  };
 
   const saveBalance = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -827,6 +878,134 @@ export default function SettingsPage() {
                   }}
                 >
                   {emailMsg.text}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Transaction Categories */}
+        <div className="card" style={{ marginTop: 28 }}>
+          <h2
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              color: "#0f2342",
+              marginBottom: 6,
+            }}
+          >
+            Bank Transaction Categories
+          </h2>
+          <p style={{ fontSize: 13, color: "#64748b", marginBottom: 20 }}>
+            Categories used to tag imported bank transactions. Deactivate a
+            category instead of deleting it — past transactions keep their
+            category even after it's turned off.
+          </p>
+
+          {categoriesLoading ? (
+            <p style={{ fontSize: 13, color: "#64748b" }}>Loading…</p>
+          ) : (
+            <>
+              {categories.length > 0 && (
+                <div
+                  style={{
+                    marginBottom: 16,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  {categories
+                    .slice()
+                    .sort((a, b) => a.sortOrder - b.sortOrder)
+                    .map((c) => (
+                      <div
+                        key={c.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          padding: "8px 12px",
+                          background: "#f8fafc",
+                          borderRadius: 6,
+                          border: "1px solid #e2e8f0",
+                        }}
+                      >
+                        <span
+                          style={{
+                            flex: 1,
+                            fontSize: 14,
+                            color: c.isActive ? "#1a1a2e" : "#94a3b8",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {c.name}
+                        </span>
+                        <button
+                          onClick={() => toggleCategoryActive(c)}
+                          style={{
+                            padding: "3px 10px",
+                            background: c.isActive ? "#f0fdf4" : "#fef2f2",
+                            border: c.isActive
+                              ? "1px solid #bbf7d0"
+                              : "1px solid #fecaca",
+                            borderRadius: 5,
+                            fontSize: 12,
+                            color: c.isActive ? "#166534" : "#b91c1c",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {c.isActive ? "Active" : "Inactive"}
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              <form
+                onSubmit={addCategory}
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "flex-start",
+                  flexWrap: "wrap",
+                }}
+              >
+                <input
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="New category name"
+                  required
+                  style={{ ...inputStyle, flex: "1 1 200px", maxWidth: 260 }}
+                />
+                <button
+                  type="submit"
+                  disabled={addingCategory}
+                  style={{
+                    padding: "9px 18px",
+                    background: "#0f2342",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 6,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: addingCategory ? "not-allowed" : "pointer",
+                    opacity: addingCategory ? 0.7 : 1,
+                  }}
+                >
+                  {addingCategory ? "Adding…" : "Add Category"}
+                </button>
+              </form>
+
+              {categoryMsg && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    fontSize: 13,
+                    color: categoryMsg.ok ? "#15803d" : "#b91c1c",
+                  }}
+                >
+                  {categoryMsg.text}
                 </div>
               )}
             </>

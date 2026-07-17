@@ -24,6 +24,7 @@ const NAV = [
   { href: "/audit-log", label: "Audit Log", icon: "🔍" },
   { href: "/settings", label: "Settings", icon: "⚙" },
   { href: "/historical-import", label: "Historical Import", icon: "⬆" },
+  { href: "/bank-transactions", label: "Bank Transactions", icon: "🏦" },
   // { href: "/smtp-test", label: "SMTP Test", icon: "✉" },
 ];
 

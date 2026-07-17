@@ -110,3 +110,8 @@ export function bankDetailsPath(): string {
 export function dailyBalancesPath(): string {
   return "/daily-balances";
 }
+
+export function bankTransactionsPath(params: QueryParams): string {
+  const q = buildQueryString(params);
+  return `/bank-transactions?${q}`;
+}
