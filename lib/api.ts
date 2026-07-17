@@ -1328,6 +1328,23 @@ export interface BankTxnImportSessionDetail extends BankTxnImportSessionListItem
   rows: BankTransactionImportRowResult[];
 }
 
+export interface BankTransactionCategoryTotal {
+  categoryId: number;
+  categoryName: string;
+  sortOrder: number;
+  total: number;
+  count: number;
+}
+
+export interface BankTransactionBalanceFlow {
+  categoryTotals: BankTransactionCategoryTotal[];
+  uncategorizedTotal: number;
+  uncategorizedCount: number;
+  latestBankBalance?: number;
+  latestBalanceDate?: string;
+  totalTransactionCount: number;
+}
+
 export const bankTransactionsApi = {
   upload: (
     file: File,
@@ -1348,6 +1365,10 @@ export const bankTransactionsApi = {
     ),
   getById: (id: number) =>
     api.get<ApiResponse<BankTransactionDetail>>(`/bank-transactions/${id}`),
+  getBalanceFlow: () =>
+    api.get<ApiResponse<BankTransactionBalanceFlow>>(
+      `/bank-transactions/balance-flow`,
+    ),
   update: (
     id: number,
     dto: {
