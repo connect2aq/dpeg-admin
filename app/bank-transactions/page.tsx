@@ -189,16 +189,31 @@ export default function BankTransactionsPage() {
 
   // ── Row actions ───────────────────────────────────────────────────────────
 
+  // Patch a single row in place rather than re-fetching the whole page — a full
+  // reload after every edit re-sorts the list and visibly moves the row the admin
+  // just touched (or the next one they meant to edit), which makes categorizing a
+  // run of rows one after another frustrating.
+  const updateRowInPlace = (id: number, patch: Partial<BankTransactionListItem>) => {
+    setResult((prev) =>
+      prev
+        ? { ...prev, items: prev.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) }
+        : prev,
+    );
+  };
+
   const saveAdminDescription = async (row: BankTransactionListItem, value: string) => {
     if (value === (row.adminDescription ?? "")) return;
-    await bankTransactionsApi.update(row.id, { adminDescription: value });
-    load();
+    const res = await bankTransactionsApi.update(row.id, { adminDescription: value });
+    if (res.success) updateRowInPlace(row.id, { adminDescription: value });
   };
 
   const changeCategory = async (row: BankTransactionListItem, value: string) => {
     const categoryId = value === "" ? null : Number(value);
-    await bankTransactionsApi.setCategory(row.id, categoryId);
-    load();
+    const res = await bankTransactionsApi.setCategory(row.id, categoryId);
+    if (res.success) {
+      const categoryName = categoryId == null ? undefined : categories.find((c) => c.id === categoryId)?.name;
+      updateRowInPlace(row.id, { categoryId: categoryId ?? undefined, categoryName });
+    }
   };
 
   const deleteRow = async (row: BankTransactionListItem) => {
