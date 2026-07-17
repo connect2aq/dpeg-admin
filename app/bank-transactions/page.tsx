@@ -11,6 +11,7 @@ import {
   bankTransactionsApi,
   type BankTransactionListItem,
   type BankTransactionImportResult,
+  type BankTransactionLinkItem,
   type LinkCandidate,
   type LinkedEntityType,
   type PagedResult,
@@ -632,6 +633,23 @@ function TransactionRow({
   const [selectedCandidate, setSelectedCandidate] = useState<LinkCandidate | null>(null);
   const [linking, setLinking] = useState(false);
   const [linkError, setLinkError] = useState("");
+  const [existingLinks, setExistingLinks] = useState<BankTransactionLinkItem[]>([]);
+  const [loadingLinks, setLoadingLinks] = useState(false);
+  const [unlinkingId, setUnlinkingId] = useState<number | null>(null);
+
+  const loadLinks = useCallback(async () => {
+    setLoadingLinks(true);
+    try {
+      const res = await bankTransactionsApi.getById(row.id);
+      if (res.success) setExistingLinks(res.data.links);
+    } finally {
+      setLoadingLinks(false);
+    }
+  }, [row.id]);
+
+  useEffect(() => {
+    if (linkOpen) loadLinks();
+  }, [linkOpen, loadLinks]);
 
   const addLink = async () => {
     if (!selectedCandidate) return;
@@ -643,12 +661,26 @@ function TransactionRow({
         linkedEntityId: selectedCandidate.entityId,
       });
       if (res.success) {
-        setLinkOpen(false);
         setSelectedCandidate(null);
+        await loadLinks();
         onReload();
       } else setLinkError(res.message);
     } finally {
       setLinking(false);
+    }
+  };
+
+  const removeLink = async (linkId: number) => {
+    if (!confirm("Remove this link?")) return;
+    setUnlinkingId(linkId);
+    try {
+      const res = await bankTransactionsApi.removeLink(linkId);
+      if (res.success) {
+        await loadLinks();
+        onReload();
+      } else alert(res.message);
+    } finally {
+      setUnlinkingId(null);
     }
   };
 
@@ -704,6 +736,42 @@ function TransactionRow({
       {linkOpen && (
         <tr>
           <td colSpan={12} style={{ ...s.td, background: "#f8fafc" }}>
+            {loadingLinks ? (
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 10 }}>Loading links…</div>
+            ) : existingLinks.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+                {existingLinks.map((l) => (
+                  <div
+                    key={l.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "6px 10px",
+                      background: "white",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 6,
+                      fontSize: 12,
+                    }}
+                  >
+                    <span style={{ flex: 1, color: "#1a1a2e" }}>
+                      {l.linkedEntityLabel}
+                      {l.linkedAmount != null && ` — ${fmtMoney(l.linkedAmount)}`}
+                    </span>
+                    <button
+                      onClick={() => removeLink(l.id)}
+                      disabled={unlinkingId === l.id}
+                      style={s.btn("#991b1b", unlinkingId === l.id)}
+                    >
+                      {unlinkingId === l.id ? "Removing…" : "Unlink"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 12 }}>Not linked to anything yet.</div>
+            )}
+
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <div style={{ display: "flex", gap: 6 }}>
                 {(["Investment", "Redemption", "Distribution"] as LinkedEntityType[]).map((t) => (
@@ -727,7 +795,7 @@ function TransactionRow({
                 disabled={!selectedCandidate || linking}
                 style={s.btn("#b8923a", !selectedCandidate || linking)}
               >
-                {linking ? "Linking…" : "Link"}
+                {linking ? "Linking…" : "Add Link"}
               </button>
               <button onClick={() => setLinkOpen(false)} style={s.btn("#64748b")}>
                 Close
