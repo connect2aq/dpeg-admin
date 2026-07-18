@@ -9,8 +9,8 @@ import Image from "next/image";
 
 const NAV = [
   { href: "/executive-copilot", label: "Executive Copilot", icon: "💬" },
-  { href: "/investor-statements", label: "Investor Statements", icon: "📄" },
   { href: "/dashboard", label: "Dashboard", icon: "▦" },
+  { href: "/investor-statements", label: "Investor Statements", icon: "📄" },
   { href: "/applications", label: "Applications", icon: "📋" },
   { href: "/redemptions", label: "Redemptions", icon: "↩" },
   { href: "/capital-ledger", label: "Fund Capital Ledger", icon: "⊞" },
