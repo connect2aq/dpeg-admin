@@ -9,16 +9,16 @@ import Image from "next/image";
 
 const NAV = [
   { href: "/executive-copilot", label: "Executive Copilot", icon: "💬" },
+  { href: "/investor-statements", label: "Investor Statements", icon: "📄" },
   { href: "/dashboard", label: "Dashboard", icon: "▦" },
-  { href: "/users", label: "Users", icon: "👤" },
   { href: "/applications", label: "Applications", icon: "📋" },
   { href: "/redemptions", label: "Redemptions", icon: "↩" },
   { href: "/capital-ledger", label: "Fund Capital Ledger", icon: "⊞" },
-  { href: "/investor-statements", label: "Investor Statements", icon: "📄" },
   { href: "/daily-interest", label: "Daily Interest", icon: "%" },
   { href: "/distributions", label: "Distributions", icon: "$" },
   { href: "/pending-approvals", label: "Pending Approvals", icon: "⏳" },
   // { href: "/odoo-logs", label: "Odoo Logs", icon: "⇄" },
+  { href: "/users", label: "Users", icon: "👤" },
   { href: "/email-logs", label: "Email Logs", icon: "✉" },
   { href: "/docusign", label: "DocuSign", icon: "✍" },
   { href: "/audit-log", label: "Audit Log", icon: "🔍" },
