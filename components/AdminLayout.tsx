@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { adminApi } from "@/lib/api";
 import { isExecutiveCopilotAllowed } from "@/lib/executiveCopilot/accessControl";
+import { isBankTransactionsAllowed } from "@/lib/bankTransactions/accessControl";
 import Image from "next/image";
 
 const NAV = [
@@ -137,6 +138,12 @@ export default function AdminLayout({
             if (
               href === "/executive-copilot" &&
               !isExecutiveCopilotAllowed(user?.email)
+            )
+              return null;
+            // Bank Transactions — restricted to one admin account for now
+            if (
+              href === "/bank-transactions" &&
+              !isBankTransactionsAllowed(user?.email)
             )
               return null;
             return (
