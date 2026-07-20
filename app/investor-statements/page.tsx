@@ -344,7 +344,7 @@ function InvestorStatementsContent() {
   const [search, setSearch] = useState("");
   const [showOnlyFunded, setShowOnlyFunded] = useState(true);
   const [listSort, setListSort] = useState<
-    "name_asc" | "createdOn_desc" | "createdOn_asc"
+    "createdOn_desc" | "createdOn_asc" | "name_asc" | "name_desc"
   >("createdOn_desc");
   const [listPage, setListPage] = useState(1);
   const [listPageSize, setListPageSize] = useState(DEFAULT_LIST_PAGE_SIZE);
@@ -361,11 +361,13 @@ function InvestorStatementsContent() {
   const loadList = useCallback(() => {
     setListLoading(true);
     const [sortOn, sortDirection] =
-      listSort === "name_asc"
-        ? ["name", "asc"]
-        : listSort === "createdOn_desc"
-          ? ["createdOn", "desc"]
-          : ["createdOn", "asc"];
+      listSort === "createdOn_desc"
+        ? ["createdOn", "desc"]
+        : listSort === "createdOn_asc"
+          ? ["createdOn", "asc"]
+          : listSort === "name_asc"
+            ? ["name", "asc"]
+            : ["name", "desc"];
     adminApi
       .users({
         page: listPage,
@@ -706,9 +708,10 @@ function InvestorStatementsContent() {
                       boxSizing: "border-box",
                     }}
                   >
-                    <option value="name_asc">Name (A–Z)</option>
                     <option value="createdOn_desc">Newest Registered</option>
                     <option value="createdOn_asc">Oldest Registered</option>
+                    <option value="name_asc">Name (A–Z)</option>
+                    <option value="name_desc">Name (Z–A)</option>
                   </select>
                 </div>
               </div>
