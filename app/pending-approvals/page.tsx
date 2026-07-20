@@ -12,7 +12,7 @@ import { formatShortDate, formatShortDateTime } from '@/lib/dateFormat';
 import { PAGE_SIZE_OPTIONS } from '@/lib/pagination';
 
 const STATUSES = ['Pending', 'Checked', 'Approved', 'Rejected', 'Cancelled'];
-const ENTITY_TYPES = ['Investment', 'Redemption', 'Distribution', 'BulkUsers', 'BulkApplications', 'BulkRedemptions'];
+const ENTITY_TYPES = ['Investment', 'Redemption', 'Distribution', 'BankAccount', 'BulkUsers', 'BulkApplications', 'BulkRedemptions'];
 const DEFAULT_PAGE_SIZE = 20;
 
 // ── Field definitions (payload keys are PascalCase — C# JsonSerializer default) ──
@@ -49,10 +49,7 @@ const INV_FIELDS: FieldDef[] = [
   { key: 'PPMRefNO',               label: 'PPM Ref #',               getCurrent: r => String((r as ApplicationDetail).investment?.ppmRefNO ?? '') },
   { key: 'PaymentMethod',          label: 'Payment Method',          getCurrent: r => (r as ApplicationDetail).investment?.paymentMethod ?? '' },
   { key: 'DistributionPreference', label: 'Distribution Preference', getCurrent: r => (r as ApplicationDetail).investment?.distributionPreference ?? '' },
-  { key: 'BankName',               label: 'Bank Name',               getCurrent: r => (r as ApplicationDetail).investment?.bankName ?? '' },
-  { key: 'AccHolder',              label: 'Account Holder',          getCurrent: r => (r as ApplicationDetail).investment?.accHolder ?? '' },
-  { key: 'RoutingNumber',          label: 'Routing Number',          getCurrent: r => String((r as ApplicationDetail).investment?.routingNumber ?? '') },
-  { key: 'AccNumber',              label: 'Account Number',          getCurrent: r => (r as ApplicationDetail).investment?.accNumber ?? '' },
+  { key: 'BankAccountId',          label: 'Bank Account',            getCurrent: r => String((r as ApplicationDetail).investment?.bankAccountId ?? '') },
 ];
 
 const REDEEM_FIELDS: FieldDef[] = [
@@ -73,6 +70,7 @@ const REDEEM_FIELDS: FieldDef[] = [
   { key: 'SignatoryName',           label: 'Signatory Name',            getCurrent: r => (r as RedemptionDetail).signatoryName ?? '' },
   { key: 'SignatoryTitle',          label: 'Signatory Title',           getCurrent: r => (r as RedemptionDetail).signatoryTitle ?? '' },
   { key: 'Status',                  label: 'Status',                    getCurrent: r => (r as RedemptionDetail).status ?? '' },
+  { key: 'PayoutBankAccountId',     label: 'Payout Bank Account',       getCurrent: r => String((r as RedemptionDetail).payoutBankAccountId ?? '') },
 ];
 
 const DIST_LABELS: Record<string, string> = {
@@ -86,6 +84,15 @@ const DIST_LABELS: Record<string, string> = {
   BankAccountHolderName: 'Account Holder Name',
   BankAccountNumber:     'Account Number',
   BankRoutingNumber:     'Routing Number',
+};
+
+const BANK_ACCOUNT_LABELS: Record<string, string> = {
+  BankName:          'Bank Name',
+  AccountHolderName: 'Account Holder Name',
+  RoutingNumber:     'Routing Number',
+  AccountNumber:     'Account Number',
+  Label:             'Label',
+  SetPrimary:        'Set as Primary',
 };
 
 function fmt(v: unknown): string {
@@ -163,6 +170,41 @@ function PayloadDiff({ change, currentRecord, fetchingRecord }: {
                   {DIST_LABELS[k] ?? k}
                 </td>
                 <td style={{ padding: '6px 10px', color: '#1e293b', fontFamily: 'monospace', fontSize: 12 }}>{fmt(v)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // ── BankAccount: no current-record fetch available — show payload with labels ──
+  if (entityType === 'BankAccount') {
+    const entries = Object.entries(payload).filter(([, v]) => v !== null && v !== '' && v !== undefined);
+    const isAdd = operationType === 'Add';
+    if (entries.length === 0) {
+      return (
+        <div style={{ marginTop: 16, fontSize: 13, color: '#64748b' }}>
+          {change.description}
+        </div>
+      );
+    }
+    return (
+      <div style={{ marginTop: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6,
+          color: isAdd ? '#065f46' : '#92400e' }}>
+          {isAdd ? 'New bank account' : 'Bank account change'}
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <tbody>
+            {entries.map(([k, v]) => (
+              <tr key={k} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '6px 10px', background: '#f8fafc', fontWeight: 600, color: '#475569', width: 200, fontSize: 12 }}>
+                  {BANK_ACCOUNT_LABELS[k] ?? k}
+                </td>
+                <td style={{ padding: '6px 10px', color: '#1e293b', fontFamily: 'monospace', fontSize: 12 }}>
+                  {k === 'AccountNumber' ? '••••' + String(v).slice(-4) : fmt(v)}
+                </td>
               </tr>
             ))}
           </tbody>

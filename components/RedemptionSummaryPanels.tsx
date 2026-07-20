@@ -14,25 +14,6 @@ function InfoRow({ label, value }: { label: string; value?: string | number | nu
   );
 }
 
-export function BankDetailsPanel({ bankName, accHolder, accNumber, routingNumber }: {
-  bankName?: string | null;
-  accHolder?: string | null;
-  accNumber?: string | null;
-  routingNumber?: string | number | null;
-}) {
-  if (!bankName && !accHolder && !accNumber && !routingNumber) {
-    return <p style={{ fontSize: 13, color: '#94a3b8', marginBottom: 16 }}>No bank details on file for this investment.</p>;
-  }
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px', marginBottom: 16 }}>
-      <InfoRow label="Bank Name" value={bankName} />
-      <InfoRow label="Account Holder" value={accHolder} />
-      <InfoRow label="Account Number" value={accNumber ? '••••' + String(accNumber).slice(-4) : undefined} />
-      <InfoRow label="Routing Number" value={routingNumber} />
-    </div>
-  );
-}
-
 export function RedemptionSummaryPanel({ calc }: { calc: RedemptionCalculations }) {
   if (calc.redeemUnits <= 0) {
     return <p style={{ fontSize: 13, color: '#94a3b8', marginBottom: 16 }}>Enter units to redeem to see the calculated summary.</p>;

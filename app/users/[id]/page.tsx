@@ -57,7 +57,9 @@ const distributionSortValue = (d: UserDistributionItem, field: DistributionSortF
   }
 };
 import { type RedemptionCalculations } from '@/lib/redemptionCalculations';
-import { BankDetailsPanel, RedemptionSummaryPanel } from '@/components/RedemptionSummaryPanels';
+import { RedemptionSummaryPanel } from '@/components/RedemptionSummaryPanels';
+import { BankAccountPicker } from '@/components/BankAccountPicker';
+import { BankAccountsPanel } from '@/components/BankAccountsPanel';
 
 const USER_STATUSES = ['InProgress', 'UnderReview', 'Active', 'Inactive'];
 const INVESTOR_TYPES = ['Individual', 'Entity', 'IRA', 'Trust'];
@@ -88,7 +90,7 @@ const emptyInvForm = (): CreateApplicationRequest => ({
   entityName: '', ein: '', stateFormation: '', signatoryName: '', signatoryTitle: '',
   numUnits: 0, totalAmount: 0, ppmRefNO: undefined,
   paymentMethod: 'WireTransfer', distributionPreference: 'WireToBank',
-  bankName: '', accHolder: '', routingNumber: '', accNumber: '',
+  bankAccountId: null,
 });
 
 const emptyRedeemForm = (): CreateRedemptionAdminRequest => ({
@@ -346,10 +348,7 @@ export default function UserDetailPage() {
       ppmRefNO: inv?.ppmRefNO ?? undefined,
       paymentMethod: inv?.paymentMethod || 'WireTransfer',
       distributionPreference: inv?.distributionPreference || 'WireToBank',
-      bankName: inv?.bankName || '',
-      accHolder: inv?.accHolder || '',
-      routingNumber: inv?.routingNumber ? String(inv.routingNumber) : '',
-      accNumber: inv?.accNumber || '',
+      bankAccountId: inv?.bankAccountId ?? null,
     });
     setInvSSNMasked(p?.ssNumberMasked || '');
     setInvSpouseSSNMasked(p?.spouseSSN || '');
@@ -783,6 +782,12 @@ export default function UserDetailPage() {
           </div>
         </div>
 
+        {/* ── Bank Accounts Section ───────────────────────────────────────────── */}
+        <div className="card" style={{ marginBottom: 24 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f2342', marginBottom: 16 }}>Bank Accounts</h2>
+          <BankAccountsPanel userId={userId} isSuperAdmin={isSuperAdmin} />
+        </div>
+
         {/* ── Investments Section ─────────────────────────────────────────────── */}
         <div className="card" style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -1102,11 +1107,13 @@ export default function UserDetailPage() {
             </div>
 
             <SectionTitle>Bank Details</SectionTitle>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-              <FormField label="Bank Name"><input style={inputStyle} value={invForm.bankName || ''} onChange={e => setInvForm(f => ({ ...f, bankName: e.target.value }))} /></FormField>
-              <FormField label="Account Holder"><input style={inputStyle} value={invForm.accHolder || ''} onChange={e => setInvForm(f => ({ ...f, accHolder: e.target.value }))} /></FormField>
-              <FormField label="Routing Number"><input style={inputStyle} value={invForm.routingNumber || ''} onChange={e => setInvForm(f => ({ ...f, routingNumber: e.target.value }))} /></FormField>
-              <FormField label="Account Number"><input style={inputStyle} value={invForm.accNumber || ''} onChange={e => setInvForm(f => ({ ...f, accNumber: e.target.value }))} /></FormField>
+            <div style={{ marginBottom: 16 }}>
+              <BankAccountPicker
+                userId={userId}
+                isSuperAdmin={isSuperAdmin}
+                selectedId={invForm.bankAccountId ?? null}
+                onSelect={id => setInvForm(f => ({ ...f, bankAccountId: id }))}
+              />
             </div>
 
             {invMsg && <p style={{ color: '#b91c1c', fontSize: 13, marginBottom: 12 }}>{invMsg}</p>}
@@ -1159,13 +1166,16 @@ export default function UserDetailPage() {
                   </div>
                 </div>
 
-                <SectionTitle>Bank Details</SectionTitle>
-                <BankDetailsPanel
-                  bankName={trancheDetail?.investment?.bankName}
-                  accHolder={trancheDetail?.investment?.accHolder}
-                  accNumber={trancheDetail?.investment?.accNumber}
-                  routingNumber={trancheDetail?.investment?.routingNumber}
-                />
+                <SectionTitle>Payout Bank Account</SectionTitle>
+                <div style={{ marginBottom: 16 }}>
+                  <BankAccountPicker
+                    userId={userId}
+                    isSuperAdmin={isSuperAdmin}
+                    selectedId={redeemForm.payoutBankAccountId ?? null}
+                    onSelect={id => setRedeemForm(f => ({ ...f, payoutBankAccountId: id }))}
+                    description="Select the account this redemption should pay out to, or add a new one."
+                  />
+                </div>
 
                 <SectionTitle>Redemption Details</SectionTitle>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>

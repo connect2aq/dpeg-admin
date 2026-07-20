@@ -236,6 +236,7 @@ export interface ApplicationDetail extends ApplicationListItem {
     accHolder?: string;
     routingNumber?: number;
     accNumber?: string;
+    bankAccountId?: number | null;
   };
 }
 
@@ -281,6 +282,8 @@ export interface RedemptionDetail extends RedemptionListItem {
   bankAccountHolderName?: string;
   bankAccountNumber?: string;
   bankRoutingNumber?: string;
+  payoutBankAccountId?: number | null;
+  bankDetailsChanged?: boolean;
   investorNotifiedAt?: string;
   isAdminCreated?: boolean;
 }
@@ -789,6 +792,36 @@ export const adminApi = {
   deleteApplication: (id: number) =>
     api.delete<ApiResponse<string>>(`/applications/${id}`),
 
+  // ── Investor Bank Accounts ──────────────────────────────────────────────
+  getUserBankAccounts: (userId: number) =>
+    api.get<ApiResponse<InvestorBankAccount[]>>(
+      `/users/${userId}/bank-accounts`,
+    ),
+  getUserDeactivatedBankAccounts: (userId: number) =>
+    api.get<ApiResponse<InvestorBankAccount[]>>(
+      `/users/${userId}/bank-accounts/deactivated`,
+    ),
+  addUserBankAccount: (userId: number, dto: AddBankAccountRequest) =>
+    api.post<ApiResponse<InvestorBankAccount>>(
+      `/users/${userId}/bank-accounts`,
+      dto,
+    ),
+  setUserBankAccountPrimary: (userId: number, id: number) =>
+    api.put<ApiResponse<string>>(
+      `/users/${userId}/bank-accounts/${id}/primary`,
+      {},
+    ),
+  deactivateUserBankAccount: (userId: number, id: number) =>
+    api.put<ApiResponse<string>>(
+      `/users/${userId}/bank-accounts/${id}/deactivate`,
+      {},
+    ),
+  reactivateUserBankAccount: (userId: number, id: number) =>
+    api.put<ApiResponse<string>>(
+      `/users/${userId}/bank-accounts/${id}/reactivate`,
+      {},
+    ),
+
   // ── Admin CRUD: Redemption ─────────────────────────────────────────────
   getRedemptionPreview: (
     trancheApplicationId: number,
@@ -1089,6 +1122,26 @@ export interface CreateUserAdminRequest {
   password: string;
 }
 
+export interface InvestorBankAccount {
+  id: number;
+  bankName: string;
+  accountHolderName: string;
+  routingNumber: string;
+  accountNumber: string;
+  label?: string | null;
+  isPrimary: boolean;
+  createdOn: string;
+}
+
+export interface AddBankAccountRequest {
+  bankName: string;
+  accountHolderName: string;
+  routingNumber: string;
+  accountNumber: string;
+  label?: string;
+  setPrimary?: boolean;
+}
+
 export interface CreateApplicationRequest {
   investorType: string;
   investmentType?: string;
@@ -1131,10 +1184,7 @@ export interface CreateApplicationRequest {
   ppmRefNO?: number;
   paymentMethod?: string;
   distributionPreference?: string;
-  bankName?: string;
-  accHolder?: string;
-  routingNumber?: string;
-  accNumber?: string;
+  bankAccountId?: number | null;
 }
 
 export interface CreateRedemptionAdminRequest {
@@ -1158,6 +1208,7 @@ export interface CreateRedemptionAdminRequest {
   addressLine3?: string;
   email?: string;
   status?: string;
+  payoutBankAccountId?: number | null;
 }
 
 export interface RedemptionCalculationPreview {

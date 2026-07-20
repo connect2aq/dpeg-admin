@@ -6,10 +6,8 @@ import {
   type CreateRedemptionAdminRequest,
 } from "@/lib/api";
 import { type RedemptionCalculations } from "@/lib/redemptionCalculations";
-import {
-  BankDetailsPanel,
-  RedemptionSummaryPanel,
-} from "@/components/RedemptionSummaryPanels";
+import { RedemptionSummaryPanel } from "@/components/RedemptionSummaryPanels";
+import { BankAccountPicker } from "@/components/BankAccountPicker";
 
 const EMPTY_CALC: RedemptionCalculations = {
   totalUnits: 0,
@@ -101,6 +99,7 @@ export function RedemptionEditModal({
   const [trancheDetail, setTrancheDetail] = useState<ApplicationDetail | null>(
     null,
   );
+  const [investorUserId, setInvestorUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState("");
@@ -132,7 +131,9 @@ export function RedemptionEditModal({
         addressLine3: d.addressLine3 || "",
         email: d.email || "",
         status: d.status || "Active",
+        payoutBankAccountId: d.payoutBankAccountId ?? null,
       });
+      setInvestorUserId(d.accountUserId ?? null);
       if (d.trancheApplicationId) {
         const ar = await adminApi.application(d.trancheApplicationId);
         if (ar.success) setTrancheDetail(ar.data);
@@ -277,13 +278,22 @@ export function RedemptionEditModal({
                 </div>
               </div>
 
-              <SectionTitle>Bank Details</SectionTitle>
-              <BankDetailsPanel
-                bankName={trancheDetail?.investment?.bankName}
-                accHolder={trancheDetail?.investment?.accHolder}
-                accNumber={trancheDetail?.investment?.accNumber}
-                routingNumber={trancheDetail?.investment?.routingNumber}
-              />
+              <SectionTitle>Payout Bank Account</SectionTitle>
+              <div style={{ marginBottom: 16 }}>
+                {investorUserId ? (
+                  <BankAccountPicker
+                    userId={investorUserId}
+                    isSuperAdmin={isSuperAdmin}
+                    selectedId={form.payoutBankAccountId ?? null}
+                    onSelect={id => setForm(f => f && ({ ...f, payoutBankAccountId: id }))}
+                    description="Select the account this redemption should pay out to, or add a new one."
+                  />
+                ) : (
+                  <p style={{ fontSize: 13, color: "#94a3b8" }}>
+                    Unable to load this investor&apos;s bank accounts.
+                  </p>
+                )}
+              </div>
 
               <SectionTitle>Redemption Details</SectionTitle>
               <div

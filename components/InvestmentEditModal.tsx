@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { adminApi, type CreateApplicationRequest } from '@/lib/api';
+import { BankAccountPicker } from './BankAccountPicker';
 
 const INVESTOR_TYPES = ['Individual', 'Entity', 'IRA', 'Trust'];
 const INVESTMENT_TYPES = ['ShortTerm', 'LongTerm'];
@@ -37,6 +38,7 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
   onSaved: (pendingSubmitted: boolean, message: string) => void;
 }) {
   const [form, setForm] = useState<CreateApplicationRequest | null>(null);
+  const [investorUserId, setInvestorUserId] = useState<number | null>(null);
   const [ssNumberMasked, setSsNumberMasked] = useState('');
   const [spouseSSNMasked, setSpouseSSNMasked] = useState('');
   const [dlNoMasked, setDlNoMasked] = useState('');
@@ -51,6 +53,7 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
       const d = r.data;
       const p = d.investorProfile;
       const inv = d.investment;
+      setInvestorUserId(d.userId ?? null);
       setSsNumberMasked(p?.ssNumberMasked || '');
       setSpouseSSNMasked(p?.spouseSSN || '');
       setDlNoMasked(p?.drivingLicenseNo || '');
@@ -93,10 +96,7 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
         ppmRefNO: inv?.ppmRefNO ?? undefined,
         paymentMethod: inv?.paymentMethod || 'WireTransfer',
         distributionPreference: inv?.distributionPreference || 'WireToBank',
-        bankName: inv?.bankName || '',
-        accHolder: inv?.accHolder || '',
-        routingNumber: inv?.routingNumber ? String(inv.routingNumber) : '',
-        accNumber: inv?.accNumber || '',
+        bankAccountId: inv?.bankAccountId ?? null,
       });
       setLoading(false);
     });
@@ -291,11 +291,17 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
 
               {/* ── Bank Details ── */}
               <SectionTitle>Bank Details</SectionTitle>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-                <FormField label="Bank Name"><input style={inputStyle} value={form.bankName || ''} onChange={e => setForm(f => f && ({ ...f, bankName: e.target.value }))} /></FormField>
-                <FormField label="Account Holder"><input style={inputStyle} value={form.accHolder || ''} onChange={e => setForm(f => f && ({ ...f, accHolder: e.target.value }))} /></FormField>
-                <FormField label="Routing Number"><input style={inputStyle} value={form.routingNumber || ''} onChange={e => setForm(f => f && ({ ...f, routingNumber: e.target.value }))} /></FormField>
-                <FormField label="Account Number"><input style={inputStyle} value={form.accNumber || ''} onChange={e => setForm(f => f && ({ ...f, accNumber: e.target.value }))} /></FormField>
+              <div style={{ marginBottom: 16 }}>
+                {investorUserId ? (
+                  <BankAccountPicker
+                    userId={investorUserId}
+                    isSuperAdmin={isSuperAdmin}
+                    selectedId={form.bankAccountId ?? null}
+                    onSelect={id => setForm(f => f && ({ ...f, bankAccountId: id }))}
+                  />
+                ) : (
+                  <p style={{ fontSize: 13, color: '#94a3b8' }}>Unable to load this investor&apos;s bank accounts.</p>
+                )}
               </div>
 
               {msg && <p style={{ color: '#b91c1c', fontSize: 13, marginBottom: 12 }}>{msg}</p>}
