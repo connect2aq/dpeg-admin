@@ -295,10 +295,6 @@ export function BankAccountPicker({
                     <span style={{ color: "#94a3b8" }}>Routing #: </span>
                     <span style={{ fontFamily: "monospace" }}>{acc.routingNumber}</span>
                   </div>
-                  <div>
-                    <span style={{ color: "#94a3b8" }}>Added: </span>
-                    {new Date(acc.createdOn).toLocaleDateString()}
-                  </div>
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10, flexShrink: 0, marginTop: 3 }}>
@@ -431,10 +427,6 @@ export function BankAccountPicker({
                       <div>
                         <span style={{ color: "#94a3b8" }}>Routing #: </span>
                         <span style={{ fontFamily: "monospace" }}>{acc.routingNumber}</span>
-                      </div>
-                      <div>
-                        <span style={{ color: "#94a3b8" }}>Added: </span>
-                        {new Date(acc.createdOn).toLocaleDateString()}
                       </div>
                     </div>
                   </div>
