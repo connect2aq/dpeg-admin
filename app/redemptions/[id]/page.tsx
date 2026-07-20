@@ -449,6 +449,103 @@ export default function RedemptionDetailPage() {
           </div>
         )}
 
+        {/* Review Decision */}
+        <div className="card" style={{ marginBottom: 24 }}>
+          <h2
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              color: "#0f2342",
+              marginBottom: 16,
+            }}
+          >
+            Review Decision
+          </h2>
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              alignItems: "flex-start",
+              flexWrap: "wrap",
+            }}
+          >
+            <select
+              value={newStatus}
+              onChange={(e) => setNewStatus(e.target.value)}
+              style={{
+                padding: "10px 14px",
+                border: "1.5px solid #e2e8f0",
+                borderRadius: 8,
+                fontSize: 14,
+                background: "white",
+              }}
+            >
+              {STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Review note (optional)"
+              style={{
+                flex: "1 1 250px",
+                padding: "10px 14px",
+                border: "1.5px solid #e2e8f0",
+                borderRadius: 8,
+                fontSize: 14,
+              }}
+            />
+            <button
+              className="btn-primary"
+              onClick={updateStatus}
+              disabled={updating || newStatus === redemption.status}
+            >
+              {updating ? "Updating..." : "Apply Decision"}
+            </button>
+            {msg && (
+              <span
+                style={{
+                  fontSize: 13,
+                  color: msg.includes("updated") ? "#10b981" : "#ef4444",
+                  alignSelf: "center",
+                }}
+              >
+                {msg}
+              </span>
+            )}
+          </div>
+          {redemption.reviewNote && (
+            <div
+              style={{
+                marginTop: 14,
+                padding: "10px 14px",
+                background: "#fffbeb",
+                border: "1px solid #fde68a",
+                borderRadius: 8,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                  color: "#92400e",
+                }}
+              >
+                Review Note —{" "}
+              </span>
+              <span style={{ fontSize: 13, color: "#78350f" }}>
+                {redemption.reviewNote}
+              </span>
+            </div>
+          )}
+        </div>
+
         {/* Partner / investor info */}
         <div className="card" style={{ marginBottom: 20 }}>
           <SectionLabel>Partner Information</SectionLabel>
@@ -576,103 +673,6 @@ export default function RedemptionDetailPage() {
               </div>
             )}
           </div>
-        </div>
-
-        {/* Review Decision */}
-        <div className="card" style={{ marginBottom: 24 }}>
-          <h2
-            style={{
-              fontSize: 15,
-              fontWeight: 700,
-              color: "#0f2342",
-              marginBottom: 16,
-            }}
-          >
-            Review Decision
-          </h2>
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              alignItems: "flex-start",
-              flexWrap: "wrap",
-            }}
-          >
-            <select
-              value={newStatus}
-              onChange={(e) => setNewStatus(e.target.value)}
-              style={{
-                padding: "10px 14px",
-                border: "1.5px solid #e2e8f0",
-                borderRadius: 8,
-                fontSize: 14,
-                background: "white",
-              }}
-            >
-              {STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-            <input
-              type="text"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Review note (optional)"
-              style={{
-                flex: "1 1 250px",
-                padding: "10px 14px",
-                border: "1.5px solid #e2e8f0",
-                borderRadius: 8,
-                fontSize: 14,
-              }}
-            />
-            <button
-              className="btn-primary"
-              onClick={updateStatus}
-              disabled={updating || newStatus === redemption.status}
-            >
-              {updating ? "Updating..." : "Apply Decision"}
-            </button>
-            {msg && (
-              <span
-                style={{
-                  fontSize: 13,
-                  color: msg.includes("updated") ? "#10b981" : "#ef4444",
-                  alignSelf: "center",
-                }}
-              >
-                {msg}
-              </span>
-            )}
-          </div>
-          {redemption.reviewNote && (
-            <div
-              style={{
-                marginTop: 14,
-                padding: "10px 14px",
-                background: "#fffbeb",
-                border: "1px solid #fde68a",
-                borderRadius: 8,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
-                  color: "#92400e",
-                }}
-              >
-                Review Note —{" "}
-              </span>
-              <span style={{ fontSize: 13, color: "#78350f" }}>
-                {redemption.reviewNote}
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Bank Details */}
