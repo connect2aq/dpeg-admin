@@ -55,6 +55,9 @@ export function BankAccountPicker({
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [showDeactivated, setShowDeactivated] = useState(false);
+  const [isLoadingDeactivated, setIsLoadingDeactivated] = useState(false);
+  const [deactivatedAccounts, setDeactivatedAccounts] = useState<InvestorBankAccount[]>([]);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -140,7 +143,10 @@ export function BankAccountPicker({
     try {
       const res = await adminApi.deactivateUserBankAccount(userId, id);
       if (!res.success) throw new Error(res.message || "Failed to deactivate bank account");
-      if (isSuperAdmin) await load();
+      if (isSuperAdmin) {
+        await load();
+        if (showDeactivated) await loadDeactivated();
+      }
       setMsg({
         text: isSuperAdmin
           ? "Bank account deactivated."
@@ -150,6 +156,48 @@ export function BankAccountPicker({
     } catch (err) {
       setMsg({
         text: err instanceof Error ? err.message : "Failed to deactivate bank account",
+        ok: false,
+      });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const loadDeactivated = useCallback(async () => {
+    setIsLoadingDeactivated(true);
+    try {
+      const res = await adminApi.getUserDeactivatedBankAccounts(userId);
+      setDeactivatedAccounts(res.success && res.data ? res.data : []);
+    } finally {
+      setIsLoadingDeactivated(false);
+    }
+  }, [userId]);
+
+  const toggleShowDeactivated = () => {
+    const next = !showDeactivated;
+    setShowDeactivated(next);
+    if (next) loadDeactivated();
+  };
+
+  const handleReactivate = async (id: number) => {
+    setBusyId(id);
+    setMsg(null);
+    try {
+      const res = await adminApi.reactivateUserBankAccount(userId, id);
+      if (!res.success) throw new Error(res.message || "Failed to reactivate bank account");
+      if (isSuperAdmin) {
+        await load();
+        await loadDeactivated();
+      }
+      setMsg({
+        text: isSuperAdmin
+          ? "Bank account reactivated."
+          : res.message || "Submitted for approval.",
+        ok: true,
+      });
+    } catch (err) {
+      setMsg({
+        text: err instanceof Error ? err.message : "Failed to reactivate bank account",
         ok: false,
       });
     } finally {
@@ -185,9 +233,9 @@ export function BankAccountPicker({
               onClick={() => onSelect(acc.id)}
               style={{
                 display: "flex",
-                alignItems: "center",
+                alignItems: "flex-start",
                 gap: 10,
-                padding: "8px 12px",
+                padding: "10px 12px",
                 background: selectedId === acc.id ? "#eff6ff" : "#f8fafc",
                 border:
                   selectedId === acc.id
@@ -201,11 +249,11 @@ export function BankAccountPicker({
                 type="radio"
                 checked={selectedId === acc.id}
                 onChange={() => onSelect(acc.id)}
-                style={{ margin: 0 }}
+                style={{ margin: "3px 0 0" }}
               />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a2e" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a2e" }}>
                     {acc.label ? `${acc.label} — ` : ""}
                     {acc.bankName}
                   </span>
@@ -226,11 +274,34 @@ export function BankAccountPicker({
                     </span>
                   )}
                 </div>
-                <p style={{ fontSize: 12, color: "#64748b", margin: "2px 0 0" }}>
-                  {acc.accountHolderName} • ••••{acc.accountNumber.slice(-4)}
-                </p>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "4px 16px",
+                    fontSize: 12,
+                    color: "#334155",
+                  }}
+                >
+                  <div>
+                    <span style={{ color: "#94a3b8" }}>Account Holder: </span>
+                    {acc.accountHolderName}
+                  </div>
+                  <div>
+                    <span style={{ color: "#94a3b8" }}>Account #: </span>
+                    <span style={{ fontFamily: "monospace" }}>{acc.accountNumber}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: "#94a3b8" }}>Routing #: </span>
+                    <span style={{ fontFamily: "monospace" }}>{acc.routingNumber}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: "#94a3b8" }}>Added: </span>
+                    {new Date(acc.createdOn).toLocaleDateString()}
+                  </div>
+                </div>
               </div>
-              <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+              <div style={{ display: "flex", gap: 10, flexShrink: 0, marginTop: 3 }}>
                 {!acc.isPrimary && (
                   <button
                     type="button"
@@ -277,22 +348,119 @@ export function BankAccountPicker({
         </div>
       )}
 
-      {!isAdding && (
+      <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: showDeactivated ? 10 : 0 }}>
+        {!isAdding && (
+          <button
+            type="button"
+            onClick={() => setIsAdding(true)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#2563eb",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            + Add another bank account
+          </button>
+        )}
         <button
           type="button"
-          onClick={() => setIsAdding(true)}
+          onClick={toggleShowDeactivated}
           style={{
             background: "none",
             border: "none",
-            color: "#2563eb",
+            color: "#64748b",
             fontSize: 12,
             fontWeight: 600,
             cursor: "pointer",
             padding: 0,
           }}
         >
-          + Add another bank account
+          {showDeactivated ? "Hide deactivated accounts" : "Show deactivated accounts"}
         </button>
+      </div>
+
+      {showDeactivated && (
+        <div style={{ marginBottom: 12 }}>
+          {isLoadingDeactivated ? (
+            <p style={{ fontSize: 13, color: "#64748b" }}>Loading…</p>
+          ) : deactivatedAccounts.length === 0 ? (
+            <p style={{ fontSize: 13, color: "#94a3b8" }}>No deactivated accounts.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {deactivatedAccounts.map((acc) => (
+                <div
+                  key={acc.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    padding: "10px 12px",
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 6,
+                    opacity: 0.75,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a2e" }}>
+                      {acc.label ? `${acc.label} — ` : ""}
+                      {acc.bankName}
+                    </span>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "4px 16px",
+                        fontSize: 12,
+                        color: "#334155",
+                        marginTop: 6,
+                      }}
+                    >
+                      <div>
+                        <span style={{ color: "#94a3b8" }}>Account Holder: </span>
+                        {acc.accountHolderName}
+                      </div>
+                      <div>
+                        <span style={{ color: "#94a3b8" }}>Account #: </span>
+                        <span style={{ fontFamily: "monospace" }}>{acc.accountNumber}</span>
+                      </div>
+                      <div>
+                        <span style={{ color: "#94a3b8" }}>Routing #: </span>
+                        <span style={{ fontFamily: "monospace" }}>{acc.routingNumber}</span>
+                      </div>
+                      <div>
+                        <span style={{ color: "#94a3b8" }}>Added: </span>
+                        {new Date(acc.createdOn).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busyId === acc.id}
+                    onClick={() => handleReactivate(acc.id)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#2563eb",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      padding: 0,
+                      flexShrink: 0,
+                      marginTop: 3,
+                    }}
+                  >
+                    Reactivate
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {isAdding && (
