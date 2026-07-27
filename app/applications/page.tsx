@@ -557,13 +557,19 @@ function ApplicationsContent() {
                       />
                       {/* <SortableTh label="Submitted" sortKey="submitted" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} /> */}
                       <SortableTh
+                        label="Amount"
+                        sortKey="amount"
+                        sortOn={sortOn}
+                        sortDirection={sortDirection}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
                         label="Units"
                         sortKey="units"
                         sortOn={sortOn}
                         sortDirection={sortDirection}
                         onSort={toggleSort}
                       />
-                      {/* <SortableTh label="Amount" sortKey="amount" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} /> */}
                       <SortableTh
                         label="Status"
                         sortKey="status"
@@ -664,12 +670,12 @@ function ApplicationsContent() {
                             </div>
                           </td>
                           <td>{a.investorType}</td>
-                          <td>{a.numUnits ?? "—"}</td>
-                          {/* <td style={{ fontWeight: 600 }}>
+                          <td style={{ fontWeight: 600 }}>
                             {a.totalAmount
                               ? `$${a.totalAmount.toLocaleString()}`
                               : "—"}
-                          </td> */}
+                          </td>
+                          <td>{a.numUnits ?? "—"}</td>
                           <td>
                             <div
                               style={{
