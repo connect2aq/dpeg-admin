@@ -51,7 +51,7 @@ function SmtpPanel({ title, color, defaults }: { title: string; color: string; d
     setResult({ success: null, message: 'Sending, please wait…' });
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL?.replace('/admin', '') ?? ''}smtptest/send`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL?.replace('admin', '') ?? ''}smtptest/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ ...cfg, recipientEmail: cfg.recipient }),
