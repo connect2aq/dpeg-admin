@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { adminApi, InvestorBankAccount } from "@/lib/api";
 
 const inputStyle = {
@@ -38,6 +38,7 @@ interface BankAccountPickerProps {
   isSuperAdmin: boolean;
   selectedId: number | null;
   onSelect: (accountId: number) => void;
+  onLoaded?: (accounts: InvestorBankAccount[]) => void;
   description?: string;
 }
 
@@ -46,6 +47,7 @@ export function BankAccountPicker({
   isSuperAdmin,
   selectedId,
   onSelect,
+  onLoaded,
   description = "Select the investor's saved bank account, or add a new one.",
 }: BankAccountPickerProps) {
   const [accounts, setAccounts] = useState<InvestorBankAccount[]>([]);
@@ -59,6 +61,11 @@ export function BankAccountPicker({
   const [isLoadingDeactivated, setIsLoadingDeactivated] = useState(false);
   const [deactivatedAccounts, setDeactivatedAccounts] = useState<InvestorBankAccount[]>([]);
 
+  // Kept in a ref (not a dependency of `load`) so callers can pass an inline
+  // callback without retriggering the load effect on every render.
+  const onLoadedRef = useRef(onLoaded);
+  onLoadedRef.current = onLoaded;
+
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -66,6 +73,7 @@ export function BankAccountPicker({
       const list = res.success && res.data ? res.data : [];
       setAccounts(list);
       if (list.length === 0) setIsAdding(true);
+      onLoadedRef.current?.(list);
     } finally {
       setIsLoading(false);
     }

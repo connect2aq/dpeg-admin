@@ -17,6 +17,10 @@ export function BankAccountsPanel({ userId, isSuperAdmin }: BankAccountsPanelPro
       isSuperAdmin={isSuperAdmin}
       selectedId={selectedId}
       onSelect={setSelectedId}
+      onLoaded={(accounts) => {
+        const primary = accounts.find((a) => a.isPrimary);
+        if (primary) setSelectedId(primary.id);
+      }}
       description="This investor's saved payout/funding accounts. Selecting one has no effect here — use this to add, deactivate, reactivate, or reprioritize accounts."
     />
   );
