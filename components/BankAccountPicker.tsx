@@ -320,11 +320,12 @@ export function BankAccountPicker({
                       color: "#2563eb",
                       fontSize: 12,
                       fontWeight: 600,
-                      cursor: "pointer",
+                      cursor: busyId === acc.id ? "not-allowed" : "pointer",
+                      opacity: busyId === acc.id ? 0.5 : 1,
                       padding: 0,
                     }}
                   >
-                    Make primary
+                    {busyId === acc.id ? "Updating…" : "Make primary"}
                   </button>
                 )}
                 <button
@@ -340,11 +341,12 @@ export function BankAccountPicker({
                     color: "#b91c1c",
                     fontSize: 12,
                     fontWeight: 600,
-                    cursor: "pointer",
+                    cursor: busyId === acc.id ? "not-allowed" : "pointer",
+                    opacity: busyId === acc.id ? 0.5 : 1,
                     padding: 0,
                   }}
                 >
-                  Deactivate
+                  {busyId === acc.id ? "Deactivating…" : "Deactivate"}
                 </button>
               </div>
             </div>
@@ -448,13 +450,14 @@ export function BankAccountPicker({
                       color: "#2563eb",
                       fontSize: 12,
                       fontWeight: 600,
-                      cursor: "pointer",
+                      cursor: busyId === acc.id ? "not-allowed" : "pointer",
+                      opacity: busyId === acc.id ? 0.5 : 1,
                       padding: 0,
                       flexShrink: 0,
                       marginTop: 3,
                     }}
                   >
-                    Reactivate
+                    {busyId === acc.id ? "Reactivating…" : "Reactivate"}
                   </button>
                 </div>
               ))}
