@@ -89,6 +89,13 @@ export default function SettingsPage() {
     text: string;
     ok: boolean;
   } | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(
+    null,
+  );
+  const [editingCategoryName, setEditingCategoryName] = useState("");
+  const [subFormOpenFor, setSubFormOpenFor] = useState<number | null>(null);
+  const [newSubCategoryName, setNewSubCategoryName] = useState("");
+  const [savingCategory, setSavingCategory] = useState(false);
 
   const [balances, setBalances] = useState<DailyBalanceLog[]>([]);
   const [balanceForm, setBalanceForm] =
@@ -138,6 +145,11 @@ export default function SettingsPage() {
     loadBalances().finally(() => setBalanceLoading(false));
   }, []);
 
+  const refreshCategories = async () => {
+    const listRes = await bankTransactionsApi.getCategories(true);
+    if (listRes.success && listRes.data) setCategories(listRes.data);
+  };
+
   const addCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCategoryName.trim()) return;
@@ -150,12 +162,34 @@ export default function SettingsPage() {
       nextSortOrder,
     );
     if (r.success) {
-      const listRes = await bankTransactionsApi.getCategories(true);
-      if (listRes.success && listRes.data) setCategories(listRes.data);
+      await refreshCategories();
       setNewCategoryName("");
       setCategoryMsg({ text: "Category added.", ok: true });
     } else {
       setCategoryMsg({ text: r.message || "Failed to add category.", ok: false });
+    }
+    setAddingCategory(false);
+  };
+
+  const addSubCategory = async (e: React.FormEvent, parent: TransactionCategoryItem) => {
+    e.preventDefault();
+    if (!newSubCategoryName.trim()) return;
+    setAddingCategory(true);
+    setCategoryMsg(null);
+    const nextSortOrder =
+      parent.subCategories.reduce((max, c) => Math.max(max, c.sortOrder), 0) + 1;
+    const r = await bankTransactionsApi.createCategory(
+      newSubCategoryName.trim(),
+      nextSortOrder,
+      parent.id,
+    );
+    if (r.success) {
+      await refreshCategories();
+      setNewSubCategoryName("");
+      setSubFormOpenFor(null);
+      setCategoryMsg({ text: "Sub-category added.", ok: true });
+    } else {
+      setCategoryMsg({ text: r.message || "Failed to add sub-category.", ok: false });
     }
     setAddingCategory(false);
   };
@@ -166,10 +200,49 @@ export default function SettingsPage() {
       isActive: !c.isActive,
       sortOrder: c.sortOrder,
     });
-    if (r.success)
-      setCategories((prev) =>
-        prev.map((x) => (x.id === c.id ? { ...x, isActive: !x.isActive } : x)),
-      );
+    if (r.success) await refreshCategories();
+    else setCategoryMsg({ text: r.message || "Failed to update category.", ok: false });
+  };
+
+  const startEditCategory = (c: TransactionCategoryItem) => {
+    setEditingCategoryId(c.id);
+    setEditingCategoryName(c.name);
+    setCategoryMsg(null);
+  };
+
+  const cancelEditCategory = () => {
+    setEditingCategoryId(null);
+    setEditingCategoryName("");
+  };
+
+  const saveEditCategory = async (c: TransactionCategoryItem) => {
+    const name = editingCategoryName.trim();
+    if (!name) return;
+    setSavingCategory(true);
+    const r = await bankTransactionsApi.updateCategory(c.id, {
+      name,
+      isActive: c.isActive,
+      sortOrder: c.sortOrder,
+    });
+    if (r.success) {
+      await refreshCategories();
+      cancelEditCategory();
+    } else {
+      setCategoryMsg({ text: r.message || "Failed to rename category.", ok: false });
+    }
+    setSavingCategory(false);
+  };
+
+  const deleteCategory = async (c: TransactionCategoryItem) => {
+    if (!confirm(`Delete "${c.name}"? This can't be undone.`)) return;
+    setCategoryMsg(null);
+    const r = await bankTransactionsApi.deleteCategory(c.id);
+    if (r.success) {
+      await refreshCategories();
+      setCategoryMsg({ text: "Category deleted.", ok: true });
+    } else {
+      setCategoryMsg({ text: r.message || "Failed to delete category.", ok: false });
+    }
   };
 
   const saveBalance = async (e: React.FormEvent) => {
@@ -897,9 +970,10 @@ export default function SettingsPage() {
             Bank Transaction Categories
           </h2>
           <p style={{ fontSize: 13, color: "#64748b", marginBottom: 20 }}>
-            Categories used to tag imported bank transactions. Deactivate a
-            category instead of deleting it — past transactions keep their
-            category even after it's turned off.
+            Categories used to tag imported bank transactions. Each category
+            can have sub-categories. Deleting is only allowed for categories
+            with no sub-categories and no transactions using them —
+            deactivate instead if it&apos;s in use.
           </p>
 
           {categoriesLoading ? (
@@ -919,44 +993,134 @@ export default function SettingsPage() {
                     .slice()
                     .sort((a, b) => a.sortOrder - b.sortOrder)
                     .map((c) => (
-                      <div
-                        key={c.id}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                          padding: "8px 12px",
-                          background: "#f8fafc",
-                          borderRadius: 6,
-                          border: "1px solid #e2e8f0",
-                        }}
-                      >
-                        <span
+                      <div key={c.id}>
+                        <CategoryRow
+                          category={c}
+                          indent={0}
+                          isEditing={editingCategoryId === c.id}
+                          editingName={editingCategoryName}
+                          saving={savingCategory}
+                          onStartEdit={() => startEditCategory(c)}
+                          onCancelEdit={cancelEditCategory}
+                          onSaveEdit={() => saveEditCategory(c)}
+                          onChangeEditingName={setEditingCategoryName}
+                          onToggleActive={() => toggleCategoryActive(c)}
+                          onDelete={() => deleteCategory(c)}
+                        />
+                        <div
                           style={{
-                            flex: 1,
-                            fontSize: 14,
-                            color: c.isActive ? "#1a1a2e" : "#94a3b8",
-                            fontWeight: 500,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 8,
+                            marginTop: 8,
                           }}
                         >
-                          {c.name}
-                        </span>
-                        <button
-                          onClick={() => toggleCategoryActive(c)}
-                          style={{
-                            padding: "3px 10px",
-                            background: c.isActive ? "#f0fdf4" : "#fef2f2",
-                            border: c.isActive
-                              ? "1px solid #bbf7d0"
-                              : "1px solid #fecaca",
-                            borderRadius: 5,
-                            fontSize: 12,
-                            color: c.isActive ? "#166534" : "#b91c1c",
-                            cursor: "pointer",
-                          }}
-                        >
-                          {c.isActive ? "Active" : "Inactive"}
-                        </button>
+                          {c.subCategories
+                            .slice()
+                            .sort((a, b) => a.sortOrder - b.sortOrder)
+                            .map((sub) => (
+                              <CategoryRow
+                                key={sub.id}
+                                category={sub}
+                                indent={28}
+                                isEditing={editingCategoryId === sub.id}
+                                editingName={editingCategoryName}
+                                saving={savingCategory}
+                                onStartEdit={() => startEditCategory(sub)}
+                                onCancelEdit={cancelEditCategory}
+                                onSaveEdit={() => saveEditCategory(sub)}
+                                onChangeEditingName={setEditingCategoryName}
+                                onToggleActive={() => toggleCategoryActive(sub)}
+                                onDelete={() => deleteCategory(sub)}
+                              />
+                            ))}
+                          {subFormOpenFor === c.id ? (
+                            <form
+                              onSubmit={(e) => addSubCategory(e, c)}
+                              style={{
+                                display: "flex",
+                                gap: 8,
+                                alignItems: "center",
+                                marginLeft: 28,
+                              }}
+                            >
+                              <input
+                                value={newSubCategoryName}
+                                onChange={(e) =>
+                                  setNewSubCategoryName(e.target.value)
+                                }
+                                placeholder="New sub-category name"
+                                autoFocus
+                                required
+                                style={{
+                                  ...inputStyle,
+                                  padding: "6px 10px",
+                                  fontSize: 13,
+                                  flex: "1 1 200px",
+                                  maxWidth: 240,
+                                }}
+                              />
+                              <button
+                                type="submit"
+                                disabled={addingCategory}
+                                style={{
+                                  padding: "6px 14px",
+                                  background: "#0f2342",
+                                  color: "#fff",
+                                  border: "none",
+                                  borderRadius: 5,
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: addingCategory
+                                    ? "not-allowed"
+                                    : "pointer",
+                                }}
+                              >
+                                Add
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSubFormOpenFor(null);
+                                  setNewSubCategoryName("");
+                                }}
+                                style={{
+                                  padding: "6px 14px",
+                                  background: "transparent",
+                                  color: "#64748b",
+                                  border: "1px solid #e2e8f0",
+                                  borderRadius: 5,
+                                  fontSize: 12,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </form>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setSubFormOpenFor(c.id);
+                                setNewSubCategoryName("");
+                                setCategoryMsg(null);
+                              }}
+                              style={{
+                                marginLeft: 28,
+                                alignSelf: "flex-start",
+                                padding: "4px 10px",
+                                background: "transparent",
+                                color: "#0f2342",
+                                border: "1px dashed #cbd5e1",
+                                borderRadius: 5,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
+                            >
+                              + Add sub-category
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                 </div>
@@ -1013,5 +1177,142 @@ export default function SettingsPage() {
         </div>
       </div>
     </AdminLayout>
+  );
+}
+
+// ── Category row ─────────────────────────────────────────────────────────
+
+function CategoryRow({
+  category,
+  indent,
+  isEditing,
+  editingName,
+  saving,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onChangeEditingName,
+  onToggleActive,
+  onDelete,
+}: {
+  category: TransactionCategoryItem;
+  indent: number;
+  isEditing: boolean;
+  editingName: string;
+  saving: boolean;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onChangeEditingName: (value: string) => void;
+  onToggleActive: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 12px",
+        marginLeft: indent,
+        background: "#f8fafc",
+        borderRadius: 6,
+        border: "1px solid #e2e8f0",
+      }}
+    >
+      {isEditing ? (
+        <>
+          <input
+            value={editingName}
+            onChange={(e) => onChangeEditingName(e.target.value)}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onSaveEdit();
+              if (e.key === "Escape") onCancelEdit();
+            }}
+            style={{
+              flex: 1,
+              padding: "5px 8px",
+              fontSize: 14,
+              border: "1px solid #d1d5db",
+              borderRadius: 5,
+            }}
+          />
+          <button
+            onClick={onSaveEdit}
+            disabled={saving}
+            style={{
+              padding: "3px 10px",
+              background: "#0f2342",
+              color: "#fff",
+              border: "none",
+              borderRadius: 5,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: saving ? "not-allowed" : "pointer",
+            }}
+          >
+            Save
+          </button>
+          <button
+            onClick={onCancelEdit}
+            style={{
+              padding: "3px 10px",
+              background: "transparent",
+              color: "#64748b",
+              border: "1px solid #e2e8f0",
+              borderRadius: 5,
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            Cancel
+          </button>
+        </>
+      ) : (
+        <span
+          onClick={onStartEdit}
+          title="Click to rename"
+          style={{
+            flex: 1,
+            fontSize: 14,
+            color: category.isActive ? "#1a1a2e" : "#94a3b8",
+            fontWeight: 500,
+            cursor: "pointer",
+          }}
+        >
+          {category.name}
+        </span>
+      )}
+      <button
+        onClick={onToggleActive}
+        style={{
+          padding: "3px 10px",
+          background: category.isActive ? "#f0fdf4" : "#fef2f2",
+          border: category.isActive ? "1px solid #bbf7d0" : "1px solid #fecaca",
+          borderRadius: 5,
+          fontSize: 12,
+          color: category.isActive ? "#166534" : "#b91c1c",
+          cursor: "pointer",
+        }}
+      >
+        {category.isActive ? "Active" : "Inactive"}
+      </button>
+      <button
+        onClick={onDelete}
+        title="Delete"
+        style={{
+          padding: "3px 10px",
+          background: "#fef2f2",
+          border: "1px solid #fecaca",
+          borderRadius: 5,
+          fontSize: 12,
+          color: "#b91c1c",
+          cursor: "pointer",
+        }}
+      >
+        Delete
+      </button>
+    </div>
   );
 }

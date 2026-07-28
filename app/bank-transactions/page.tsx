@@ -28,6 +28,34 @@ function fmtMoney(n?: number) {
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// Categories are a tree one level deep (category -> sub-category); a transaction's
+// categoryId may point at either level, so lookups need to walk both.
+function findCategoryById(
+  categories: TransactionCategoryItem[],
+  id?: number | null,
+): TransactionCategoryItem | undefined {
+  if (id == null) return undefined;
+  for (const c of categories) {
+    if (c.id === id) return c;
+    const sub = c.subCategories.find((s) => s.id === id);
+    if (sub) return sub;
+  }
+  return undefined;
+}
+
+function resolveCategorySelection(
+  categories: TransactionCategoryItem[],
+  categoryId?: number | null,
+): { topId: string; subId: string } {
+  if (categoryId == null) return { topId: "", subId: "" };
+  for (const c of categories) {
+    if (c.id === categoryId) return { topId: String(c.id), subId: "" };
+    const sub = c.subCategories.find((s) => s.id === categoryId);
+    if (sub) return { topId: String(c.id), subId: String(sub.id) };
+  }
+  return { topId: "", subId: "" };
+}
+
 const s = {
   h1: { fontSize: 22, fontWeight: 700, color: "#0f2342", marginBottom: 4 } as React.CSSProperties,
   sub: { color: "#64748b", fontSize: 14, marginBottom: 24 } as React.CSSProperties,
@@ -158,11 +186,13 @@ export default function BankTransactionsPage() {
 
   const categoryOptions = [
     { value: "uncategorized", label: "Uncategorized" },
-    ...categories.map((c) => ({ value: String(c.id), label: c.name })),
-  ];
-  const categorySelectOptions = [
-    { value: "", label: "Uncategorized" },
-    ...categories.map((c) => ({ value: String(c.id), label: c.name })),
+    ...categories.flatMap((c) => [
+      { value: String(c.id), label: c.name },
+      ...c.subCategories.map((sub) => ({
+        value: String(sub.id),
+        label: `${c.name} › ${sub.name}`,
+      })),
+    ]),
   ];
 
   // ── Upload ────────────────────────────────────────────────────────────────
@@ -214,7 +244,7 @@ export default function BankTransactionsPage() {
     const categoryId = value === "" ? null : Number(value);
     const res = await bankTransactionsApi.setCategory(row.id, categoryId);
     if (res.success) {
-      const categoryName = categoryId == null ? undefined : categories.find((c) => c.id === categoryId)?.name;
+      const categoryName = categoryId == null ? undefined : findCategoryById(categories, categoryId)?.name;
       updateRowInPlace(row.id, { categoryId: categoryId ?? undefined, categoryName });
     }
   };
@@ -522,6 +552,7 @@ export default function BankTransactionsPage() {
                       <th style={{ ...s.th, textAlign: "right" }}>Credit</th>
                       <SortableTh label="Balance" sortKey="balance" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={{ ...s.th, textAlign: "right" }} />
                       <th style={s.th}>Category</th>
+                      <th style={s.th}>Sub-Category</th>
                       <th style={s.th}>Linked To</th>
                       <th style={s.th}>Link</th>
                       <th style={s.th}></th>
@@ -534,7 +565,7 @@ export default function BankTransactionsPage() {
                         row={row}
                         checked={selected.has(row.id)}
                         onToggle={() => toggleSelect(row.id)}
-                        categorySelectOptions={categorySelectOptions}
+                        categories={categories}
                         onSaveNotes={(v) => saveAdminDescription(row, v)}
                         onCategoryChange={(v) => changeCategory(row, v)}
                         onDelete={() => deleteRow(row)}
@@ -669,7 +700,7 @@ function TransactionRow({
   row,
   checked,
   onToggle,
-  categorySelectOptions,
+  categories,
   onSaveNotes,
   onCategoryChange,
   onDelete,
@@ -678,12 +709,27 @@ function TransactionRow({
   row: BankTransactionListItem;
   checked: boolean;
   onToggle: () => void;
-  categorySelectOptions: { value: string; label: string }[];
+  categories: TransactionCategoryItem[];
   onSaveNotes: (value: string) => void;
   onCategoryChange: (value: string) => void;
   onDelete: () => void;
   onReload: () => void;
 }) {
+  const { topId, subId } = resolveCategorySelection(categories, row.categoryId ?? null);
+  const topCategoryOptions = [
+    { value: "", label: "Uncategorized" },
+    ...categories.map((c) => ({ value: String(c.id), label: c.name })),
+  ];
+  const selectedTopCategory = categories.find((c) => String(c.id) === topId);
+  const subCategoryOptions = selectedTopCategory
+    ? [
+        { value: "", label: "— (category only) —" },
+        ...selectedTopCategory.subCategories.map((sub) => ({
+          value: String(sub.id),
+          label: sub.name,
+        })),
+      ]
+    : [];
   const [notes, setNotes] = useState(row.adminDescription ?? "");
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkEntityType, setLinkEntityType] = useState<LinkedEntityType>("Investment");
@@ -773,10 +819,21 @@ function TransactionRow({
         <td style={{ ...s.td, textAlign: "right" }}>{fmtMoney(row.balance)}</td>
         <td style={s.td}>
           <EditableStatusBadge
-            status={row.categoryId != null ? String(row.categoryId) : ""}
-            options={categorySelectOptions}
+            status={topId}
+            options={topCategoryOptions}
             onChange={onCategoryChange}
           />
+        </td>
+        <td style={s.td}>
+          {selectedTopCategory && selectedTopCategory.subCategories.length > 0 ? (
+            <EditableStatusBadge
+              status={subId}
+              options={subCategoryOptions}
+              onChange={(v) => onCategoryChange(v === "" ? topId : v)}
+            />
+          ) : (
+            "—"
+          )}
         </td>
         <td style={{ ...s.td, fontSize: 12 }}>{row.linkedSummary ?? "—"}</td>
         <td style={s.td}>
@@ -792,7 +849,7 @@ function TransactionRow({
       </tr>
       {linkOpen && (
         <tr>
-          <td colSpan={12} style={{ ...s.td, background: "#f8fafc" }}>
+          <td colSpan={13} style={{ ...s.td, background: "#f8fafc" }}>
             {loadingLinks ? (
               <div style={{ fontSize: 12, color: "#64748b", marginBottom: 10 }}>Loading links…</div>
             ) : existingLinks.length > 0 ? (

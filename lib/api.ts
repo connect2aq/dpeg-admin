@@ -1343,6 +1343,8 @@ export interface TransactionCategoryItem {
   name: string;
   isActive: boolean;
   sortOrder: number;
+  parentCategoryId?: number | null;
+  subCategories: TransactionCategoryItem[];
 }
 
 export interface BankTransactionImportRowResult {
@@ -1477,13 +1479,20 @@ export const bankTransactionsApi = {
     api.get<ApiResponse<TransactionCategoryItem[]>>(
       `/bank-transactions/categories?includeInactive=${includeInactive}`,
     ),
-  createCategory: (name: string, sortOrder: number) =>
+  createCategory: (
+    name: string,
+    sortOrder: number,
+    parentCategoryId?: number | null,
+  ) =>
     api.post<ApiResponse<string>>(`/bank-transactions/categories`, {
       name,
       sortOrder,
+      parentCategoryId: parentCategoryId ?? null,
     }),
   updateCategory: (
     id: number,
     dto: { name: string; isActive: boolean; sortOrder: number },
   ) => api.put<ApiResponse<string>>(`/bank-transactions/categories/${id}`, dto),
+  deleteCategory: (id: number) =>
+    api.delete<ApiResponse<string>>(`/bank-transactions/categories/${id}`),
 };
