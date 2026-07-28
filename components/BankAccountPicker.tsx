@@ -56,7 +56,7 @@ export function BankAccountPicker({
   const [isSaving, setIsSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [form, setForm] = useState(emptyForm);
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const [busyAction, setBusyAction] = useState<{ id: number; action: "primary" | "deactivate" | "reactivate" } | null>(null);
   const [showDeactivated, setShowDeactivated] = useState(false);
   const [isLoadingDeactivated, setIsLoadingDeactivated] = useState(false);
   const [deactivatedAccounts, setDeactivatedAccounts] = useState<InvestorBankAccount[]>([]);
@@ -123,7 +123,7 @@ export function BankAccountPicker({
   };
 
   const handleSetPrimary = async (id: number) => {
-    setBusyId(id);
+    setBusyAction({ id, action: "primary" });
     setMsg(null);
     try {
       const res = await adminApi.setUserBankAccountPrimary(userId, id);
@@ -141,12 +141,12 @@ export function BankAccountPicker({
         ok: false,
       });
     } finally {
-      setBusyId(null);
+      setBusyAction(null);
     }
   };
 
   const handleDeactivate = async (id: number) => {
-    setBusyId(id);
+    setBusyAction({ id, action: "deactivate" });
     setMsg(null);
     try {
       const res = await adminApi.deactivateUserBankAccount(userId, id);
@@ -167,7 +167,7 @@ export function BankAccountPicker({
         ok: false,
       });
     } finally {
-      setBusyId(null);
+      setBusyAction(null);
     }
   };
 
@@ -188,7 +188,7 @@ export function BankAccountPicker({
   };
 
   const handleReactivate = async (id: number) => {
-    setBusyId(id);
+    setBusyAction({ id, action: "reactivate" });
     setMsg(null);
     try {
       const res = await adminApi.reactivateUserBankAccount(userId, id);
@@ -209,7 +209,7 @@ export function BankAccountPicker({
         ok: false,
       });
     } finally {
-      setBusyId(null);
+      setBusyAction(null);
     }
   };
 
@@ -309,7 +309,7 @@ export function BankAccountPicker({
                 {!acc.isPrimary && (
                   <button
                     type="button"
-                    disabled={busyId === acc.id}
+                    disabled={busyAction?.id === acc.id}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleSetPrimary(acc.id);
@@ -320,17 +320,17 @@ export function BankAccountPicker({
                       color: "#2563eb",
                       fontSize: 12,
                       fontWeight: 600,
-                      cursor: busyId === acc.id ? "not-allowed" : "pointer",
-                      opacity: busyId === acc.id ? 0.5 : 1,
+                      cursor: busyAction?.id === acc.id ? "not-allowed" : "pointer",
+                      opacity: busyAction?.id === acc.id ? 0.5 : 1,
                       padding: 0,
                     }}
                   >
-                    {busyId === acc.id ? "Updating…" : "Make primary"}
+                    {busyAction?.id === acc.id && busyAction.action === "primary" ? "Updating…" : "Make primary"}
                   </button>
                 )}
                 <button
                   type="button"
-                  disabled={busyId === acc.id}
+                  disabled={busyAction?.id === acc.id}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDeactivate(acc.id);
@@ -341,12 +341,12 @@ export function BankAccountPicker({
                     color: "#b91c1c",
                     fontSize: 12,
                     fontWeight: 600,
-                    cursor: busyId === acc.id ? "not-allowed" : "pointer",
-                    opacity: busyId === acc.id ? 0.5 : 1,
+                    cursor: busyAction?.id === acc.id ? "not-allowed" : "pointer",
+                    opacity: busyAction?.id === acc.id ? 0.5 : 1,
                     padding: 0,
                   }}
                 >
-                  {busyId === acc.id ? "Deactivating…" : "Deactivate"}
+                  {busyAction?.id === acc.id && busyAction.action === "deactivate" ? "Deactivating…" : "Deactivate"}
                 </button>
               </div>
             </div>
@@ -442,7 +442,7 @@ export function BankAccountPicker({
                   </div>
                   <button
                     type="button"
-                    disabled={busyId === acc.id}
+                    disabled={busyAction?.id === acc.id}
                     onClick={() => handleReactivate(acc.id)}
                     style={{
                       background: "none",
@@ -450,14 +450,14 @@ export function BankAccountPicker({
                       color: "#2563eb",
                       fontSize: 12,
                       fontWeight: 600,
-                      cursor: busyId === acc.id ? "not-allowed" : "pointer",
-                      opacity: busyId === acc.id ? 0.5 : 1,
+                      cursor: busyAction?.id === acc.id ? "not-allowed" : "pointer",
+                      opacity: busyAction?.id === acc.id ? 0.5 : 1,
                       padding: 0,
                       flexShrink: 0,
                       marginTop: 3,
                     }}
                   >
-                    {busyId === acc.id ? "Reactivating…" : "Reactivate"}
+                    {busyAction?.id === acc.id && busyAction.action === "reactivate" ? "Reactivating…" : "Reactivate"}
                   </button>
                 </div>
               ))}
