@@ -1389,6 +1389,15 @@ export interface BankTransactionCategoryTotal {
   count: number;
 }
 
+export interface PortalCapitalFlow {
+  fundContributionsTotal: number;
+  fundContributionsCount: number;
+  redemptionCapitalTotal: number;
+  redemptionCount: number;
+  distributionTotal: number;
+  distributionCount: number;
+}
+
 export interface BankTransactionBalanceFlow {
   categoryTotals: BankTransactionCategoryTotal[];
   uncategorizedTotal: number;
@@ -1396,6 +1405,7 @@ export interface BankTransactionBalanceFlow {
   latestBankBalance?: number;
   latestBalanceDate?: string;
   totalTransactionCount: number;
+  portalCapitalFlow: PortalCapitalFlow;
 }
 
 export interface BankCapitalLedgerEntry {

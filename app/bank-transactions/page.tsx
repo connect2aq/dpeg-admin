@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import AdminLayout from "@/components/AdminLayout";
 import { PaginationControls } from "@/components/PaginationControls";
 import { SortableTh } from "@/components/SortableTh";
@@ -94,12 +95,12 @@ export default function BankTransactionsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  // Default view is unsorted-by-us — exactly the order rows were imported (which is exactly the
-  // order they appeared in the CSV, since import inserts rows sequentially in file order). Sorting
-  // by Date reshuffles same-day (or otherwise non-strictly-chronological) rows and makes the bank's
-  // own literal Balance snapshot for each row look like it jumps around.
-  const [sortOn, setSortOn] = useState("importorder");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  // Default view is newest-first by posted date. Same-day ties resolve via the backend's
+  // ThenByDescending(Id) on the "postdate" branch (BankTransactionRepository.GetTransactionsAsync),
+  // i.e. most-recently-imported-first within a day — bank-capital-ledger's default Date-desc view
+  // mirrors this same tiebreak so the two pages stay visually consistent.
+  const [sortOn, setSortOn] = useState("postdate");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkLinkOpen, setBulkLinkOpen] = useState(false);
@@ -312,7 +313,15 @@ export default function BankTransactionsPage() {
   return (
     <AdminLayout>
       <div className="page-content">
-        <h1 style={s.h1}>Manage Bank Statements</h1>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+          <h1 style={{ ...s.h1, marginBottom: 0 }}>Manage Bank Statements</h1>
+          <Link
+            href="/bank-transactions/history"
+            style={{ fontSize: 13, color: "#b8923a", fontWeight: 600, textDecoration: "none" }}
+          >
+            View Import History →
+          </Link>
+        </div>
         <p style={s.sub}>
           Import the fund&apos;s bank account history, categorize each line, and
           tag transactions against the matching Investment, Redemption, or
@@ -465,9 +474,9 @@ export default function BankTransactionsPage() {
             }}
             style={s.input}
           >
-            <option value="">Money In &amp; Out</option>
-            <option value="in">Money In</option>
-            <option value="out">Money Out</option>
+            <option value="">Credit &amp; Debit</option>
+            <option value="in">Credit</option>
+            <option value="out">Debit</option>
           </select>
           <button
             onClick={() => {

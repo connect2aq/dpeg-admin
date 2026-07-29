@@ -209,13 +209,26 @@ export default function BankCapitalLedgerPage() {
   };
 
   const sortedEntries = useMemo(() => {
+    // visibleEntries is already in the backend's one true ascending order (PostDate asc, Id asc —
+    // BankTransactionRepository.GetLedgerAsync: OrderBy(PostDate).ThenBy(Id)); the filtering above
+    // preserves that relative order. For Date, skip the comparator entirely and just reverse for
+    // descending — this guarantees the exact same same-day tiebreak Bank Transactions' own
+    // "postdate desc" branch produces (OrderByDescending(PostDate).ThenByDescending(Id)), with zero
+    // risk of a client comparator disagreeing with the backend on same-day ties.
+    if (sortField === "date") {
+      return sortDir === "asc" ? visibleEntries : [...visibleEntries].reverse();
+    }
+
     const arr = [...visibleEntries];
     arr.sort((a, b) => {
       const va = sortValue(a, sortField);
       const vb = sortValue(b, sortField);
       const cmp =
         typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
-      return sortDir === "asc" ? cmp : -cmp;
+      const signedCmp = sortDir === "asc" ? cmp : -cmp;
+      // Deterministic tiebreak by Id, sign-matched to sortDir — mirrors the backend's own
+      // ThenBy(Id)/ThenByDescending(Id) convention (BankTransactionRepository.GetTransactionsAsync).
+      return signedCmp !== 0 ? signedCmp : sortDir === "asc" ? a.id - b.id : b.id - a.id;
     });
     return arr;
   }, [visibleEntries, sortField, sortDir]);
@@ -410,9 +423,9 @@ export default function BankCapitalLedgerPage() {
                 }}
                 style={s.input}
               >
-                <option value="">Money In &amp; Out</option>
-                <option value="in">Money In</option>
-                <option value="out">Money Out</option>
+                <option value="">Credit &amp; Debit</option>
+                <option value="in">Credit</option>
+                <option value="out">Debit</option>
               </select>
               <select
                 value={linkFilter}
@@ -472,8 +485,8 @@ export default function BankCapitalLedgerPage() {
                       "#0f2342",
                       from ? `as at ${from}` : undefined,
                     )}
-                  {statCard("Total Money In", fmtMoney(rangeStats.totalIn), "#0f9444")}
-                  {statCard("Total Money Out", fmtMoney(rangeStats.totalOut), "#991b1b")}
+                  {statCard("Total Credit", fmtMoney(rangeStats.totalIn), "#0f9444")}
+                  {statCard("Total Debit", fmtMoney(rangeStats.totalOut), "#991b1b")}
                   {statCard(
                     "Net Change",
                     signed(rangeStats.netChange),
@@ -779,9 +792,17 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
   const profitFromBank = getCat("Profit Received from Bank");
   const otherCharges = getCat("Other Charges");
 
-  const totalFundContributions = fundContributions?.total ?? 0;
-  const totalRedemption = redemption?.total ?? 0;
-  const totalDistribution = distribution?.total ?? 0;
+  // Fund Contributions / Redemption / Distribution Paid are sourced from portal data (Investments,
+  // RedemptionForms, MonthlyDistributionLogs — cumulative through yesterday), not from how bank
+  // transactions happen to be categorized. This is what makes Variance below a real reconciliation
+  // signal instead of a number that's definitionally always in sync with the category tiles.
+  const portal = data.portalCapitalFlow;
+  const totalFundContributions = portal.fundContributionsTotal;
+  const fundContributionsCount = portal.fundContributionsCount;
+  const totalRedemption = portal.redemptionCapitalTotal;
+  const redemptionCount = portal.redemptionCount;
+  const totalDistribution = portal.distributionTotal;
+  const distributionCount = portal.distributionCount;
   const totalInvestments = investments?.total ?? 0;
   const totalDividendReceived = dividendReceived?.total ?? 0;
   const totalSponsorsEquity = sponsorsEquity?.total ?? 0;
@@ -819,26 +840,29 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, alignItems: "stretch" }}>
         {tile({
           label: "Fund Contributions",
-          value: fundContributions && fundContributions.count > 0 ? signedFlow(totalFundContributions) : "No transactions yet",
+          value: fundContributionsCount > 0 ? signedFlow(totalFundContributions) : "No transactions yet",
           accent: "#0e3416",
-          muted: !fundContributions || fundContributions.count === 0,
+          muted: fundContributionsCount === 0,
+          sub: "From portal data",
           onClick: fundContributions ? () => onViewCategory(String(fundContributions.categoryId)) : undefined,
         })}
         {tile({
           label: "Redemption",
-          value: redemption && redemption.count > 0 ? signedFlow(totalRedemption) : "No transactions yet",
+          value: redemptionCount > 0 ? signedFlow(totalRedemption) : "No transactions yet",
           accent: "#ef4444",
           arrow: true,
-          muted: !redemption || redemption.count === 0,
+          muted: redemptionCount === 0,
+          sub: "From portal data",
           onClick: redemption ? () => onViewCategory(String(redemption.categoryId)) : undefined,
         })}
         {tile({ label: "Balance Remaining", value: signedFlow(balanceRemaining), accent: "#6366f1" })}
         {tile({
           label: "Distribution Paid",
-          value: distribution && distribution.count > 0 ? signedFlow(totalDistribution) : "No transactions yet",
+          value: distributionCount > 0 ? signedFlow(totalDistribution) : "No transactions yet",
           accent: "#f59e0b",
           arrow: true,
-          muted: !distribution || distribution.count === 0,
+          muted: distributionCount === 0,
+          sub: "From portal data",
           onClick: distribution ? () => onViewCategory(String(distribution.categoryId)) : undefined,
         })}
 
@@ -888,6 +912,7 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
               value: `${variance >= 0 ? "+" : "−"}${fmt(Math.abs(variance))}`,
               accent: variance >= 0 ? "#10b981" : "#ef4444",
               arrow: true,
+              onClick: () => onViewCategory("uncategorized"),
             })
           : tile({ label: "Variance", value: "N/A", accent: "#94a3b8", arrow: true, muted: true })}
 
