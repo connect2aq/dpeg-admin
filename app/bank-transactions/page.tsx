@@ -13,6 +13,7 @@ import {
   type BankTransactionListItem,
   type BankTransactionImportResult,
   type BankTransactionLinkItem,
+  type BankAccountBalanceAnchor,
   type LinkCandidate,
   type LinkedEntityType,
   type PagedResult,
@@ -110,6 +111,15 @@ export default function BankTransactionsPage() {
   const [linkError, setLinkError] = useState("");
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
+  const [anchors, setAnchors] = useState<BankAccountBalanceAnchor[]>([]);
+  const [anchorListOpen, setAnchorListOpen] = useState(false);
+  const [anchorModalAccount, setAnchorModalAccount] = useState<string | null>(null);
+  const [anchorValue, setAnchorValue] = useState("");
+  const [savingAnchor, setSavingAnchor] = useState(false);
+  const [anchorError, setAnchorError] = useState("");
+
+  const [addOpen, setAddOpen] = useState(false);
+
   const toggleSort = (key: string) => {
     if (sortOn === key) setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
     else {
@@ -174,6 +184,48 @@ export default function BankTransactionsPage() {
     });
   }, []);
 
+  const loadAnchors = useCallback(async () => {
+    const res = await bankTransactionsApi.getBalanceAnchors();
+    if (res.success) setAnchors(res.data);
+  }, []);
+
+  useEffect(() => {
+    loadAnchors();
+  }, [loadAnchors]);
+
+  const openAnchorModal = (account: BankAccountBalanceAnchor) => {
+    setAnchorModalAccount(account.accountNumber);
+    setAnchorValue(
+      account.startingCalculatedBalance != null
+        ? String(account.startingCalculatedBalance)
+        : account.firstTransactionBalance != null
+          ? String(account.firstTransactionBalance)
+          : "",
+    );
+    setAnchorError("");
+  };
+
+  const saveAnchor = async () => {
+    if (!anchorModalAccount) return;
+    const value = Number(anchorValue);
+    if (Number.isNaN(value)) {
+      setAnchorError("Enter a valid number.");
+      return;
+    }
+    setSavingAnchor(true);
+    setAnchorError("");
+    try {
+      const res = await bankTransactionsApi.setBalanceAnchor(anchorModalAccount, value);
+      if (res.success) {
+        setAnchorModalAccount(null);
+        await loadAnchors();
+        load();
+      } else setAnchorError(res.message);
+    } finally {
+      setSavingAnchor(false);
+    }
+  };
+
   const categoryFilterOptions = [
     { value: "uncategorized", label: "Uncategorized" },
     ...categories.map((c) => ({ value: String(c.id), label: c.name })),
@@ -196,6 +248,7 @@ export default function BankTransactionsPage() {
       if (res.success) {
         setUploadResult(res.data);
         load();
+        loadAnchors();
       } else setUploadError(res.message || "Upload failed.");
     } catch {
       setUploadError("Network error. Please try again.");
@@ -315,12 +368,20 @@ export default function BankTransactionsPage() {
       <div className="page-content">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
           <h1 style={{ ...s.h1, marginBottom: 0 }}>Manage Bank Statements</h1>
-          <Link
-            href="/bank-transactions/history"
-            style={{ fontSize: 13, color: "#b8923a", fontWeight: 600, textDecoration: "none" }}
-          >
-            View Import History →
-          </Link>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <button onClick={() => setAddOpen(true)} style={s.btn("#0f2342")}>
+              + Add Transaction
+            </button>
+            <button onClick={() => setAnchorListOpen(true)} style={{ fontSize: 13, color: "#b8923a", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+              ⚙ Starting Balances
+            </button>
+            <Link
+              href="/bank-transactions/history"
+              style={{ fontSize: 13, color: "#b8923a", fontWeight: 600, textDecoration: "none" }}
+            >
+              View Import History →
+            </Link>
+          </div>
         </div>
         <p style={s.sub}>
           Import the fund&apos;s bank account history, categorize each line, and
@@ -329,6 +390,43 @@ export default function BankTransactionsPage() {
           rows are skipped until they post on a later export. For fund totals
           and a read-only ledger view, see Bank Capital Ledger.
         </p>
+
+        {anchors.filter((a) => a.startingCalculatedBalance == null).length > 0 && (
+          <div
+            style={{
+              ...s.card,
+              background: "#fffbeb",
+              border: "1px solid #fde68a",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            {anchors
+              .filter((a) => a.startingCalculatedBalance == null)
+              .map((a) => (
+                <div
+                  key={a.accountNumber}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
+                >
+                  <span style={{ fontSize: 13, color: "#92400e" }}>
+                    ⚠ No starting balance set for account <strong>{a.accountNumber}</strong> — Calculated Balance
+                    can&apos;t be shown until you set one.
+                    {a.firstTransactionBalance != null && (
+                      <>
+                        {" "}
+                        Its earliest transaction ({a.firstTransactionDate ? formatShortDate(a.firstTransactionDate) : "—"}) has a bank
+                        Balance of <strong>{fmtMoney(a.firstTransactionBalance)}</strong> — a natural starting point.
+                      </>
+                    )}
+                  </span>
+                  <button onClick={() => openAnchorModal(a)} style={s.btn("#b8923a")}>
+                    Set Starting Balance
+                  </button>
+                </div>
+              ))}
+          </div>
+        )}
 
         {/* Upload */}
         <div style={s.card}>
@@ -551,6 +649,7 @@ export default function BankTransactionsPage() {
                       <th style={{ ...s.th, textAlign: "right" }}>Debit</th>
                       <th style={{ ...s.th, textAlign: "right" }}>Credit</th>
                       <SortableTh label="Balance" sortKey="balance" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={{ ...s.th, textAlign: "right" }} />
+                      <th style={{ ...s.th, textAlign: "right" }}>Calculated Balance</th>
                       <th style={s.th}>Category</th>
                       <th style={s.th}>Sub-Category</th>
                       <th style={s.th}>Linked To</th>
@@ -688,6 +787,117 @@ export default function BankTransactionsPage() {
           </div>
         </div>
       )}
+
+      {/* Starting balances list */}
+      {anchorListOpen && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
+          }}
+          onClick={() => setAnchorListOpen(false)}
+        >
+          <div
+            style={{ background: "white", borderRadius: 10, padding: 24, width: 480, maxWidth: "90vw" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#0f2342", marginBottom: 12 }}>
+              Starting Balances
+            </div>
+            <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>
+              The Calculated Balance shown for each account&apos;s earliest transaction starts from this value.
+            </div>
+            {anchors.length === 0 ? (
+              <div style={{ fontSize: 13, color: "#94a3b8" }}>No bank accounts yet — import a statement first.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                {anchors.map((a) => (
+                  <div
+                    key={a.accountNumber}
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+                      padding: "8px 12px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, fontSize: 13,
+                    }}
+                  >
+                    <span>
+                      <strong>{a.accountNumber}</strong>
+                      <span style={{ color: "#64748b", marginLeft: 8 }}>
+                        {a.startingCalculatedBalance != null ? fmtMoney(a.startingCalculatedBalance) : "Not set"}
+                      </span>
+                    </span>
+                    <button onClick={() => openAnchorModal(a)} style={s.btn("#0f2342")}>
+                      {a.startingCalculatedBalance != null ? "Edit" : "Set"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button onClick={() => setAnchorListOpen(false)} style={s.btn("#64748b")}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set/edit one account's starting balance */}
+      {anchorModalAccount && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center", zIndex: 101,
+          }}
+          onClick={() => setAnchorModalAccount(null)}
+        >
+          <div
+            style={{ background: "white", borderRadius: 10, padding: 24, width: 400, maxWidth: "90vw" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#0f2342", marginBottom: 12 }}>
+              Starting Balance — {anchorModalAccount}
+            </div>
+            <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>
+              This becomes the Calculated Balance of this account&apos;s chronologically earliest transaction.
+              Ideally it matches that transaction&apos;s own bank-reported Balance, so row one shows no mismatch.
+            </div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+              Starting Calculated Balance
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={anchorValue}
+              onChange={(e) => setAnchorValue(e.target.value)}
+              style={{ ...s.input, width: "100%", marginBottom: 12, boxSizing: "border-box" }}
+              autoFocus
+            />
+            {anchorError && <div style={{ color: "#991b1b", fontSize: 13, marginBottom: 12 }}>{anchorError}</div>}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button onClick={() => setAnchorModalAccount(null)} style={s.btn("#64748b")}>
+                Cancel
+              </button>
+              <button onClick={saveAnchor} disabled={savingAnchor} style={s.btn("#b8923a", savingAnchor)}>
+                {savingAnchor ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Transaction */}
+      {addOpen && (
+        <AddTransactionModal
+          accounts={anchors.map((a) => a.accountNumber)}
+          categories={categories}
+          onClose={() => setAddOpen(false)}
+          onAdded={() => {
+            setAddOpen(false);
+            load();
+            loadAnchors();
+          }}
+        />
+      )}
     </AdminLayout>
   );
 }
@@ -815,6 +1025,18 @@ function TransactionRow({
           {row.credit != null ? fmtMoney(row.credit) : ""}
         </td>
         <td style={{ ...s.td, textAlign: "right" }}>{fmtMoney(row.balance)}</td>
+        <td
+          style={{
+            ...s.td,
+            textAlign: "right",
+            ...(row.balanceMismatch
+              ? { background: "#fee2e2", color: "#991b1b", fontWeight: 700 }
+              : {}),
+          }}
+          title={row.balanceMismatch ? `Doesn't match bank Balance of ${fmtMoney(row.balance)}` : undefined}
+        >
+          {row.calculatedBalance != null ? fmtMoney(row.calculatedBalance) : "—"}
+        </td>
         <td style={s.td}>
           <EditableStatusBadge
             status={topId}
@@ -847,7 +1069,7 @@ function TransactionRow({
       </tr>
       {linkOpen && (
         <tr>
-          <td colSpan={13} style={{ ...s.td, background: "#f8fafc" }}>
+          <td colSpan={14} style={{ ...s.td, background: "#f8fafc" }}>
             {loadingLinks ? (
               <div style={{ fontSize: 12, color: "#64748b", marginBottom: 10 }}>Loading links…</div>
             ) : existingLinks.length > 0 ? (
@@ -920,5 +1142,213 @@ function TransactionRow({
         </tr>
       )}
     </>
+  );
+}
+
+// ── Add Transaction modal ────────────────────────────────────────────────
+
+function AddTransactionModal({
+  accounts,
+  categories,
+  onClose,
+  onAdded,
+}: {
+  accounts: string[];
+  categories: TransactionCategoryItem[];
+  onClose: () => void;
+  onAdded: () => void;
+}) {
+  const [accountNumber, setAccountNumber] = useState(accounts[0] ?? "");
+  const [postDate, setPostDate] = useState(new Date().toISOString().slice(0, 10));
+  const [description, setDescription] = useState("");
+  const [checkNumber, setCheckNumber] = useState("");
+  const [direction, setDirection] = useState<"credit" | "debit">("credit");
+  const [amount, setAmount] = useState("");
+  const [balance, setBalance] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    setError("");
+    if (!accountNumber.trim()) return setError("Account number is required.");
+    if (!description.trim()) return setError("Description is required.");
+    const amountNum = Number(amount);
+    if (!amount || Number.isNaN(amountNum) || amountNum <= 0) return setError("Enter an amount greater than zero.");
+    const balanceNum = Number(balance);
+    if (balance === "" || Number.isNaN(balanceNum)) return setError("Bank Balance is required.");
+
+    setSaving(true);
+    try {
+      const res = await bankTransactionsApi.create({
+        accountNumber: accountNumber.trim(),
+        postDate,
+        checkNumber: checkNumber.trim() || undefined,
+        description: description.trim(),
+        debit: direction === "debit" ? amountNum : undefined,
+        credit: direction === "credit" ? amountNum : undefined,
+        balance: balanceNum,
+        categoryId: categoryId ? Number(categoryId) : undefined,
+      });
+      if (res.success) onAdded();
+      else setError(res.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)",
+        display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: "white", borderRadius: 10, padding: 24, width: 480, maxWidth: "90vw" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ fontSize: 16, fontWeight: 700, color: "#0f2342", marginBottom: 16 }}>
+          Add Transaction
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+              Account Number
+            </label>
+            <input
+              type="text"
+              list="known-accounts"
+              value={accountNumber}
+              onChange={(e) => setAccountNumber(e.target.value)}
+              style={{ padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 14, width: "100%", boxSizing: "border-box" }}
+            />
+            <datalist id="known-accounts">
+              {accounts.map((a) => (
+                <option key={a} value={a} />
+              ))}
+            </datalist>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+              Date
+            </label>
+            <input
+              type="date"
+              value={postDate}
+              onChange={(e) => setPostDate(e.target.value)}
+              style={{ padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 14, width: "100%", boxSizing: "border-box" }}
+            />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+            Description
+          </label>
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            style={{ padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 14, width: "100%", boxSizing: "border-box" }}
+          />
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+              Check #
+            </label>
+            <input
+              type="text"
+              value={checkNumber}
+              onChange={(e) => setCheckNumber(e.target.value)}
+              style={{ padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 14, width: "100%", boxSizing: "border-box" }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+              Category (optional)
+            </label>
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              style={{ padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 14, width: "100%", boxSizing: "border-box" }}
+            >
+              <option value="">Uncategorized</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+              Direction
+            </label>
+            <select
+              value={direction}
+              onChange={(e) => setDirection(e.target.value as "credit" | "debit")}
+              style={{ padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 14, width: "100%", boxSizing: "border-box" }}
+            >
+              <option value="credit">Credit (in)</option>
+              <option value="debit">Debit (out)</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+              Amount
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              style={{ padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 14, width: "100%", boxSizing: "border-box" }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+              Bank Balance
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={balance}
+              onChange={(e) => setBalance(e.target.value)}
+              style={{ padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 14, width: "100%", boxSizing: "border-box" }}
+            />
+          </div>
+        </div>
+
+        {error && <div style={{ color: "#991b1b", fontSize: 13, marginBottom: 12 }}>{error}</div>}
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <button
+            onClick={onClose}
+            style={{ padding: "8px 18px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: "#64748b", color: "#fff" }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={saving}
+            style={{
+              padding: "8px 18px", borderRadius: 6, border: "none",
+              cursor: saving ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600,
+              background: saving ? "#d1d5db" : "#b8923a", color: "#fff", opacity: saving ? 0.7 : 1,
+            }}
+          >
+            {saving ? "Adding…" : "Add Transaction"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

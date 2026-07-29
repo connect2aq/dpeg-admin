@@ -1307,6 +1307,8 @@ export interface BankTransactionListItem {
   credit?: number;
   amount: number;
   balance: number;
+  calculatedBalance?: number;
+  balanceMismatch: boolean;
   status: string;
   categoryId?: number;
   categoryName?: string;
@@ -1314,6 +1316,15 @@ export interface BankTransactionListItem {
   linkedSummary?: string;
   importSessionId: number;
   createdOn: string;
+}
+
+export interface BankAccountBalanceAnchor {
+  accountNumber: string;
+  startingCalculatedBalance?: number;
+  setOn?: string;
+  setBy?: number;
+  firstTransactionBalance?: number;
+  firstTransactionDate?: string;
 }
 
 export interface BankTransactionLinkItem {
@@ -1483,12 +1494,29 @@ export const bankTransactionsApi = {
       credit?: number;
     },
   ) => api.put<ApiResponse<string>>(`/bank-transactions/${id}`, dto),
+  create: (dto: {
+    accountNumber: string;
+    postDate: string;
+    checkNumber?: string;
+    description: string;
+    debit?: number;
+    credit?: number;
+    balance: number;
+    categoryId?: number | null;
+  }) => api.post<ApiResponse<string>>(`/bank-transactions`, dto),
   setCategory: (id: number, categoryId: number | null) =>
     api.put<ApiResponse<string>>(`/bank-transactions/${id}/category`, {
       categoryId,
     }),
   remove: (id: number) =>
     api.delete<ApiResponse<string>>(`/bank-transactions/${id}`),
+  getBalanceAnchors: () =>
+    api.get<ApiResponse<BankAccountBalanceAnchor[]>>(`/bank-transactions/balance-anchors`),
+  setBalanceAnchor: (accountNumber: string, startingCalculatedBalance: number) =>
+    api.put<ApiResponse<string>>(`/bank-transactions/balance-anchors`, {
+      accountNumber,
+      startingCalculatedBalance,
+    }),
   bulkDelete: (ids: number[]) =>
     api.post<ApiResponse<BulkDeleteResult>>(`/bank-transactions/bulk-delete`, {
       bankTransactionIds: ids,
