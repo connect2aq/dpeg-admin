@@ -1426,6 +1426,13 @@ export interface BankCapitalLedgerResult {
   openingBalance: number;
 }
 
+export interface BulkDeleteResult {
+  requested: number;
+  deleted: number;
+  skippedLinked: number;
+  skippedIds: number[];
+}
+
 export const bankTransactionsApi = {
   upload: (
     file: File,
@@ -1472,6 +1479,10 @@ export const bankTransactionsApi = {
     }),
   remove: (id: number) =>
     api.delete<ApiResponse<string>>(`/bank-transactions/${id}`),
+  bulkDelete: (ids: number[]) =>
+    api.post<ApiResponse<BulkDeleteResult>>(`/bank-transactions/bulk-delete`, {
+      bankTransactionIds: ids,
+    }),
   searchLinkCandidates: (
     type: LinkedEntityType,
     search?: string,

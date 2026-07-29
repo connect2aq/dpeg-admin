@@ -16,7 +16,7 @@ import {
 import { PAGE_SIZE_OPTIONS } from "@/lib/pagination";
 import { formatShortDate } from "@/lib/dateFormat";
 import { downloadCsv } from "@/lib/exportCsv";
-import { buildSubCategoryOptions } from "@/lib/bankTransactions/categoryTree";
+import { buildSubCategoryOptionsForSelection } from "@/lib/bankTransactions/categoryTree";
 
 const DEFAULT_PAGE_SIZE = 25;
 
@@ -119,7 +119,7 @@ export default function BankCapitalLedgerPage() {
   const [search, setSearch] = useState("");
   const [investorSearch, setInvestorSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("date");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [exporting, setExporting] = useState(false);
@@ -148,7 +148,7 @@ export default function BankCapitalLedgerPage() {
     { value: "uncategorized", label: "Uncategorized" },
     ...categories.map((c) => ({ value: String(c.id), label: c.name })),
   ];
-  const subCategoryFilterOptions = buildSubCategoryOptions(categories);
+  const subCategoryFilterOptions = buildSubCategoryOptionsForSelection(categories, categoryIds);
 
   // KPI cards reflect the full From/To range exactly as loaded from the API — unaffected by the
   // Category/Sub-Category/search/etc. filters below, the same way Fund Capital Ledger's stat cards
@@ -234,9 +234,10 @@ export default function BankCapitalLedgerPage() {
   };
 
   // Running Balance is each row's true bank-reported balance as of that date — always accurate on
-  // its own — but it only builds up as a visually contiguous sequence oldest -> newest with every
-  // row shown. Any of these filters hides rows, or any sort other than Date ascending reorders
-  // them, so the sequence won't look contiguous even though each value is still correct.
+  // its own — but it only builds up as a visually contiguous sequence with every row shown, read in
+  // Date order. Date ascending and Date descending are equally contiguous (same running balance,
+  // just read top-to-bottom in the opposite direction) — it's any OTHER sort, or any filter that
+  // hides rows, that breaks the visual sequence even though each value is still correct.
   const runningBalanceUnreliable =
     categoryIds.length > 0 ||
     subCategoryIds.length > 0 ||
@@ -244,8 +245,7 @@ export default function BankCapitalLedgerPage() {
     linkFilter !== "" ||
     !!search ||
     !!investorSearch ||
-    sortField !== "date" ||
-    sortDir !== "asc";
+    sortField !== "date";
 
   const resetToDateOrder = () => {
     setCategoryIds([]);
@@ -255,7 +255,7 @@ export default function BankCapitalLedgerPage() {
     setSearch("");
     setInvestorSearch("");
     setSortField("date");
-    setSortDir("asc");
+    setSortDir("desc");
     setPage(1);
   };
 
@@ -385,6 +385,8 @@ export default function BankCapitalLedgerPage() {
                 selectedValues={categoryIds}
                 onChange={(v) => {
                   setCategoryIds(v);
+                  const valid = new Set(buildSubCategoryOptionsForSelection(categories, v).map((o) => o.value));
+                  setSubCategoryIds((prev) => prev.filter((id) => valid.has(id)));
                   setPage(1);
                 }}
                 allLabel="All Categories"

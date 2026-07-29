@@ -19,7 +19,11 @@ import {
 } from "@/lib/api";
 import { PAGE_SIZE_OPTIONS } from "@/lib/pagination";
 import { formatShortDate } from "@/lib/dateFormat";
-import { findCategoryById, resolveCategorySelection } from "@/lib/bankTransactions/categoryTree";
+import {
+  findCategoryById,
+  resolveCategorySelection,
+  buildSubCategoryOptionsForSelection,
+} from "@/lib/bankTransactions/categoryTree";
 
 const DEFAULT_PAGE_SIZE = 25;
 
@@ -83,14 +87,19 @@ export default function BankTransactionsPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
+  const [subCategoryIds, setSubCategoryIds] = useState<string[]>([]);
   const [linkFilter, setLinkFilter] = useState<"" | "linked" | "unlinked">("");
   const [direction, setDirection] = useState<"" | "in" | "out">("");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [sortOn, setSortOn] = useState("postdate");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  // Default view is unsorted-by-us — exactly the order rows were imported (which is exactly the
+  // order they appeared in the CSV, since import inserts rows sequentially in file order). Sorting
+  // by Date reshuffles same-day (or otherwise non-strictly-chronological) rows and makes the bank's
+  // own literal Balance snapshot for each row look like it jumps around.
+  const [sortOn, setSortOn] = useState("importorder");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkLinkOpen, setBulkLinkOpen] = useState(false);
@@ -98,6 +107,7 @@ export default function BankTransactionsPage() {
   const [selectedCandidate, setSelectedCandidate] = useState<LinkCandidate | null>(null);
   const [linking, setLinking] = useState(false);
   const [linkError, setLinkError] = useState("");
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const toggleSort = (key: string) => {
     if (sortOn === key) setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
@@ -120,17 +130,26 @@ export default function BankTransactionsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      // The backend's categoryIds filter is a raw literal-id match (a transaction's CategoryId
+      // points at whichever level it was actually tagged at). So a selected top-level Category
+      // needs to expand to "itself + all its children" here — otherwise a transaction tagged at a
+      // sub-category wouldn't match its parent's Category filter, breaking the rollup semantics
+      // used everywhere else in this feature (Balance Flow, Bank Capital Ledger).
+      const wantsUncategorized = categoryIds.includes("uncategorized");
+      const topIds = categoryIds.filter((v) => v !== "uncategorized");
+      const expanded = topIds.flatMap((id) => {
+        const cat = categories.find((c) => String(c.id) === id);
+        return cat ? [String(cat.id), ...cat.subCategories.map((s) => String(s.id))] : [id];
+      });
+      const finalCategoryIds = [...new Set([...expanded, ...subCategoryIds])];
+
       const res = await bankTransactionsApi.list({
         page,
         pageSize,
         from: from || undefined,
         to: to || undefined,
-        categoryIds: categoryIds.includes("uncategorized")
-          ? undefined
-          : categoryIds.length
-            ? categoryIds
-            : undefined,
-        uncategorizedOnly: categoryIds.includes("uncategorized") ? true : undefined,
+        categoryIds: wantsUncategorized ? undefined : finalCategoryIds.length ? finalCategoryIds : undefined,
+        uncategorizedOnly: wantsUncategorized ? true : undefined,
         linkedOnly: linkFilter === "linked" ? true : undefined,
         unlinkedOnly: linkFilter === "unlinked" ? true : undefined,
         direction: direction || undefined,
@@ -142,7 +161,7 @@ export default function BankTransactionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, from, to, categoryIds, linkFilter, direction, search, sortOn, sortDirection]);
+  }, [page, pageSize, from, to, categoryIds, subCategoryIds, categories, linkFilter, direction, search, sortOn, sortDirection]);
 
   useEffect(() => {
     load();
@@ -154,16 +173,11 @@ export default function BankTransactionsPage() {
     });
   }, []);
 
-  const categoryOptions = [
+  const categoryFilterOptions = [
     { value: "uncategorized", label: "Uncategorized" },
-    ...categories.flatMap((c) => [
-      { value: String(c.id), label: c.name },
-      ...c.subCategories.map((sub) => ({
-        value: String(sub.id),
-        label: `${c.name} › ${sub.name}`,
-      })),
-    ]),
+    ...categories.map((c) => ({ value: String(c.id), label: c.name })),
   ];
+  const subCategoryFilterOptions = buildSubCategoryOptionsForSelection(categories, categoryIds);
 
   // ── Upload ────────────────────────────────────────────────────────────────
 
@@ -269,6 +283,29 @@ export default function BankTransactionsPage() {
       } else setLinkError(res.message);
     } finally {
       setLinking(false);
+    }
+  };
+
+  const deleteSelected = async () => {
+    if (
+      !confirm(
+        `Delete ${selected.size} selected transaction(s)? Any that are linked will be skipped — remove their links first. This can't be undone from here.`,
+      )
+    )
+      return;
+    setBulkDeleting(true);
+    try {
+      const res = await bankTransactionsApi.bulkDelete(Array.from(selected));
+      if (res.success) {
+        const { deleted, skippedLinked } = res.data;
+        if (skippedLinked > 0) {
+          alert(`Deleted ${deleted}, skipped ${skippedLinked} — they have existing links. Remove the links first, then delete again.`);
+        }
+        setSelected(new Set());
+        load();
+      } else alert(res.message);
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -383,14 +420,26 @@ export default function BankTransactionsPage() {
             style={s.input}
           />
           <MultiSelectFilter
-            options={categoryOptions}
+            options={categoryFilterOptions}
             selectedValues={categoryIds}
             onChange={(v) => {
               setCategoryIds(v);
+              const valid = new Set(buildSubCategoryOptionsForSelection(categories, v).map((o) => o.value));
+              setSubCategoryIds((prev) => prev.filter((id) => valid.has(id)));
               setPage(1);
             }}
             allLabel="All Categories"
             buttonLabel="Category"
+          />
+          <MultiSelectFilter
+            options={subCategoryFilterOptions}
+            selectedValues={subCategoryIds}
+            onChange={(v) => {
+              setSubCategoryIds(v);
+              setPage(1);
+            }}
+            allLabel="All Sub-Categories"
+            buttonLabel="Sub-Category"
           />
           <select
             value={linkFilter}
@@ -421,6 +470,7 @@ export default function BankTransactionsPage() {
               setFrom("");
               setTo("");
               setCategoryIds([]);
+              setSubCategoryIds([]);
               setLinkFilter("");
               setDirection("");
               setSearchInput("");
@@ -450,6 +500,9 @@ export default function BankTransactionsPage() {
             </span>
             <button onClick={() => setBulkLinkOpen(true)} style={s.btn("#b8923a")}>
               🔗 Link Selected to…
+            </button>
+            <button onClick={deleteSelected} disabled={bulkDeleting} style={s.btn("#991b1b", bulkDeleting)}>
+              {bulkDeleting ? "Deleting…" : "🗑 Delete Selected"}
             </button>
             <button onClick={() => setSelected(new Set())} style={s.btn("#64748b")}>
               Clear Selection

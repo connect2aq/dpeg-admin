@@ -68,3 +68,21 @@ export function buildSubCategoryOptions(
     })),
   );
 }
+
+// Same as buildSubCategoryOptions, but narrowed to only the children of the selected top-level
+// Category filter values — so the Sub-Category dropdown stays relevant once a Category is picked.
+// "uncategorized" is ignored (it has no children); with no real category selected, all
+// sub-categories are shown, same as buildSubCategoryOptions.
+export function buildSubCategoryOptionsForSelection(
+  categories: TransactionCategoryItem[],
+  selectedCategoryIds: string[],
+): { value: string; label: string }[] {
+  const ids = selectedCategoryIds.filter((v) => v !== "uncategorized");
+  const relevant = ids.length > 0 ? categories.filter((c) => ids.includes(String(c.id))) : categories;
+  return relevant.flatMap((c) =>
+    c.subCategories.map((sub) => ({
+      value: String(sub.id),
+      label: `${c.name} › ${sub.name}`,
+    })),
+  );
+}
