@@ -64,6 +64,8 @@ const EMPTY_BALANCE: DailyBalanceLog = {
 };
 
 export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState<"general" | "bank-transaction-settings">("general");
+
   const [form, setForm] = useState<BankDetails>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -353,6 +355,34 @@ export default function SettingsPage() {
           investors when an application is sent to signers.
         </p>
 
+        <div style={{ display: "flex", gap: 6, marginBottom: 20, borderBottom: "1px solid #e2e8f0" }}>
+          {(
+            [
+              { key: "general", label: "General" },
+              { key: "bank-transaction-settings", label: "Bank Transaction Settings" },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              style={{
+                padding: "10px 18px",
+                border: "none",
+                borderBottom: activeTab === t.key ? "2px solid #b8923a" : "2px solid transparent",
+                background: "transparent",
+                fontSize: 14,
+                fontWeight: 600,
+                color: activeTab === t.key ? "#0f2342" : "#64748b",
+                cursor: "pointer",
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === "general" && (
+        <>
         <div className="card">
           <h2
             style={{
@@ -956,9 +986,13 @@ export default function SettingsPage() {
             </>
           )}
         </div>
+        </>
+        )}
 
+        {activeTab === "bank-transaction-settings" && (
+        <>
         {/* Transaction Categories */}
-        <div className="card" style={{ marginTop: 28 }}>
+        <div className="card">
           <h2
             style={{
               fontSize: 15,
@@ -1175,6 +1209,8 @@ export default function SettingsPage() {
             </>
           )}
         </div>
+        </>
+        )}
       </div>
     </AdminLayout>
   );

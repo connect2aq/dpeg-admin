@@ -25,7 +25,8 @@ const NAV = [
   { href: "/audit-log", label: "Audit Log", icon: "🔍" },
   { href: "/settings", label: "Settings", icon: "⚙" },
   { href: "/historical-import", label: "Historical Import", icon: "⬆" },
-  { href: "/bank-transactions", label: "Bank Transactions", icon: "🏦" },
+  { href: "/bank-capital-ledger", label: "Bank Capital Ledger", icon: "🏛" },
+  { href: "/bank-transactions", label: "Manage Bank Statements", icon: "🏦" },
   // { href: "/smtp-test", label: "SMTP Test", icon: "✉" },
 ];
 
@@ -140,9 +141,9 @@ export default function AdminLayout({
               !isExecutiveCopilotAllowed(user?.email)
             )
               return null;
-            // Bank Transactions — restricted to one admin account for now
+            // Bank Transactions / Bank Capital Ledger — restricted to one admin account for now
             if (
-              href === "/bank-transactions" &&
+              (href === "/bank-transactions" || href === "/bank-capital-ledger") &&
               !isBankTransactionsAllowed(user?.email)
             )
               return null;

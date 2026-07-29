@@ -1398,6 +1398,34 @@ export interface BankTransactionBalanceFlow {
   totalTransactionCount: number;
 }
 
+export interface BankCapitalLedgerEntry {
+  id: number;
+  date: string;
+  rawDescription: string;
+  adminDescription?: string;
+  checkNumber?: string;
+  debit?: number;
+  credit?: number;
+  amount: number;
+  balance: number;
+  categoryId?: number;
+  categoryName?: string;
+  subCategoryId?: number;
+  subCategoryName?: string;
+  linkedCount: number;
+  linkedEntityType?: string;
+  linkedEntityId?: number;
+  investorName?: string;
+  accountUserId?: number;
+  accountUserName?: string;
+  accountUserEmail?: string;
+}
+
+export interface BankCapitalLedgerResult {
+  entries: BankCapitalLedgerEntry[];
+  openingBalance: number;
+}
+
 export const bankTransactionsApi = {
   upload: (
     file: File,
@@ -1422,6 +1450,12 @@ export const bankTransactionsApi = {
     api.get<ApiResponse<BankTransactionBalanceFlow>>(
       `/bank-transactions/balance-flow`,
     ),
+  getLedger: (params: { from?: string; to?: string }) => {
+    const q = buildQueryString({ from: params.from, to: params.to });
+    return api.get<ApiResponse<BankCapitalLedgerResult>>(
+      `/bank-transactions/ledger?${q}`,
+    );
+  },
   update: (
     id: number,
     dto: {
