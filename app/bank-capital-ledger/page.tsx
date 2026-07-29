@@ -804,9 +804,16 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
   const totalDistribution = portal.distributionTotal;
   const distributionCount = portal.distributionCount;
   const totalInvestments = investments?.total ?? 0;
-  const totalDividendReceived = dividendReceived?.total ?? 0;
-  const totalSponsorsEquity = sponsorsEquity?.total ?? 0;
-  const totalProfitFromBank = profitFromBank?.total ?? 0;
+  // Dividend Received, Sponsor's Equity, and Profit Received from Bank are always inflows to the
+  // fund and must always add into Total Balance Available — matching the Dashboard's own Balance
+  // Flow formula, which hard-codes these three with a "+" regardless of sign (dashboard/page.tsx's
+  // BalanceFlow: "afterDividend - deployedAmount + interestReceived + dividendReceived +
+  // sponsoredEquity - otherCharges"). Force positive here rather than trusting the bank-transaction
+  // category's own signed Total, since a handful of debit-side transactions miscategorized under
+  // one of these inflow categories shouldn't flip the whole tile (and the downstream sum) negative.
+  const totalDividendReceived = Math.abs(dividendReceived?.total ?? 0);
+  const totalSponsorsEquity = Math.abs(sponsorsEquity?.total ?? 0);
+  const totalProfitFromBank = Math.abs(profitFromBank?.total ?? 0);
   const totalOtherCharges = otherCharges?.total ?? 0;
 
   const balanceRemaining = totalFundContributions + totalRedemption;
