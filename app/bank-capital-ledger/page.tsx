@@ -24,6 +24,9 @@ function fmtMoney(n?: number) {
   if (n == null) return "—";
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+function signed(n: number) {
+  return `${n < 0 ? "−" : ""}${fmtMoney(Math.abs(n))}`;
+}
 
 const s = {
   h1: { fontSize: 22, fontWeight: 700, color: "#0f2342", marginBottom: 4 } as React.CSSProperties,
@@ -146,6 +149,18 @@ export default function BankCapitalLedgerPage() {
     ...categories.map((c) => ({ value: String(c.id), label: c.name })),
   ];
   const subCategoryFilterOptions = buildSubCategoryOptions(categories);
+
+  // KPI cards reflect the full From/To range exactly as loaded from the API — unaffected by the
+  // Category/Sub-Category/search/etc. filters below, the same way Fund Capital Ledger's stat cards
+  // come from backend-computed totals over the date range, not the further-filtered client view.
+  const rangeStats = useMemo(() => {
+    const entries = ledgerData?.entries ?? [];
+    const totalIn = entries.reduce((sum, e) => sum + (e.credit ?? 0), 0);
+    const totalOut = entries.reduce((sum, e) => sum + (e.debit ?? 0), 0);
+    const netChange = entries.reduce((sum, e) => sum + e.amount, 0);
+    const closingBalance = entries.length > 0 ? entries[entries.length - 1].balance : null;
+    return { totalIn, totalOut, netChange, closingBalance, count: entries.length };
+  }, [ledgerData]);
 
   const visibleEntries = useMemo(() => {
     const entries = ledgerData?.entries ?? [];
@@ -447,16 +462,30 @@ export default function BankCapitalLedgerPage() {
               </div>
             ) : (
               <>
-                {ledgerData.openingBalance !== 0 && (
-                  <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-                    {statCard(
+                <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+                  {ledgerData.openingBalance !== 0 &&
+                    statCard(
                       "Opening Balance",
                       fmtMoney(ledgerData.openingBalance),
                       "#0f2342",
                       from ? `as at ${from}` : undefined,
                     )}
-                  </div>
-                )}
+                  {statCard("Total Money In", fmtMoney(rangeStats.totalIn), "#0f9444")}
+                  {statCard("Total Money Out", fmtMoney(rangeStats.totalOut), "#991b1b")}
+                  {statCard(
+                    "Net Change",
+                    signed(rangeStats.netChange),
+                    rangeStats.netChange >= 0 ? "#0f9444" : "#991b1b",
+                  )}
+                  {rangeStats.closingBalance != null &&
+                    statCard(
+                      "Closing Balance",
+                      fmtMoney(rangeStats.closingBalance),
+                      "#0f2342",
+                      to ? `as at ${to}` : "latest imported balance",
+                    )}
+                  {statCard("Transactions", String(rangeStats.count), "#699172")}
+                </div>
 
                 {runningBalanceUnreliable && (
                   <div
