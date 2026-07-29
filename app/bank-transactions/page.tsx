@@ -184,7 +184,7 @@ export default function BankTransactionsPage() {
   const handleUpload = async () => {
     const file = fileRef.current?.files?.[0];
     if (!file) {
-      setUploadError("Please select a .csv file first.");
+      setUploadError("Please select a .csv or .qbo file first.");
       return;
     }
     setUploading(true);
@@ -323,12 +323,16 @@ export default function BankTransactionsPage() {
 
         {/* Upload */}
         <div style={s.card}>
-          <div style={s.cardTitle}>Import Bank Statement (CSV)</div>
+          <div style={s.cardTitle}>Import Bank Statement (CSV or QBO)</div>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <input ref={fileRef} type="file" accept=".csv" style={{ fontSize: 13, color: "#374151" }} />
+            <input ref={fileRef} type="file" accept=".csv,.qbo,.ofx" style={{ fontSize: 13, color: "#374151" }} />
             <button onClick={handleUpload} disabled={uploading} style={s.btn("#0f2342", uploading)}>
               {uploading ? "Importing…" : "⬆ Import"}
             </button>
+          </div>
+          <div style={{ marginTop: 8, fontSize: 12, color: "#94a3b8" }}>
+            QBO/OFX files carry each transaction&apos;s own bank-assigned ID, so re-importing an
+            overlapping statement automatically skips anything already in.
           </div>
           {uploadError && (
             <div
