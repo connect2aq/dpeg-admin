@@ -900,7 +900,7 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: "#0e3416" }}>
-          Balance Flow (Since Inception) — from {data.totalTransactionCount} imported transaction(s)
+          Balance Flow (Since Inception)
         </div>
         <button onClick={load} style={s.btn("#64748b")}>
           ↻ Refresh
@@ -1010,7 +1010,7 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
           onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "")}
         >
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#475569", marginBottom: 6 }}>
-            Bank Account Balance (Calculated)
+            Bank Account Balance
           </div>
           <div style={{ fontSize: 17, fontWeight: 800, color: bankBalance != null ? "#0f2342" : "#94a3b8", flex: 1, letterSpacing: "0.01em" }}>
             {bankBalance != null ? fmt(bankBalance) : "No transactions imported yet"}
@@ -1018,34 +1018,6 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
           <div style={{ fontSize: 10, color: "#699172", marginTop: 6, fontWeight: 600 }}>View all transactions →</div>
         </button>
       </div>
-
-      {data.uncategorizedCount > 0 && (
-        <div
-          style={{
-            marginTop: 14,
-            padding: "10px 14px",
-            background: "#fffbeb",
-            border: "1px solid #fde68a",
-            borderRadius: 8,
-            fontSize: 12,
-            color: "#92400e",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 8,
-          }}
-        >
-          <span>
-            ⚠ {data.uncategorizedCount} transaction(s) totaling {signedFlow(data.uncategorizedTotal)} are still
-            uncategorized — the totals above won&apos;t fully reconcile against the bank balance until these are
-            tagged.
-          </span>
-          <button onClick={() => onViewCategory("uncategorized")} style={s.btn("#b8923a")}>
-            View uncategorized →
-          </button>
-        </div>
-      )}
     </div>
   );
 }
