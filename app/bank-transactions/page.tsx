@@ -14,6 +14,7 @@ import {
   type BankTransactionImportResult,
   type BankTransactionLinkItem,
   type BankAccountBalanceAnchor,
+  type BankTransactionBalanceFlow,
   type LinkCandidate,
   type LinkedEntityType,
   type PagedResult,
@@ -32,6 +33,10 @@ const DEFAULT_PAGE_SIZE = 25;
 function fmtMoney(n?: number) {
   if (n == null) return "—";
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function fmtSigned(n: number) {
+  return `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 const s = {
@@ -63,17 +68,28 @@ const s = {
     fontSize: 14,
     color: "#0f172a",
   } as React.CSSProperties,
-  table: { width: "100%", borderCollapse: "collapse" as const, fontSize: 13 },
+  table: { borderCollapse: "collapse" as const, fontSize: 11.5, tableLayout: "fixed" as const },
   th: {
-    padding: "8px 10px",
+    padding: "6px 6px",
     textAlign: "left" as const,
     background: "#0f2342",
     color: "#fff",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 600,
     textTransform: "uppercase" as const,
   },
-  td: { padding: "8px 10px", borderBottom: "1px solid #f1f5f9", color: "#1a1a2e" },
+  td: { padding: "6px 6px", borderBottom: "1px solid #f1f5f9", color: "#1a1a2e", overflow: "hidden" },
+  iconBtn: (color: string, disabled?: boolean): React.CSSProperties => ({
+    padding: "3px 7px",
+    borderRadius: 5,
+    border: "none",
+    cursor: disabled ? "not-allowed" : "pointer",
+    fontSize: 12,
+    lineHeight: 1.4,
+    background: disabled ? "#d1d5db" : color,
+    color: "#fff",
+    opacity: disabled ? 0.7 : 1,
+  }),
 };
 
 export default function BankTransactionsPage() {
@@ -110,6 +126,8 @@ export default function BankTransactionsPage() {
   const [linking, setLinking] = useState(false);
   const [linkError, setLinkError] = useState("");
   const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const [flow, setFlow] = useState<BankTransactionBalanceFlow | null>(null);
 
   const [anchors, setAnchors] = useState<BankAccountBalanceAnchor[]>([]);
   const [anchorListOpen, setAnchorListOpen] = useState(false);
@@ -193,6 +211,15 @@ export default function BankTransactionsPage() {
     loadAnchors();
   }, [loadAnchors]);
 
+  const loadFlow = useCallback(async () => {
+    const res = await bankTransactionsApi.getBalanceFlow();
+    if (res.success) setFlow(res.data);
+  }, []);
+
+  useEffect(() => {
+    loadFlow();
+  }, [loadFlow]);
+
   const openAnchorModal = (account: BankAccountBalanceAnchor) => {
     setAnchorModalAccount(account.accountNumber);
     setAnchorValue(
@@ -220,6 +247,7 @@ export default function BankTransactionsPage() {
         setAnchorModalAccount(null);
         await loadAnchors();
         load();
+        loadFlow();
       } else setAnchorError(res.message);
     } finally {
       setSavingAnchor(false);
@@ -249,6 +277,7 @@ export default function BankTransactionsPage() {
         setUploadResult(res.data);
         load();
         loadAnchors();
+        loadFlow();
       } else setUploadError(res.message || "Upload failed.");
     } catch {
       setUploadError("Network error. Please try again.");
@@ -296,6 +325,7 @@ export default function BankTransactionsPage() {
     const res = await bankTransactionsApi.remove(row.id);
     if (!res.success) alert(res.message);
     load();
+    loadFlow();
   };
 
   // ── Selection & bulk link ────────────────────────────────────────────────
@@ -357,6 +387,7 @@ export default function BankTransactionsPage() {
         }
         setSelected(new Set());
         load();
+        loadFlow();
       } else alert(res.message);
     } finally {
       setBulkDeleting(false);
@@ -474,7 +505,7 @@ export default function BankTransactionsPage() {
               </div>
               {uploadResult.failed > 0 && (
                 <div style={{ marginTop: 10, overflowX: "auto" }}>
-                  <table style={s.table}>
+                  <table style={{ ...s.table, width: "100%", tableLayout: "auto" }}>
                     <thead>
                       <tr>
                         <th style={s.th}>Row</th>
@@ -499,6 +530,93 @@ export default function BankTransactionsPage() {
                 </div>
               )}
             </div>
+          )}
+        </div>
+
+        {/* Reconciliation: portal (system of record) vs bank (what the statement shows) */}
+        <div style={{ ...s.card, padding: "14px 20px" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 10,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#0f2342" }}>
+              Reconciliation — Portal vs Bank (Since Inception)
+            </div>
+            <button onClick={loadFlow} style={s.btn("#64748b")}>
+              ↻ Refresh
+            </button>
+          </div>
+          {!flow ? (
+            <div style={{ fontSize: 13, color: "#94a3b8" }}>Loading…</div>
+          ) : (
+            (() => {
+              const getCat = (name: string) =>
+                flow.categoryTotals.find((c) => c.categoryName.toLowerCase() === name.toLowerCase());
+              const bankFundContrib = getCat("Fund Contributions")?.total ?? 0;
+              const bankRedemption = getCat("Redemption")?.total ?? 0;
+              const bankDistribution = getCat("Distribution")?.total ?? 0;
+              const portal = flow.portalCapitalFlow;
+              const varianceAccent = (v: number) => (Math.abs(v) < 1 ? "#10b981" : "#ef4444");
+              const reconcileCard = (label: string, value: number, accent?: string) => (
+                <div
+                  key={label + value}
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                    minWidth: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 9.5,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.04em",
+                      color: "#94a3b8",
+                      marginBottom: 3,
+                    }}
+                  >
+                    {label}
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: accent ?? "#0f2342" }}>
+                    {fmtSigned(value)}
+                  </div>
+                </div>
+              );
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                  {reconcileCard("Total Deposits to Date (From Portal)", portal.fundContributionsTotal)}
+                  {reconcileCard("Total Deposits to Date (From Bank)", bankFundContrib)}
+                  {reconcileCard(
+                    "Variance",
+                    bankFundContrib - portal.fundContributionsTotal,
+                    varianceAccent(bankFundContrib - portal.fundContributionsTotal),
+                  )}
+
+                  {reconcileCard("Redemption (From Portal)", portal.redemptionTotal)}
+                  {reconcileCard("Redemption (From Bank)", bankRedemption)}
+                  {reconcileCard(
+                    "Variance",
+                    bankRedemption - portal.redemptionTotal,
+                    varianceAccent(bankRedemption - portal.redemptionTotal),
+                  )}
+
+                  {reconcileCard("Distribution (From Portal)", portal.distributionTotal)}
+                  {reconcileCard("Distribution (From Bank)", bankDistribution)}
+                  {reconcileCard(
+                    "Variance",
+                    bankDistribution - portal.distributionTotal,
+                    varianceAccent(bankDistribution - portal.distributionTotal),
+                  )}
+                </div>
+              );
+            })()
           )}
         </div>
 
@@ -635,26 +753,26 @@ export default function BankTransactionsPage() {
                 <table style={s.table}>
                   <thead>
                     <tr>
-                      <th style={{ ...s.th, width: 30 }}>
+                      <th style={{ ...s.th, width: 24 }}>
                         <input
                           type="checkbox"
                           checked={selected.size === result.items.length && result.items.length > 0}
                           onChange={toggleSelectAll}
                         />
                       </th>
-                      <SortableTh label="Date" sortKey="postdate" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={s.th} />
-                      <th style={s.th}>Description</th>
-                      <th style={s.th}>Notes</th>
-                      <th style={s.th}>Check #</th>
-                      <th style={{ ...s.th, textAlign: "right" }}>Debit</th>
-                      <th style={{ ...s.th, textAlign: "right" }}>Credit</th>
-                      <SortableTh label="Balance" sortKey="balance" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={{ ...s.th, textAlign: "right" }} />
-                      <th style={{ ...s.th, textAlign: "right" }}>Calculated Balance</th>
-                      <th style={s.th}>Category</th>
-                      <th style={s.th}>Sub-Category</th>
-                      <th style={s.th}>Linked To</th>
-                      <th style={s.th}>Link</th>
-                      <th style={s.th}></th>
+                      <SortableTh label="Date" sortKey="postdate" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={{ ...s.th, width: 64 }} />
+                      <th style={{ ...s.th, width: 110 }}>Description</th>
+                      <th style={{ ...s.th, width: 90 }}>Notes</th>
+                      <th style={{ ...s.th, width: 40 }}>Check #</th>
+                      <th style={{ ...s.th, width: 76, textAlign: "right" }}>Debit</th>
+                      <th style={{ ...s.th, width: 76, textAlign: "right" }}>Credit</th>
+                      <SortableTh label="Balance" sortKey="balance" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} style={{ ...s.th, width: 100, textAlign: "right" }} />
+                      <th style={{ ...s.th, width: 108, textAlign: "right" }}>Calc. Balance</th>
+                      <th style={{ ...s.th, width: 190 }}>Category</th>
+                      <th style={{ ...s.th, width: 190 }}>Sub-Category</th>
+                      <th style={{ ...s.th, width: 60 }}>Linked To</th>
+                      <th style={{ ...s.th, width: 34 }}>Link</th>
+                      <th style={{ ...s.th, width: 30 }}></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -895,6 +1013,7 @@ export default function BankTransactionsPage() {
             setAddOpen(false);
             load();
             loadAnchors();
+            loadFlow();
           }}
         />
       )}
@@ -1002,7 +1121,7 @@ function TransactionRow({
           <input type="checkbox" checked={checked} onChange={onToggle} />
         </td>
         <td style={s.td}>{formatShortDate(row.postDate)}</td>
-        <td style={{ ...s.td, maxWidth: 260 }} title={row.rawDescription}>
+        <td style={{ ...s.td, wordBreak: "break-word" }} title={row.rawDescription}>
           {row.rawDescription}
         </td>
         <td style={s.td}>
@@ -1014,7 +1133,7 @@ function TransactionRow({
               setNotes(e.target.value);
               onSaveNotes(e.target.value);
             }}
-            style={{ ...s.input, padding: "4px 8px", fontSize: 12, width: 140 }}
+            style={{ ...s.input, padding: "3px 6px", fontSize: 11, width: "100%", boxSizing: "border-box" }}
           />
         </td>
         <td style={s.td}>{row.checkNumber ?? "—"}</td>
@@ -1055,14 +1174,14 @@ function TransactionRow({
             "—"
           )}
         </td>
-        <td style={{ ...s.td, fontSize: 12 }}>{row.linkedSummary ?? "—"}</td>
+        <td style={{ ...s.td, wordBreak: "break-word" }}>{row.linkedSummary ?? "—"}</td>
         <td style={s.td}>
-          <button onClick={() => setLinkOpen((v) => !v)} style={s.btn("#0f2342")}>
+          <button onClick={() => setLinkOpen((v) => !v)} style={s.iconBtn("#0f2342")}>
             🔗
           </button>
         </td>
         <td style={s.td}>
-          <button onClick={onDelete} style={s.btn("#991b1b")}>
+          <button onClick={onDelete} style={s.iconBtn("#991b1b")}>
             ✕
           </button>
         </td>

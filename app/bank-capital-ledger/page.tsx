@@ -863,7 +863,7 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
   const portal = data.portalCapitalFlow;
   const totalFundContributions = portal.fundContributionsTotal;
   const fundContributionsCount = portal.fundContributionsCount;
-  const totalRedemption = portal.redemptionCapitalTotal;
+  const totalRedemption = portal.redemptionTotal;
   const redemptionCount = portal.redemptionCount;
   const totalDistribution = portal.distributionTotal;
   const distributionCount = portal.distributionCount;

@@ -1403,7 +1403,7 @@ export interface BankTransactionCategoryTotal {
 export interface PortalCapitalFlow {
   fundContributionsTotal: number;
   fundContributionsCount: number;
-  redemptionCapitalTotal: number;
+  redemptionTotal: number;
   redemptionCount: number;
   distributionTotal: number;
   distributionCount: number;
