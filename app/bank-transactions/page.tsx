@@ -599,20 +599,20 @@ export default function BankTransactionsPage() {
                     varianceAccent(bankFundContrib - portal.fundContributionsTotal),
                   )}
 
-                  {reconcileCard("Redemption (From Portal)", portal.redemptionTotal)}
+                  {reconcileCard("Redemption (From Portal)", portal.redemptionInclInterestTotal)}
                   {reconcileCard("Redemption (From Bank)", bankRedemption)}
                   {reconcileCard(
                     "Variance",
-                    bankRedemption - portal.redemptionTotal,
-                    varianceAccent(bankRedemption - portal.redemptionTotal),
+                    bankRedemption - portal.redemptionInclInterestTotal,
+                    varianceAccent(bankRedemption - portal.redemptionInclInterestTotal),
                   )}
 
-                  {reconcileCard("Distribution (From Portal)", portal.distributionTotal)}
+                  {reconcileCard("Distribution (From Portal)", portal.monthlyDistributionOnlyTotal)}
                   {reconcileCard("Distribution (From Bank)", bankDistribution)}
                   {reconcileCard(
                     "Variance",
-                    bankDistribution - portal.distributionTotal,
-                    varianceAccent(bankDistribution - portal.distributionTotal),
+                    bankDistribution - portal.monthlyDistributionOnlyTotal,
+                    varianceAccent(bankDistribution - portal.monthlyDistributionOnlyTotal),
                   )}
                 </div>
               );

@@ -1403,10 +1403,12 @@ export interface BankTransactionCategoryTotal {
 export interface PortalCapitalFlow {
   fundContributionsTotal: number;
   fundContributionsCount: number;
-  redemptionTotal: number;
+  redemptionCapitalTotal: number;
   redemptionCount: number;
   distributionTotal: number;
   distributionCount: number;
+  redemptionInclInterestTotal: number;
+  monthlyDistributionOnlyTotal: number;
 }
 
 export interface BankTransactionBalanceFlow {
