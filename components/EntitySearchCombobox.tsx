@@ -54,7 +54,7 @@ export function EntitySearchCombobox({
       <input
         type="text"
         value={query}
-        placeholder={placeholder ?? `Search by investor name or amount...`}
+        placeholder={placeholder ?? `Search by investor name, or date (e.g. 05/07/26)...`}
         onFocus={() => setOpen(true)}
         onChange={(e) => {
           setQuery(e.target.value);
@@ -92,8 +92,8 @@ export function EntitySearchCombobox({
           )}
           {!loading && results.length === 0 && (
             <div style={{ padding: 12, fontSize: 13, color: "#94a3b8" }}>
-              No matches — try a different name or leave blank to browse recent
-              records
+              No matches — try a different name/date or leave blank to browse
+              recent records
             </div>
           )}
           {!loading &&
