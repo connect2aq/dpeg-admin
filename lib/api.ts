@@ -1414,6 +1414,7 @@ export interface BankTransactionBalanceFlow {
   uncategorizedTotal: number;
   uncategorizedCount: number;
   latestBankBalance?: number;
+  latestCalculatedBalance?: number;
   latestBalanceDate?: string;
   totalTransactionCount: number;
   portalCapitalFlow: PortalCapitalFlow;
@@ -1429,6 +1430,7 @@ export interface BankCapitalLedgerEntry {
   credit?: number;
   amount: number;
   balance: number;
+  calculatedBalance?: number;
   categoryId?: number;
   categoryName?: string;
   subCategoryId?: number;

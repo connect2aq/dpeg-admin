@@ -158,7 +158,7 @@ export default function BankCapitalLedgerPage() {
     const totalIn = entries.reduce((sum, e) => sum + (e.credit ?? 0), 0);
     const totalOut = entries.reduce((sum, e) => sum + (e.debit ?? 0), 0);
     const netChange = entries.reduce((sum, e) => sum + e.amount, 0);
-    const closingBalance = entries.length > 0 ? entries[entries.length - 1].balance : null;
+    const closingBalance = entries.length > 0 ? entries[entries.length - 1].calculatedBalance ?? null : null;
     return { totalIn, totalOut, netChange, closingBalance, count: entries.length };
   }, [ledgerData]);
 
@@ -200,7 +200,7 @@ export default function BankCapitalLedgerPage() {
       case "amount":
         return e.amount;
       case "balance":
-        return e.balance;
+        return e.calculatedBalance ?? 0;
       case "category":
         return e.categoryName ?? "";
       case "description":
@@ -246,11 +246,12 @@ export default function BankCapitalLedgerPage() {
     }
   };
 
-  // Running Balance is each row's true bank-reported balance as of that date — always accurate on
-  // its own — but it only builds up as a visually contiguous sequence with every row shown, read in
-  // Date order. Date ascending and Date descending are equally contiguous (same running balance,
-  // just read top-to-bottom in the opposite direction) — it's any OTHER sort, or any filter that
-  // hides rows, that breaks the visual sequence even though each value is still correct.
+  // Running Balance is each row's Calculated Balance (the anchored running total, not the bank's own
+  // reported Balance) as of that date — always accurate on its own — but it only builds up as a
+  // visually contiguous sequence with every row shown, read in Date order. Date ascending and Date
+  // descending are equally contiguous (same running balance, just read top-to-bottom in the opposite
+  // direction) — it's any OTHER sort, or any filter that hides rows, that breaks the visual sequence
+  // even though each value is still correct.
   const runningBalanceUnreliable =
     categoryIds.length > 0 ||
     subCategoryIds.length > 0 ||
@@ -297,7 +298,7 @@ export default function BankCapitalLedgerPage() {
           e.checkNumber ?? "",
           e.debit ?? "",
           e.credit ?? "",
-          e.balance,
+          e.calculatedBalance ?? "",
           e.categoryName ?? "",
           e.subCategoryName ?? "",
           e.linkedEntityType ?? "",
@@ -314,7 +315,7 @@ export default function BankCapitalLedgerPage() {
               "Check #",
               "Debit",
               "Credit",
-              "Bank Balance",
+              "Calculated Balance",
               "Category",
               "Sub-Category",
               "Linked Type",
@@ -517,7 +518,7 @@ export default function BankCapitalLedgerPage() {
                   >
                     <span style={{ fontSize: 16, lineHeight: "18px" }}>ℹ️</span>
                     <span style={{ fontSize: 13, color: "#1e40af", lineHeight: 1.5, flex: 1 }}>
-                      <strong>Balance</strong> is each row&rsquo;s true bank-reported balance as of that
+                      <strong>Calculated Balance</strong> is each row&rsquo;s anchored running total as of that
                       date — always accurate on its own — but it only reads as a contiguous sequence
                       oldest → newest with every row shown. A category, sub-category, direction,
                       linked, or search filter hides rows, and any sort other than Date (oldest first)
@@ -593,7 +594,9 @@ export default function BankCapitalLedgerPage() {
                                 <td style={{ ...s.td, textAlign: "right", color: "#0f9444" }}>
                                   {e.credit != null ? fmtMoney(e.credit) : ""}
                                 </td>
-                                <td style={{ ...s.td, textAlign: "right" }}>{fmtMoney(e.balance)}</td>
+                                <td style={{ ...s.td, textAlign: "right" }}>
+                                  {e.calculatedBalance != null ? fmtMoney(e.calculatedBalance) : "—"}
+                                </td>
                                 <td style={s.td}>{e.categoryName ?? "Uncategorized"}</td>
                                 <td style={s.td}>{e.subCategoryName ?? "—"}</td>
                                 <td style={s.td}>{e.linkedEntityType ?? "—"}</td>
@@ -647,9 +650,10 @@ export default function BankCapitalLedgerPage() {
 // ── Balance Flow tab ─────────────────────────────────────────────────────
 // Mirrors the Dashboard's "Balance Flow" card visually, but every number here is
 // derived purely from categorized bank transactions rather than manually-entered
-// figures — so "Bank Account Balance" is the real running balance from the last
-// imported statement row, and "Variance" is a genuine reconciliation check against
-// however much of the fund's activity is still miscategorized or uncategorized.
+// figures — so "Bank Account Balance" is Calculated Balance (the anchored running
+// total, not the bank's own reported Balance), and "Variance" against it catches
+// both miscategorized/uncategorized activity AND transactions the admin forgot to
+// import in the first place, since a missing transaction breaks the running total.
 
 function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | null) => void }) {
   const [data, setData] = useState<BankTransactionBalanceFlow | null>(null);
@@ -821,7 +825,8 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
   const totalBalanceAvailable =
     afterDistribution + totalInvestments + totalDividendReceived + totalSponsorsEquity + totalProfitFromBank + totalOtherCharges;
 
-  const bankBalance = data.latestBankBalance;
+  // Calculated Balance, not the bank's own reported Balance — see the file-level comment above.
+  const bankBalance = data.latestCalculatedBalance;
   const variance = bankBalance != null ? bankBalance - totalBalanceAvailable : null;
 
   return (
@@ -923,7 +928,7 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
             })
           : tile({ label: "Variance", value: "N/A", accent: "#94a3b8", arrow: true, muted: true })}
 
-        {/* Bank Account Balance — full width, from the latest imported Posted transaction's own Balance field */}
+        {/* Bank Account Balance — full width, Calculated Balance of the latest imported Posted transaction */}
         <button
           type="button"
           onClick={() => onViewCategory(null)}
@@ -947,7 +952,7 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
           onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "")}
         >
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#475569", marginBottom: 6 }}>
-            Bank Account Balance (Latest Imported Statement Row)
+            Bank Account Balance (Calculated)
           </div>
           <div style={{ fontSize: 17, fontWeight: 800, color: bankBalance != null ? "#0f2342" : "#94a3b8", flex: 1, letterSpacing: "0.01em" }}>
             {bankBalance != null ? fmt(bankBalance) : "No transactions imported yet"}
