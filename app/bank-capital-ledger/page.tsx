@@ -901,7 +901,6 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: "#0e3416" }}>
           Balance Flow (Since Inception) — from {data.totalTransactionCount} imported transaction(s)
-          {data.latestBalanceDate && ` — Balance as at ${formatShortDate(data.latestBalanceDate)}`}
         </div>
         <button onClick={load} style={s.btn("#64748b")}>
           ↻ Refresh

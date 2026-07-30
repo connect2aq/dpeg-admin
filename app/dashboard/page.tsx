@@ -402,8 +402,6 @@ function BalanceFlow({ stats }: { stats: DashboardStats }) {
         }}
       >
         Balance Flow (Since Inception)
-        {stats.balanceAsAtDate &&
-          ` — Balance as at ${formatShortDate(stats.balanceAsAtDate)}`}
       </div>
       {/* Row 1–3: 4 columns; Row 4: Bank Account Balance full width */}
       <div
