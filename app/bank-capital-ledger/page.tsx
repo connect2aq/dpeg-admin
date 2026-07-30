@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AdminLayout from "@/components/AdminLayout";
 import { PaginationControls } from "@/components/PaginationControls";
 import { SortableTh } from "@/components/SortableTh";
@@ -716,6 +717,7 @@ export default function BankCapitalLedgerPage() {
 // import in the first place, since a missing transaction breaks the running total.
 
 function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | null) => void }) {
+  const router = useRouter();
   const [data, setData] = useState<BankTransactionBalanceFlow | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -847,9 +849,6 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
     );
   }
 
-  const fundContributions = getCat("Fund Contributions");
-  const redemption = getCat("Redemption");
-  const distribution = getCat("Distribution");
   const investments = getCat("Investments");
   const dividendReceived = getCat("Dividend Received");
   const sponsorsEquity = getCat("Sponsor's Equity");
@@ -916,7 +915,7 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
           accent: "#0e3416",
           muted: fundContributionsCount === 0,
           sub: "From portal data",
-          onClick: fundContributions ? () => onViewCategory(String(fundContributions.categoryId)) : undefined,
+          onClick: () => router.push("/capital-ledger?type=Contribution"),
         })}
         {tile({
           label: "Redemption",
@@ -925,7 +924,7 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
           arrow: true,
           muted: redemptionCount === 0,
           sub: "From portal data",
-          onClick: redemption ? () => onViewCategory(String(redemption.categoryId)) : undefined,
+          onClick: () => router.push("/capital-ledger?type=Redemption"),
         })}
         {tile({ label: "Balance Remaining", value: signedFlow(balanceRemaining), accent: "#6366f1" })}
         {tile({
@@ -935,7 +934,7 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
           arrow: true,
           muted: distributionCount === 0,
           sub: "From portal data",
-          onClick: distribution ? () => onViewCategory(String(distribution.categoryId)) : undefined,
+          onClick: () => router.push("/capital-ledger?type=Redemption,Dividend"),
         })}
 
         {tile({ label: "After Distributions", value: signedFlow(afterDistribution), accent: "#10b981" })}

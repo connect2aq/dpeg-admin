@@ -37,6 +37,12 @@ export function EditableStatusBadge({
   onChange: (nextStatus: string) => void;
   disabled?: boolean;
 }) {
+  const selectedOption = options?.find((option) =>
+    typeof option === "string" ? option === status : option.value === status,
+  );
+  const selectedLabel = selectedOption
+    ? formatStatusLabel(typeof selectedOption === "string" ? selectedOption : selectedOption.label)
+    : undefined;
   return (
     <span
       className="status-badge-select-wrap"
@@ -46,6 +52,7 @@ export function EditableStatusBadge({
         value={status}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
+        title={selectedLabel}
         className={`status-badge status-badge-select ${getStatusBadgeClass(status)}`}
       >
         {options?.map((option) => (
