@@ -238,6 +238,11 @@ export interface ApplicationDetail extends ApplicationListItem {
     accNumber?: string;
     bankAccountId?: number | null;
   };
+  investorEntityProfileId?: number | null;
+  investorEntityProfileLabel?: string | null;
+  // True when this application received the 1-agreement Re-Investment DocuSign packet,
+  // i.e. it's not the earliest application filed under the same investor profile.
+  isReinvestment?: boolean;
 }
 
 export interface RedemptionListItem {

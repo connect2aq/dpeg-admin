@@ -422,6 +422,20 @@ export default function ApplicationDetailPage() {
             >
               Edit
             </button>
+            <span
+              style={{
+                padding: "4px 10px",
+                borderRadius: 6,
+                fontSize: 11,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: 0.4,
+                background: app.isReinvestment ? "#f1f5f9" : "#eef2ff",
+                color: app.isReinvestment ? "#475569" : "#4338ca",
+              }}
+            >
+              {app.isReinvestment ? "Re-Investment" : "New Investment"}
+            </span>
             <StatusBadge status={app.status} />
           </div>
         </div>
@@ -773,6 +787,15 @@ export default function ApplicationDetailPage() {
             >
               Investor Profile
             </h2>
+
+            {app.investorEntityProfileLabel && (
+              <div style={{ marginBottom: 14 }}>
+                <InfoRow
+                  label="Reusable Profile"
+                  value={`${app.investorEntityProfileLabel} (${app.isReinvestment ? "Re-Investment" : "New Investment"})`}
+                />
+              </div>
+            )}
 
             <SectionLabel>Identity</SectionLabel>
             <div
