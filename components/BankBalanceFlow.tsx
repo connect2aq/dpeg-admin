@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { bankTransactionsApi, type BankTransactionBalanceFlow } from "@/lib/api";
-import { formatShortDate } from "@/lib/dateFormat";
 
 const card = {
   background: "#fff",
@@ -214,8 +213,7 @@ export function BankBalanceFlow({ onViewCategory }: { onViewCategory: (value: st
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: "#0e3416" }}>
-          Balance Flow (Since Inception) — from {data.totalTransactionCount} imported transaction(s)
-          {data.latestBalanceDate && ` — Balance as at ${formatShortDate(data.latestBalanceDate)}`}
+          Balance Flow (Since Inception)
         </div>
         <button onClick={load} style={btn("#64748b")}>
           ↻ Refresh
@@ -325,7 +323,7 @@ export function BankBalanceFlow({ onViewCategory }: { onViewCategory: (value: st
           onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "")}
         >
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#475569", marginBottom: 6 }}>
-            Bank Account Balance (Calculated)
+            Bank Account Balance
           </div>
           <div style={{ fontSize: 17, fontWeight: 800, color: bankBalance != null ? "#0f2342" : "#94a3b8", flex: 1, letterSpacing: "0.01em" }}>
             {bankBalance != null ? fmt(bankBalance) : "No transactions imported yet"}
@@ -333,34 +331,6 @@ export function BankBalanceFlow({ onViewCategory }: { onViewCategory: (value: st
           <div style={{ fontSize: 10, color: "#699172", marginTop: 6, fontWeight: 600 }}>View all transactions →</div>
         </button>
       </div>
-
-      {data.uncategorizedCount > 0 && (
-        <div
-          style={{
-            marginTop: 14,
-            padding: "10px 14px",
-            background: "#fffbeb",
-            border: "1px solid #fde68a",
-            borderRadius: 8,
-            fontSize: 12,
-            color: "#92400e",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 8,
-          }}
-        >
-          <span>
-            ⚠ {data.uncategorizedCount} transaction(s) totaling {signedFlow(data.uncategorizedTotal)} are still
-            uncategorized — the totals above won&apos;t fully reconcile against the bank balance until these are
-            tagged.
-          </span>
-          <button onClick={() => onViewCategory("uncategorized")} style={btn("#b8923a")}>
-            View uncategorized →
-          </button>
-        </div>
-      )}
     </div>
   );
 }
