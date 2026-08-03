@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   bankTransactionsApi,
   type LinkCandidate,
@@ -20,15 +21,40 @@ export function EntitySearchCombobox({
   const [open, setOpen] = useState(false);
   const [results, setResults] = useState<LinkCandidate[]>([]);
   const [loading, setLoading] = useState(false);
+  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, []);
+
+  // The dropdown is portaled to <body> and positioned by fixed coordinates so it
+  // can't be clipped by an ancestor with overflow:auto/hidden (e.g. the scrollable
+  // transactions table) — recompute on open and whenever the page scrolls/resizes.
+  useEffect(() => {
+    if (!open) return;
+    const updateRect = () => {
+      const el = rootRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setRect({ top: r.bottom, left: r.left, width: r.width });
+    };
+    updateRect();
+    window.addEventListener("scroll", updateRect, true);
+    window.addEventListener("resize", updateRect);
+    return () => {
+      window.removeEventListener("scroll", updateRect, true);
+      window.removeEventListener("resize", updateRect);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -69,61 +95,66 @@ export function EntitySearchCombobox({
           color: "#0f172a",
         }}
       />
-      {open && (
-        <div
-          style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            left: 0,
-            zIndex: 30,
-            width: "100%",
-            maxHeight: 280,
-            overflowY: "auto",
-            background: "white",
-            border: "1px solid #e2e8f0",
-            borderRadius: 10,
-            boxShadow: "0 8px 24px rgba(15, 23, 42, 0.12)",
-          }}
-        >
-          {loading && (
-            <div style={{ padding: 12, fontSize: 13, color: "#64748b" }}>
-              Searching…
-            </div>
-          )}
-          {!loading && results.length === 0 && (
-            <div style={{ padding: 12, fontSize: 13, color: "#94a3b8" }}>
-              No matches — try a different name/date or leave blank to browse
-              recent records
-            </div>
-          )}
-          {!loading &&
-            results.map((r) => (
-              <button
-                key={`${r.entityType}-${r.entityId}`}
-                type="button"
-                onClick={() => {
-                  onSelect(r);
-                  setQuery(r.displayLabel);
-                  setOpen(false);
-                }}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  textAlign: "left",
-                  padding: "10px 14px",
-                  border: "none",
-                  borderBottom: "1px solid #f1f5f9",
-                  background: "white",
-                  cursor: "pointer",
-                  fontSize: 13,
-                  color: "#0f172a",
-                }}
-              >
-                {r.displayLabel}
-              </button>
-            ))}
-        </div>
-      )}
+      {open &&
+        rect &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            style={{
+              position: "fixed",
+              top: rect.top + 6,
+              left: rect.left,
+              zIndex: 1000,
+              width: rect.width,
+              maxHeight: 280,
+              overflowY: "auto",
+              background: "white",
+              border: "1px solid #e2e8f0",
+              borderRadius: 10,
+              boxShadow: "0 8px 24px rgba(15, 23, 42, 0.12)",
+            }}
+          >
+            {loading && (
+              <div style={{ padding: 12, fontSize: 13, color: "#64748b" }}>
+                Searching…
+              </div>
+            )}
+            {!loading && results.length === 0 && (
+              <div style={{ padding: 12, fontSize: 13, color: "#94a3b8" }}>
+                No matches — try a different name/date or leave blank to browse
+                recent records
+              </div>
+            )}
+            {!loading &&
+              results.map((r) => (
+                <button
+                  key={`${r.entityType}-${r.entityId}`}
+                  type="button"
+                  onClick={() => {
+                    onSelect(r);
+                    setQuery(r.displayLabel);
+                    setOpen(false);
+                  }}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "10px 14px",
+                    border: "none",
+                    borderBottom: "1px solid #f1f5f9",
+                    background: "white",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    color: "#0f172a",
+                  }}
+                >
+                  {r.displayLabel}
+                </button>
+              ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

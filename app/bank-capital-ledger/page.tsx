@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import AdminLayout from "@/components/AdminLayout";
 import { PaginationControls } from "@/components/PaginationControls";
 import { SortableTh } from "@/components/SortableTh";
@@ -11,7 +11,6 @@ import {
   bankTransactionsApi,
   type BankCapitalLedgerEntry,
   type BankCapitalLedgerResult,
-  type BankTransactionBalanceFlow,
   type TransactionCategoryItem,
 } from "@/lib/api";
 import { PAGE_SIZE_OPTIONS } from "@/lib/pagination";
@@ -100,8 +99,8 @@ const statCard = (label: string, value: string, color: string, sub?: string) => 
 
 type SortField = "date" | "amount" | "balance" | "category" | "description";
 
-export default function BankCapitalLedgerPage() {
-  const [activeTab, setActiveTab] = useState<"balance-flow" | "ledger">("balance-flow");
+function BankCapitalLedgerContent() {
+  const searchParams = useSearchParams();
   const [categories, setCategories] = useState<TransactionCategoryItem[]>([]);
 
   useEffect(() => {
@@ -110,10 +109,15 @@ export default function BankCapitalLedgerPage() {
     });
   }, []);
 
-  // ── Ledger tab state ──────────────────────────────────────────────────────
+  // ── Ledger state ──────────────────────────────────────────────────────────
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [categoryIds, setCategoryIds] = useState<string[]>([]);
+  // Pre-filtered to a single category when arriving from the Dashboard's Balance Flow tiles
+  // (e.g. /bank-capital-ledger?category=uncategorized).
+  const [categoryIds, setCategoryIds] = useState<string[]>(() => {
+    const c = searchParams.get("category");
+    return c ? [c] : [];
+  });
   const [subCategoryIds, setSubCategoryIds] = useState<string[]>([]);
   const [direction, setDirection] = useState<"" | "in" | "out">("");
   const [linkFilter, setLinkFilter] = useState<"" | "linked" | "unlinked">("");
@@ -127,10 +131,10 @@ export default function BankCapitalLedgerPage() {
 
   const [ledgerData, setLedgerData] = useState<BankCapitalLedgerResult | null>(null);
   const [ledgerLoading, setLedgerLoading] = useState(true);
-  // True only for the curated view landed on by clicking a Balance Flow tile — swaps the generic
-  // Credit/Debit/Net Change KPI row for one scoped to that category. Any manual interaction with the
-  // Ledger tab's own controls (filters, sort, tabs, reset) exits this view back to the normal one.
-  const [viaBalanceFlow, setViaBalanceFlow] = useState(false);
+  // True only for the curated view landed on by clicking a Dashboard Balance Flow tile — swaps the
+  // generic Credit/Debit/Net Change KPI row for one scoped to that category. Any manual interaction
+  // with this page's own controls (filters, sort, reset) exits this view back to the normal one.
+  const [viaBalanceFlow, setViaBalanceFlow] = useState(() => searchParams.get("category") != null);
 
   // Only From/To are sent to the API — everything else is filtered/sorted client-side over the
   // full result, the same architecture Fund Capital Ledger uses, because Running Balance/Opening
@@ -298,17 +302,6 @@ export default function BankCapitalLedgerPage() {
     resetToDateOrder();
   };
 
-  const viewCategory = (value: string | null) => {
-    setCategoryIds(value == null ? [] : [value]);
-    setSubCategoryIds([]);
-    setPage(1);
-    setActiveTab("ledger");
-    // The category-scoped KPI row only makes sense for an actual category (including
-    // "uncategorized") — the Bank Account Balance tile's "view everything" click (value === null)
-    // still lands on the normal full KPI row since there's no single category to summarize.
-    setViaBalanceFlow(value != null);
-  };
-
   const exportCsv = async () => {
     setExporting(true);
     try {
@@ -366,39 +359,7 @@ export default function BankCapitalLedgerPage() {
           linked investment, redemption, or distribution.
         </p>
 
-        <div style={{ display: "flex", gap: 6, marginBottom: 20, borderBottom: "1px solid #e2e8f0" }}>
-          {(
-            [
-              { key: "balance-flow", label: "Balance Flow" },
-              { key: "ledger", label: "Ledger" },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.key}
-              onClick={() => {
-                setActiveTab(t.key);
-                setViaBalanceFlow(false);
-              }}
-              style={{
-                padding: "10px 18px",
-                border: "none",
-                borderBottom: activeTab === t.key ? "2px solid #b8923a" : "2px solid transparent",
-                background: "transparent",
-                fontSize: 14,
-                fontWeight: 600,
-                color: activeTab === t.key ? "#0f2342" : "#64748b",
-                cursor: "pointer",
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {activeTab === "balance-flow" && <BalanceFlowTab onViewCategory={viewCategory} />}
-
-        {activeTab === "ledger" && (
-          <>
+        <>
             {/* Filters */}
             <div style={{ ...s.card, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
               <input
@@ -702,351 +663,16 @@ export default function BankCapitalLedgerPage() {
               </>
             )}
           </>
-        )}
       </div>
     </AdminLayout>
   );
 }
 
-// ── Balance Flow tab ─────────────────────────────────────────────────────
-// Mirrors the Dashboard's "Balance Flow" card visually, but every number here is
-// derived purely from categorized bank transactions rather than manually-entered
-// figures — so "Bank Account Balance" is Calculated Balance (the anchored running
-// total, not the bank's own reported Balance), and "Variance" against it catches
-// both miscategorized/uncategorized activity AND transactions the admin forgot to
-// import in the first place, since a missing transaction breaks the running total.
-
-function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | null) => void }) {
-  const router = useRouter();
-  const [data, setData] = useState<BankTransactionBalanceFlow | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await bankTransactionsApi.getBalanceFlow();
-      if (res.success) setData(res.data);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const fmt = (n: number) =>
-    `$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  const signedFlow = (n: number) => `${n < 0 ? "−" : ""}${fmt(n)}`;
-
-  const getCat = (name: string) =>
-    data?.categoryTotals.find((c) => c.categoryName.toLowerCase() === name.toLowerCase());
-
-  const boxStyle = (accent: string, muted?: boolean, clickable?: boolean): React.CSSProperties => ({
-    background: muted ? "#f8fafc" : "#fff",
-    border: `1px solid ${muted ? "#e2e8f0" : "#cbd5e1"}`,
-    borderTop: `3px solid ${accent}`,
-    borderRadius: 8,
-    padding: "12px 14px",
-    opacity: muted ? 0.65 : 1,
-    cursor: clickable ? "pointer" : "default",
-    transition: "box-shadow 0.15s",
-    height: "100%",
-    boxSizing: "border-box",
-    display: "flex",
-    flexDirection: "column",
-    textAlign: "left",
-  });
-
-  const arrowStyle = (color: string, muted?: boolean, clickable?: boolean): React.CSSProperties => ({
-    background: muted ? "#f8fafc" : `${color}0d`,
-    border: `1px solid ${muted ? "#e2e8f0" : `${color}40`}`,
-    borderTop: `3px solid ${muted ? "#e2e8f0" : color}`,
-    borderRadius: 8,
-    padding: "12px 14px",
-    opacity: muted ? 0.65 : 1,
-    cursor: clickable ? "pointer" : "default",
-    transition: "box-shadow 0.15s",
-    height: "100%",
-    boxSizing: "border-box",
-    display: "flex",
-    flexDirection: "column",
-    textAlign: "left",
-  });
-
-  const hoverHandlers = (clickable?: boolean) => ({
-    onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
-      if (clickable) e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)";
-    },
-    onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
-      if (clickable) e.currentTarget.style.boxShadow = "";
-    },
-  });
-
-  const tile = (opts: {
-    label: string;
-    value: string;
-    accent: string;
-    arrow?: boolean;
-    muted?: boolean;
-    sub?: string;
-    onClick?: () => void;
-  }) => {
-    const { label, value, accent, arrow, muted, sub, onClick } = opts;
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={!onClick}
-        style={arrow ? arrowStyle(accent, muted, !!onClick) : boxStyle(accent, muted, !!onClick)}
-        {...hoverHandlers(!!onClick)}
-      >
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-            color: muted ? "#94a3b8" : arrow ? accent : "#64748b",
-            marginBottom: 6,
-          }}
-        >
-          {arrow ? `→ ${label}` : label}
-        </div>
-        <div
-          style={{
-            fontSize: 17,
-            fontWeight: 700,
-            color: muted ? "#94a3b8" : arrow ? accent : "#0e3416",
-            flex: 1,
-          }}
-        >
-          {value}
-        </div>
-        {sub && <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>{sub}</div>}
-        {onClick && (
-          <div style={{ fontSize: 10, color: "#699172", marginTop: 6, fontWeight: 600 }}>
-            View details →
-          </div>
-        )}
-      </button>
-    );
-  };
-
-  if (loading) {
-    return (
-      <div style={s.card}>
-        <div style={{ padding: 20, color: "#64748b", fontSize: 14 }}>Loading…</div>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div style={s.card}>
-        <div style={{ padding: 20, color: "#94a3b8", fontSize: 14 }}>Unable to load balance flow.</div>
-      </div>
-    );
-  }
-
-  const investments = getCat("Investments");
-  const dividendReceived = getCat("Dividend Received");
-  const sponsorsEquity = getCat("Sponsor's Equity");
-  const profitFromBank = getCat("Profit Received from Bank");
-  const otherCharges = getCat("Other Charges");
-
-  // Fund Contributions / Redemption / Distribution Paid are sourced from portal data (Investments,
-  // RedemptionForms, MonthlyDistributionLogs — cumulative through yesterday), not from how bank
-  // transactions happen to be categorized. This is what makes Variance below a real reconciliation
-  // signal instead of a number that's definitionally always in sync with the category tiles.
-  const portal = data.portalCapitalFlow;
-  const totalFundContributions = portal.fundContributionsTotal;
-  const fundContributionsCount = portal.fundContributionsCount;
-  const totalRedemption = portal.redemptionCapitalTotal;
-  const redemptionCount = portal.redemptionCount;
-  const totalDistribution = portal.distributionTotal;
-  const distributionCount = portal.distributionCount;
-  const totalInvestments = investments?.total ?? 0;
-  // Dividend Received, Sponsor's Equity, and Profit Received from Bank are always inflows to the
-  // fund and must always add into Total Balance Available — matching the Dashboard's own Balance
-  // Flow formula, which hard-codes these three with a "+" regardless of sign (dashboard/page.tsx's
-  // BalanceFlow: "afterDividend - deployedAmount + interestReceived + dividendReceived +
-  // sponsoredEquity - otherCharges"). Force positive here rather than trusting the bank-transaction
-  // category's own signed Total, since a handful of debit-side transactions miscategorized under
-  // one of these inflow categories shouldn't flip the whole tile (and the downstream sum) negative.
-  const totalDividendReceived = Math.abs(dividendReceived?.total ?? 0);
-  const totalSponsorsEquity = Math.abs(sponsorsEquity?.total ?? 0);
-  const totalProfitFromBank = Math.abs(profitFromBank?.total ?? 0);
-  const totalOtherCharges = otherCharges?.total ?? 0;
-
-  const balanceRemaining = totalFundContributions + totalRedemption;
-  const afterDistribution = balanceRemaining + totalDistribution;
-  const totalBalanceAvailable =
-    afterDistribution + totalInvestments + totalDividendReceived + totalSponsorsEquity + totalProfitFromBank + totalOtherCharges;
-
-  // Calculated Balance, not the bank's own reported Balance — see the file-level comment above.
-  const bankBalance = data.latestCalculatedBalance;
-  const variance = bankBalance != null ? bankBalance - totalBalanceAvailable : null;
-
+export default function BankCapitalLedgerPage() {
   return (
-    <div
-      style={{
-        background: "#f8fafc",
-        border: "1px solid #e2e8f0",
-        borderRadius: 10,
-        padding: "20px 24px",
-        marginBottom: 20,
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#0e3416" }}>
-          Balance Flow (Since Inception) — from {data.totalTransactionCount} imported transaction(s)
-          {data.latestBalanceDate && ` — Balance as at ${formatShortDate(data.latestBalanceDate)}`}
-        </div>
-        <button onClick={load} style={s.btn("#64748b")}>
-          ↻ Refresh
-        </button>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, alignItems: "stretch" }}>
-        {tile({
-          label: "Fund Contributions",
-          value: fundContributionsCount > 0 ? signedFlow(totalFundContributions) : "No transactions yet",
-          accent: "#0e3416",
-          muted: fundContributionsCount === 0,
-          sub: "From portal data",
-          onClick: () => router.push("/capital-ledger?type=Contribution"),
-        })}
-        {tile({
-          label: "Redemption",
-          value: redemptionCount > 0 ? signedFlow(totalRedemption) : "No transactions yet",
-          accent: "#ef4444",
-          arrow: true,
-          muted: redemptionCount === 0,
-          sub: "From portal data",
-          onClick: () => router.push("/capital-ledger?type=Redemption"),
-        })}
-        {tile({ label: "Balance Remaining", value: signedFlow(balanceRemaining), accent: "#6366f1" })}
-        {tile({
-          label: "Distribution Paid",
-          value: distributionCount > 0 ? signedFlow(totalDistribution) : "No transactions yet",
-          accent: "#f59e0b",
-          arrow: true,
-          muted: distributionCount === 0,
-          sub: "From portal data",
-          onClick: () => router.push("/capital-ledger?type=Redemption,Dividend"),
-        })}
-
-        {tile({ label: "After Distributions", value: signedFlow(afterDistribution), accent: "#10b981" })}
-        {tile({
-          label: "Investments",
-          value: investments && investments.count > 0 ? signedFlow(totalInvestments) : "No transactions yet",
-          accent: "#8b5cf6",
-          arrow: true,
-          muted: !investments || investments.count === 0,
-          onClick: investments ? () => onViewCategory(String(investments.categoryId)) : undefined,
-        })}
-        {tile({
-          label: "Dividend Received",
-          value: dividendReceived && dividendReceived.count > 0 ? signedFlow(totalDividendReceived) : "No transactions yet",
-          accent: "#b8923a",
-          muted: !dividendReceived || dividendReceived.count === 0,
-          onClick: dividendReceived ? () => onViewCategory(String(dividendReceived.categoryId)) : undefined,
-        })}
-        {tile({
-          label: "Sponsor's Equity",
-          value: sponsorsEquity && sponsorsEquity.count > 0 ? signedFlow(totalSponsorsEquity) : "No transactions yet",
-          accent: "#699172",
-          muted: !sponsorsEquity || sponsorsEquity.count === 0,
-          onClick: sponsorsEquity ? () => onViewCategory(String(sponsorsEquity.categoryId)) : undefined,
-        })}
-
-        {tile({
-          label: "Profit Received from Bank",
-          value: profitFromBank && profitFromBank.count > 0 ? signedFlow(totalProfitFromBank) : "No transactions yet",
-          accent: "#0f2342",
-          muted: !profitFromBank || profitFromBank.count === 0,
-          onClick: profitFromBank ? () => onViewCategory(String(profitFromBank.categoryId)) : undefined,
-        })}
-        {tile({
-          label: "Other Charges / Expenses",
-          value: otherCharges && otherCharges.count > 0 ? signedFlow(totalOtherCharges) : "No transactions yet",
-          accent: "#ef4444",
-          arrow: true,
-          muted: !otherCharges || otherCharges.count === 0,
-          onClick: otherCharges ? () => onViewCategory(String(otherCharges.categoryId)) : undefined,
-        })}
-        {tile({ label: "Total Balance Available", value: signedFlow(totalBalanceAvailable), accent: "#699172" })}
-        {variance != null
-          ? tile({
-              label: "Variance",
-              value: `${variance >= 0 ? "+" : "−"}${fmt(Math.abs(variance))}`,
-              accent: variance >= 0 ? "#10b981" : "#ef4444",
-              arrow: true,
-              onClick: () => onViewCategory("uncategorized"),
-            })
-          : tile({ label: "Variance", value: "N/A", accent: "#94a3b8", arrow: true, muted: true })}
-
-        {/* Bank Account Balance — full width, Calculated Balance of the latest imported Posted transaction */}
-        <button
-          type="button"
-          onClick={() => onViewCategory(null)}
-          style={{
-            gridColumn: "1 / -1",
-            background: bankBalance != null ? "linear-gradient(135deg, #f0f4f8 0%, #e8edf5 100%)" : "#f8fafc",
-            border: `1px solid ${bankBalance != null ? "#b0bdd0" : "#e2e8f0"}`,
-            borderTop: "3px solid #0f2342",
-            borderRadius: 8,
-            padding: "12px 14px",
-            opacity: bankBalance != null ? 1 : 0.65,
-            cursor: "pointer",
-            transition: "box-shadow 0.15s",
-            boxSizing: "border-box",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            textAlign: "center",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)")}
-          onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "")}
-        >
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#475569", marginBottom: 6 }}>
-            Bank Account Balance (Calculated)
-          </div>
-          <div style={{ fontSize: 17, fontWeight: 800, color: bankBalance != null ? "#0f2342" : "#94a3b8", flex: 1, letterSpacing: "0.01em" }}>
-            {bankBalance != null ? fmt(bankBalance) : "No transactions imported yet"}
-          </div>
-          <div style={{ fontSize: 10, color: "#699172", marginTop: 6, fontWeight: 600 }}>View all transactions →</div>
-        </button>
-      </div>
-
-      {data.uncategorizedCount > 0 && (
-        <div
-          style={{
-            marginTop: 14,
-            padding: "10px 14px",
-            background: "#fffbeb",
-            border: "1px solid #fde68a",
-            borderRadius: 8,
-            fontSize: 12,
-            color: "#92400e",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 8,
-          }}
-        >
-          <span>
-            ⚠ {data.uncategorizedCount} transaction(s) totaling {signedFlow(data.uncategorizedTotal)} are still
-            uncategorized — the totals above won&apos;t fully reconcile against the bank balance until these are
-            tagged.
-          </span>
-          <button onClick={() => onViewCategory("uncategorized")} style={s.btn("#b8923a")}>
-            View uncategorized →
-          </button>
-        </div>
-      )}
-    </div>
+    <Suspense>
+      <BankCapitalLedgerContent />
+    </Suspense>
   );
 }
+
