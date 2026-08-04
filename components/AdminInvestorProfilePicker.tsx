@@ -340,6 +340,135 @@ export function AdminInvestorProfilePicker({
     return <p style={{ fontSize: 13, color: "#64748b" }}>Loading investor profiles…</p>;
   }
 
+  const formBlock = (isAdding || editingId) ? (
+    <div style={{ padding: 14, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, marginTop: 8 }}>
+      {!editingId && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <FormField label="Investor Type *">
+            <select required style={selectStyle} value={formType} onChange={(e) => setFormType(Number(e.target.value))}>
+              {INVESTOR_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </FormField>
+          {formType !== 1 && (
+            <FormField label="Entity Sub-Type">
+              <select style={selectStyle} value={formEntitySubType ?? ""} onChange={(e) => setFormEntitySubType(e.target.value ? Number(e.target.value) : null)}>
+                <option value="">— Select —</option>
+                {ENTITY_SUB_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </FormField>
+          )}
+        </div>
+      )}
+
+      {editingProfile?.isLocked && (
+        <p style={{ fontSize: 12, color: "#92400e", marginBottom: 10 }}>
+          This profile has been used in a submitted application. Legal identity fields (name, SSN, entity name, EIN, etc.) can still be corrected here — admin edits aren&apos;t locked the way investor self-service edits are.
+        </p>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+        {isIndividual ? (
+          <>
+            <FormField label="First Name *"><input required style={inputStyle} value={form.firstName || ""} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} /></FormField>
+            <FormField label="Last Name *"><input required style={inputStyle} value={form.lastName || ""} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} /></FormField>
+            <FormField label="SSN (leave blank to keep)">
+              <input style={inputStyle} value={form.ssNumber || ""} placeholder={editingProfile ? maskedTail(editingProfile.ssNumber) || "Enter new SSN to update" : ""} onChange={(e) => setForm((f) => ({ ...f, ssNumber: e.target.value }))} autoComplete="off" />
+            </FormField>
+            <FormField label="Date of Birth"><input type="date" style={inputStyle} value={form.dateOfBirth || ""} onChange={(e) => setForm((f) => ({ ...f, dateOfBirth: e.target.value }))} /></FormField>
+            <FormField label="Citizenship"><input style={inputStyle} value={form.citizenship || ""} onChange={(e) => setForm((f) => ({ ...f, citizenship: e.target.value }))} /></FormField>
+            <FormField label="Marital Status">
+              <select style={selectStyle} value={form.maritalStatus || ""} onChange={(e) => setForm((f) => ({ ...f, maritalStatus: e.target.value }))}>
+                <option value="">— Select —</option>
+                {MARITAL_STATUSES.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Ownership Type"><input style={inputStyle} value={form.ownershipType || ""} onChange={(e) => setForm((f) => ({ ...f, ownershipType: e.target.value }))} /></FormField>
+          </>
+        ) : (
+          <>
+            <FormField label="Entity Name *"><input required style={inputStyle} value={form.entityName || ""} onChange={(e) => setForm((f) => ({ ...f, entityName: e.target.value }))} /></FormField>
+            <FormField label="EIN (leave blank to keep)">
+              <input style={inputStyle} value={form.ein || ""} placeholder={editingProfile ? maskedTail(editingProfile.ein) || "Enter EIN to update" : ""} onChange={(e) => setForm((f) => ({ ...f, ein: e.target.value }))} autoComplete="off" />
+            </FormField>
+            <FormField label="State of Formation"><input style={inputStyle} value={form.stateFormation || ""} onChange={(e) => setForm((f) => ({ ...f, stateFormation: e.target.value }))} /></FormField>
+            <FormField label="Signatory Name"><input style={inputStyle} value={form.signatoryName || ""} onChange={(e) => setForm((f) => ({ ...f, signatoryName: e.target.value }))} /></FormField>
+            <FormField label="Signatory Title"><input style={inputStyle} value={form.signatoryTitle || ""} onChange={(e) => setForm((f) => ({ ...f, signatoryTitle: e.target.value }))} /></FormField>
+          </>
+        )}
+      </div>
+
+      {isIndividual && isMarried && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <FormField label="Spouse Full Name"><input style={inputStyle} value={form.spouseFullName || ""} onChange={(e) => setForm((f) => ({ ...f, spouseFullName: e.target.value }))} /></FormField>
+          <FormField label="Spouse Email"><input type="email" style={inputStyle} value={form.spouseEmail || ""} onChange={(e) => setForm((f) => ({ ...f, spouseEmail: e.target.value }))} /></FormField>
+          <FormField label="Spouse Date of Birth"><input type="date" style={inputStyle} value={form.spouseDateOfBirth || ""} onChange={(e) => setForm((f) => ({ ...f, spouseDateOfBirth: e.target.value }))} /></FormField>
+          <FormField label="Spouse SSN (leave blank to keep)">
+            <input style={inputStyle} value={form.spouseSSN || ""} placeholder={editingProfile ? maskedTail(editingProfile.spouseSSN) || "Enter new Spouse SSN to update" : ""} onChange={(e) => setForm((f) => ({ ...f, spouseSSN: e.target.value }))} autoComplete="off" />
+          </FormField>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+        <FormField label="Email"><input type="email" style={inputStyle} value={form.email || ""} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} /></FormField>
+        <FormField label="Phone"><input style={inputStyle} value={form.phone || ""} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} /></FormField>
+        <FormField label="Day Phone"><input style={inputStyle} value={form.day || ""} onChange={(e) => setForm((f) => ({ ...f, day: e.target.value }))} /></FormField>
+        <FormField label="Night Phone"><input style={inputStyle} value={form.night || ""} onChange={(e) => setForm((f) => ({ ...f, night: e.target.value }))} /></FormField>
+        <FormField label="Street Address"><input style={inputStyle} value={form.streetAddress || ""} onChange={(e) => setForm((f) => ({ ...f, streetAddress: e.target.value }))} /></FormField>
+        <FormField label="City"><input style={inputStyle} value={form.city || ""} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} /></FormField>
+        <FormField label="State"><input style={inputStyle} value={form.state || ""} onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))} /></FormField>
+        <FormField label="Zip Code"><input style={inputStyle} value={form.zipCode || ""} onChange={(e) => setForm((f) => ({ ...f, zipCode: e.target.value }))} /></FormField>
+        <FormField label="Mailing Address"><input style={inputStyle} value={form.mailingAddress || ""} onChange={(e) => setForm((f) => ({ ...f, mailingAddress: e.target.value }))} /></FormField>
+        <FormField label="Employer"><input style={inputStyle} value={form.employer || ""} onChange={(e) => setForm((f) => ({ ...f, employer: e.target.value }))} /></FormField>
+      </div>
+
+      {(isIRA || form.custodianName) && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <FormField label="Custodian Name"><input style={inputStyle} value={form.custodianName || ""} onChange={(e) => setForm((f) => ({ ...f, custodianName: e.target.value }))} /></FormField>
+          <FormField label="Custodian Account"><input style={inputStyle} value={form.custodianAcct || ""} onChange={(e) => setForm((f) => ({ ...f, custodianAcct: e.target.value }))} /></FormField>
+          <FormField label="Custodian Phone"><input style={inputStyle} value={form.custodianPhone || ""} onChange={(e) => setForm((f) => ({ ...f, custodianPhone: e.target.value }))} /></FormField>
+          <FormField label="Custodian Email"><input type="email" style={inputStyle} value={form.custodianEmail || ""} onChange={(e) => setForm((f) => ({ ...f, custodianEmail: e.target.value }))} /></FormField>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+        <FormField label="Driving License No (leave blank to keep)">
+          <input style={inputStyle} value={form.drivingLicenseNo || ""} placeholder={editingProfile ? maskedTail(editingProfile.drivingLicenseNo) || "Enter new DL number to update" : ""} onChange={(e) => setForm((f) => ({ ...f, drivingLicenseNo: e.target.value }))} autoComplete="off" />
+        </FormField>
+        <FormField label="Driving License State"><input style={inputStyle} value={form.drivingLicenseState || ""} onChange={(e) => setForm((f) => ({ ...f, drivingLicenseState: e.target.value }))} /></FormField>
+      </div>
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          type="button"
+          disabled={!isFormValid || isSaving}
+          onClick={handleSave}
+          style={{
+            padding: "8px 16px",
+            background: "#0f2342",
+            color: "#fff",
+            border: "none",
+            borderRadius: 6,
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: !isFormValid || isSaving ? "not-allowed" : "pointer",
+            opacity: !isFormValid || isSaving ? 0.6 : 1,
+          }}
+        >
+          {isSaving ? "Saving..." : isSuperAdmin ? (editingId ? "Save Changes" : "Save Profile") : "Submit for Approval"}
+        </button>
+        {(profiles.length > 0) && (
+          <button
+            type="button"
+            onClick={resetForm}
+            style={{ padding: "8px 16px", background: "white", color: "#475569", border: "1px solid #e2e8f0", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div>
       <p style={{ fontSize: 12, color: "#64748b", marginBottom: 10 }}>{description}</p>
@@ -353,10 +482,10 @@ export function AdminInvestorProfilePicker({
       {profiles.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
           {profiles.map((p) => (
-            <div
-              key={p.id}
-              onClick={() => onSelect(p.id, p)}
-              style={{
+            <div key={p.id}>
+              <div
+                onClick={() => onSelect(p.id, p)}
+                style={{
                 display: "flex",
                 alignItems: "flex-start",
                 gap: 10,
@@ -403,12 +532,16 @@ export function AdminInvestorProfilePicker({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onSelect(p.id, p);
-                    startEdit(p);
+                    if (editingId === p.id) {
+                      resetForm();
+                    } else {
+                      onSelect(p.id, p);
+                      startEdit(p);
+                    }
                   }}
                   style={{ background: "none", border: "none", color: "#2563eb", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: 0 }}
                 >
-                  Edit
+                  {editingId === p.id ? "Cancel" : "Edit"}
                 </button>
                 {!p.isPrimary && (
                   <button
@@ -435,6 +568,8 @@ export function AdminInvestorProfilePicker({
                   {busyAction?.id === p.id && busyAction.action === "deactivate" ? "Deactivating…" : "Deactivate"}
                 </button>
               </div>
+            </div>
+            {editingId === p.id && formBlock}
             </div>
           ))}
         </div>
@@ -479,134 +614,7 @@ export function AdminInvestorProfilePicker({
         </div>
       )}
 
-      {(isAdding || editingId) && (
-        <div style={{ padding: 14, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, marginTop: 8 }}>
-          {!editingId && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <FormField label="Investor Type *">
-                <select required style={selectStyle} value={formType} onChange={(e) => setFormType(Number(e.target.value))}>
-                  {INVESTOR_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </FormField>
-              {formType !== 1 && (
-                <FormField label="Entity Sub-Type">
-                  <select style={selectStyle} value={formEntitySubType ?? ""} onChange={(e) => setFormEntitySubType(e.target.value ? Number(e.target.value) : null)}>
-                    <option value="">— Select —</option>
-                    {ENTITY_SUB_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                </FormField>
-              )}
-            </div>
-          )}
-
-          {editingProfile?.isLocked && (
-            <p style={{ fontSize: 12, color: "#92400e", marginBottom: 10 }}>
-              This profile has been used in a submitted application. Legal identity fields (name, SSN, entity name, EIN, etc.) can still be corrected here — admin edits aren&apos;t locked the way investor self-service edits are.
-            </p>
-          )}
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-            {isIndividual ? (
-              <>
-                <FormField label="First Name *"><input required style={inputStyle} value={form.firstName || ""} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} /></FormField>
-                <FormField label="Last Name *"><input required style={inputStyle} value={form.lastName || ""} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} /></FormField>
-                <FormField label="SSN (leave blank to keep)">
-                  <input style={inputStyle} value={form.ssNumber || ""} placeholder={editingProfile ? maskedTail(editingProfile.ssNumber) || "Enter new SSN to update" : ""} onChange={(e) => setForm((f) => ({ ...f, ssNumber: e.target.value }))} autoComplete="off" />
-                </FormField>
-                <FormField label="Date of Birth"><input type="date" style={inputStyle} value={form.dateOfBirth || ""} onChange={(e) => setForm((f) => ({ ...f, dateOfBirth: e.target.value }))} /></FormField>
-                <FormField label="Citizenship"><input style={inputStyle} value={form.citizenship || ""} onChange={(e) => setForm((f) => ({ ...f, citizenship: e.target.value }))} /></FormField>
-                <FormField label="Marital Status">
-                  <select style={selectStyle} value={form.maritalStatus || ""} onChange={(e) => setForm((f) => ({ ...f, maritalStatus: e.target.value }))}>
-                    <option value="">— Select —</option>
-                    {MARITAL_STATUSES.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-                  </select>
-                </FormField>
-                <FormField label="Ownership Type"><input style={inputStyle} value={form.ownershipType || ""} onChange={(e) => setForm((f) => ({ ...f, ownershipType: e.target.value }))} /></FormField>
-              </>
-            ) : (
-              <>
-                <FormField label="Entity Name *"><input required style={inputStyle} value={form.entityName || ""} onChange={(e) => setForm((f) => ({ ...f, entityName: e.target.value }))} /></FormField>
-                <FormField label="EIN (leave blank to keep)">
-                  <input style={inputStyle} value={form.ein || ""} placeholder={editingProfile ? maskedTail(editingProfile.ein) || "Enter EIN to update" : ""} onChange={(e) => setForm((f) => ({ ...f, ein: e.target.value }))} autoComplete="off" />
-                </FormField>
-                <FormField label="State of Formation"><input style={inputStyle} value={form.stateFormation || ""} onChange={(e) => setForm((f) => ({ ...f, stateFormation: e.target.value }))} /></FormField>
-                <FormField label="Signatory Name"><input style={inputStyle} value={form.signatoryName || ""} onChange={(e) => setForm((f) => ({ ...f, signatoryName: e.target.value }))} /></FormField>
-                <FormField label="Signatory Title"><input style={inputStyle} value={form.signatoryTitle || ""} onChange={(e) => setForm((f) => ({ ...f, signatoryTitle: e.target.value }))} /></FormField>
-              </>
-            )}
-          </div>
-
-          {isIndividual && isMarried && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <FormField label="Spouse Full Name"><input style={inputStyle} value={form.spouseFullName || ""} onChange={(e) => setForm((f) => ({ ...f, spouseFullName: e.target.value }))} /></FormField>
-              <FormField label="Spouse Email"><input type="email" style={inputStyle} value={form.spouseEmail || ""} onChange={(e) => setForm((f) => ({ ...f, spouseEmail: e.target.value }))} /></FormField>
-              <FormField label="Spouse Date of Birth"><input type="date" style={inputStyle} value={form.spouseDateOfBirth || ""} onChange={(e) => setForm((f) => ({ ...f, spouseDateOfBirth: e.target.value }))} /></FormField>
-              <FormField label="Spouse SSN (leave blank to keep)">
-                <input style={inputStyle} value={form.spouseSSN || ""} placeholder={editingProfile ? maskedTail(editingProfile.spouseSSN) || "Enter new Spouse SSN to update" : ""} onChange={(e) => setForm((f) => ({ ...f, spouseSSN: e.target.value }))} autoComplete="off" />
-              </FormField>
-            </div>
-          )}
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-            <FormField label="Email"><input type="email" style={inputStyle} value={form.email || ""} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} /></FormField>
-            <FormField label="Phone"><input style={inputStyle} value={form.phone || ""} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} /></FormField>
-            <FormField label="Day Phone"><input style={inputStyle} value={form.day || ""} onChange={(e) => setForm((f) => ({ ...f, day: e.target.value }))} /></FormField>
-            <FormField label="Night Phone"><input style={inputStyle} value={form.night || ""} onChange={(e) => setForm((f) => ({ ...f, night: e.target.value }))} /></FormField>
-            <FormField label="Street Address"><input style={inputStyle} value={form.streetAddress || ""} onChange={(e) => setForm((f) => ({ ...f, streetAddress: e.target.value }))} /></FormField>
-            <FormField label="City"><input style={inputStyle} value={form.city || ""} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} /></FormField>
-            <FormField label="State"><input style={inputStyle} value={form.state || ""} onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))} /></FormField>
-            <FormField label="Zip Code"><input style={inputStyle} value={form.zipCode || ""} onChange={(e) => setForm((f) => ({ ...f, zipCode: e.target.value }))} /></FormField>
-            <FormField label="Mailing Address"><input style={inputStyle} value={form.mailingAddress || ""} onChange={(e) => setForm((f) => ({ ...f, mailingAddress: e.target.value }))} /></FormField>
-            <FormField label="Employer"><input style={inputStyle} value={form.employer || ""} onChange={(e) => setForm((f) => ({ ...f, employer: e.target.value }))} /></FormField>
-          </div>
-
-          {(isIRA || form.custodianName) && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <FormField label="Custodian Name"><input style={inputStyle} value={form.custodianName || ""} onChange={(e) => setForm((f) => ({ ...f, custodianName: e.target.value }))} /></FormField>
-              <FormField label="Custodian Account"><input style={inputStyle} value={form.custodianAcct || ""} onChange={(e) => setForm((f) => ({ ...f, custodianAcct: e.target.value }))} /></FormField>
-              <FormField label="Custodian Phone"><input style={inputStyle} value={form.custodianPhone || ""} onChange={(e) => setForm((f) => ({ ...f, custodianPhone: e.target.value }))} /></FormField>
-              <FormField label="Custodian Email"><input type="email" style={inputStyle} value={form.custodianEmail || ""} onChange={(e) => setForm((f) => ({ ...f, custodianEmail: e.target.value }))} /></FormField>
-            </div>
-          )}
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-            <FormField label="Driving License No (leave blank to keep)">
-              <input style={inputStyle} value={form.drivingLicenseNo || ""} placeholder={editingProfile ? maskedTail(editingProfile.drivingLicenseNo) || "Enter new DL number to update" : ""} onChange={(e) => setForm((f) => ({ ...f, drivingLicenseNo: e.target.value }))} autoComplete="off" />
-            </FormField>
-            <FormField label="Driving License State"><input style={inputStyle} value={form.drivingLicenseState || ""} onChange={(e) => setForm((f) => ({ ...f, drivingLicenseState: e.target.value }))} /></FormField>
-          </div>
-
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              type="button"
-              disabled={!isFormValid || isSaving}
-              onClick={handleSave}
-              style={{
-                padding: "8px 16px",
-                background: "#0f2342",
-                color: "#fff",
-                border: "none",
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: !isFormValid || isSaving ? "not-allowed" : "pointer",
-                opacity: !isFormValid || isSaving ? 0.6 : 1,
-              }}
-            >
-              {isSaving ? "Saving..." : isSuperAdmin ? (editingId ? "Save Changes" : "Save Profile") : "Submit for Approval"}
-            </button>
-            {(profiles.length > 0) && (
-              <button
-                type="button"
-                onClick={resetForm}
-                style={{ padding: "8px 16px", background: "white", color: "#475569", border: "1px solid #e2e8f0", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      {isAdding && formBlock}
     </div>
   );
 }
