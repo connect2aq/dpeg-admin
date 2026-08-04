@@ -1,14 +1,14 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { adminApi, type CreateApplicationRequest } from '@/lib/api';
+import { adminApi, type CreateApplicationRequest, type InvestorEntityProfile } from '@/lib/api';
 import { BankAccountPicker } from './BankAccountPicker';
+import { AdminInvestorProfilePicker } from './AdminInvestorProfilePicker';
 
 const INVESTOR_TYPES = ['Individual', 'Entity', 'IRA', 'Trust'];
 const INVESTMENT_TYPES = ['ShortTerm', 'LongTerm'];
 const ENTITY_SUB_TYPES = ['LLC', 'Corporation', 'LP_GP', 'PensionFund', 'BankBroker', 'Other'];
 const PAYMENT_METHODS = ['WireTransfer', 'CertifiedCheck'];
 const DIST_PREFS = ['WireToBank', 'Reinvest'];
-const MARITAL_STATUSES = ['single', 'married', 'widowed', 'divorced'];
 
 const inputStyle = { width: '100%', padding: '8px 11px', border: '1.5px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' as const };
 const labelStyle = { fontSize: 11, fontWeight: 700 as const, color: '#475569', display: 'block' as const, marginBottom: 3, textTransform: 'uppercase' as const, letterSpacing: '0.04em' };
@@ -39,10 +39,7 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
 }) {
   const [form, setForm] = useState<CreateApplicationRequest | null>(null);
   const [investorUserId, setInvestorUserId] = useState<number | null>(null);
-  const [ssNumberMasked, setSsNumberMasked] = useState('');
-  const [spouseSSNMasked, setSpouseSSNMasked] = useState('');
-  const [dlNoMasked, setDlNoMasked] = useState('');
-  const [einMasked, setEinMasked] = useState('');
+  const [selectedProfileId, setSelectedProfileId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState('');
@@ -54,10 +51,7 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
       const p = d.investorProfile;
       const inv = d.investment;
       setInvestorUserId(d.userId ?? null);
-      setSsNumberMasked(p?.ssNumberMasked || '');
-      setSpouseSSNMasked(p?.spouseSSN || '');
-      setDlNoMasked(p?.drivingLicenseNo || '');
-      setEinMasked(p?.ein || '');
+      setSelectedProfileId(d.investorEntityProfileId ?? null);
       setForm({
         investorType: d.investorType || 'Individual',
         investmentType: d.investmentType || '',
@@ -102,12 +96,57 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
     });
   }, [applicationId]);
 
+  // Pulls the picked investor profile's fields into the form so submitting keeps this
+  // application's own snapshot in sync with whichever identity it's now filed under.
+  // Sensitive fields (SSN/EIN/driving license) are masked in the profile the picker sees,
+  // so they're deliberately left blank here -- blank means "leave unchanged" on save,
+  // same convention as everywhere else in this modal.
+  const handleSelectProfile = (profileId: number, profile: InvestorEntityProfile) => {
+    setSelectedProfileId(profileId);
+    setForm(f => f && ({
+      ...f,
+      investorType: profile.investorType,
+      entitySubType: profile.entitySubType || '',
+      firstName: profile.firstName || '',
+      lastName: profile.lastName || '',
+      phone: profile.phone || '',
+      dateOfBirth: profile.dateOfBirth || '',
+      streetAddress: profile.streetAddress || '',
+      city: profile.city || '',
+      state: profile.state || '',
+      zipCode: profile.zipCode || '',
+      citizenship: profile.citizenship || '',
+      employer: profile.employer || '',
+      maritalStatus: profile.maritalStatus || '',
+      ownershipType: profile.ownershipType || '',
+      mailingAddress: profile.mailingAddress || '',
+      dayPhone: profile.day || '',
+      nightPhone: profile.night || '',
+      spouseFullName: profile.spouseFullName || '',
+      spouseEmail: profile.spouseEmail || '',
+      spouseDateOfBirth: profile.spouseDateOfBirth || '',
+      custodianName: profile.custodianName || '',
+      custodianAcct: profile.custodianAcct || '',
+      custodianPhone: profile.custodianPhone || '',
+      custodianEmail: profile.custodianEmail || '',
+      entityName: profile.entityName || '',
+      stateFormation: profile.stateFormation || '',
+      signatoryName: profile.signatoryName || '',
+      signatoryTitle: profile.signatoryTitle || '',
+      drivingLicenseState: profile.drivingLicenseState || '',
+      ssNumber: '',
+      spouseSSN: '',
+      ein: '',
+      drivingLicenseNo: '',
+    }));
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form) return;
     setSubmitting(true);
     setMsg('');
-    const r = await adminApi.updateApplicationFull(applicationId, form);
+    const r = await adminApi.updateApplicationFull(applicationId, { ...form, investorEntityProfileId: selectedProfileId });
     if (r.success) {
       onSaved(!isSuperAdmin, r.message || 'Saved.');
       onClose();
@@ -116,11 +155,6 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
     }
     setSubmitting(false);
   };
-
-  const isIndividual = form?.investorType === 'Individual';
-  const isMarried = form?.maritalStatus?.toLowerCase() === 'married';
-  const isIRA = form?.investorType === 'IRA';
-  const hasCustodian = !!(form?.custodianName || isIRA);
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, padding: '40px 16px', overflowY: 'auto' }}>
@@ -166,105 +200,19 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
                 </FormField>
               </div>
 
-              {/* ── Investor Information ── */}
-              <SectionTitle>Investor Information</SectionTitle>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                <FormField label="First Name *"><input required style={inputStyle} value={form.firstName} onChange={e => setForm(f => f && ({ ...f, firstName: e.target.value }))} /></FormField>
-                <FormField label="Last Name *"><input required style={inputStyle} value={form.lastName} onChange={e => setForm(f => f && ({ ...f, lastName: e.target.value }))} /></FormField>
-                <FormField label="Phone"><input style={inputStyle} value={form.phone || ''} onChange={e => setForm(f => f && ({ ...f, phone: e.target.value }))} /></FormField>
-                <FormField label="Day Phone"><input style={inputStyle} value={form.dayPhone || ''} onChange={e => setForm(f => f && ({ ...f, dayPhone: e.target.value }))} /></FormField>
-                <FormField label="Night Phone"><input style={inputStyle} value={form.nightPhone || ''} onChange={e => setForm(f => f && ({ ...f, nightPhone: e.target.value }))} /></FormField>
-                <FormField label="Date of Birth"><input type="date" style={inputStyle} value={form.dateOfBirth || ''} onChange={e => setForm(f => f && ({ ...f, dateOfBirth: e.target.value }))} /></FormField>
-                <FormField label="Street Address"><input style={inputStyle} value={form.streetAddress || ''} onChange={e => setForm(f => f && ({ ...f, streetAddress: e.target.value }))} /></FormField>
-                <FormField label="City"><input style={inputStyle} value={form.city || ''} onChange={e => setForm(f => f && ({ ...f, city: e.target.value }))} /></FormField>
-                <FormField label="State"><input style={inputStyle} value={form.state || ''} onChange={e => setForm(f => f && ({ ...f, state: e.target.value }))} /></FormField>
-                <FormField label="Zip Code"><input style={inputStyle} value={form.zipCode || ''} onChange={e => setForm(f => f && ({ ...f, zipCode: e.target.value }))} /></FormField>
-                <FormField label="Mailing Address"><input style={inputStyle} value={form.mailingAddress || ''} onChange={e => setForm(f => f && ({ ...f, mailingAddress: e.target.value }))} /></FormField>
-                <FormField label="Citizenship"><input style={inputStyle} value={form.citizenship || ''} onChange={e => setForm(f => f && ({ ...f, citizenship: e.target.value }))} /></FormField>
-                <FormField label="Employer"><input style={inputStyle} value={form.employer || ''} onChange={e => setForm(f => f && ({ ...f, employer: e.target.value }))} /></FormField>
-                <FormField label="Marital Status">
-                  <select style={selectStyle} value={form.maritalStatus || ''} onChange={e => setForm(f => f && ({ ...f, maritalStatus: e.target.value }))}>
-                    <option value="">— Select —</option>
-                    {MARITAL_STATUSES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-                  </select>
-                </FormField>
-                <FormField label="Ownership Type"><input style={inputStyle} value={form.ownershipType || ''} onChange={e => setForm(f => f && ({ ...f, ownershipType: e.target.value }))} /></FormField>
-                {isIndividual && (
-                  <FormField label="SSN (leave blank to keep)">
-                    <input
-                      style={inputStyle}
-                      value={form.ssNumber || ''}
-                      placeholder={ssNumberMasked || 'Enter new SSN to update'}
-                      onChange={e => setForm(f => f && ({ ...f, ssNumber: e.target.value }))}
-                      autoComplete="off"
-                    />
-                  </FormField>
-                )}
-              </div>
-
-              {/* ── Spouse / Joint Tenant ── (Individual + married) */}
-              {isIndividual && isMarried && (
-                <>
-                  <SectionTitle>Spouse / Joint Tenant</SectionTitle>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                    <FormField label="Spouse Full Name"><input style={inputStyle} value={form.spouseFullName || ''} onChange={e => setForm(f => f && ({ ...f, spouseFullName: e.target.value }))} /></FormField>
-                    <FormField label="Spouse Email"><input type="email" style={inputStyle} value={form.spouseEmail || ''} onChange={e => setForm(f => f && ({ ...f, spouseEmail: e.target.value }))} /></FormField>
-                    <FormField label="Spouse Date of Birth"><input type="date" style={inputStyle} value={form.spouseDateOfBirth || ''} onChange={e => setForm(f => f && ({ ...f, spouseDateOfBirth: e.target.value }))} /></FormField>
-                    <FormField label="Spouse SSN (leave blank to keep)">
-                      <input
-                        style={inputStyle}
-                        value={form.spouseSSN || ''}
-                        placeholder={spouseSSNMasked || 'Enter new Spouse SSN to update'}
-                        onChange={e => setForm(f => f && ({ ...f, spouseSSN: e.target.value }))}
-                        autoComplete="off"
-                      />
-                    </FormField>
-                  </div>
-                </>
-              )}
-
-              {/* ── Entity Information ── */}
-              {form.investorType !== 'Individual' && (
-                <>
-                  <SectionTitle>Entity Information</SectionTitle>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                    <FormField label="Entity Name"><input style={inputStyle} value={form.entityName || ''} onChange={e => setForm(f => f && ({ ...f, entityName: e.target.value }))} /></FormField>
-                    <FormField label="EIN (leave blank to keep)"><input style={inputStyle} value={form.ein || ''} placeholder={einMasked || 'Enter EIN to update'} onChange={e => setForm(f => f && ({ ...f, ein: e.target.value }))} autoComplete="off" /></FormField>
-                    <FormField label="State of Formation"><input style={inputStyle} value={form.stateFormation || ''} onChange={e => setForm(f => f && ({ ...f, stateFormation: e.target.value }))} /></FormField>
-                    <FormField label="Signatory Name"><input style={inputStyle} value={form.signatoryName || ''} onChange={e => setForm(f => f && ({ ...f, signatoryName: e.target.value }))} /></FormField>
-                    <FormField label="Signatory Title"><input style={inputStyle} value={form.signatoryTitle || ''} onChange={e => setForm(f => f && ({ ...f, signatoryTitle: e.target.value }))} /></FormField>
-                  </div>
-                </>
-              )}
-
-              {/* ── Custodian ── (IRA or existing custodian data) */}
-              {hasCustodian && (
-                <>
-                  <SectionTitle>Custodian</SectionTitle>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                    <FormField label="Custodian Name"><input style={inputStyle} value={form.custodianName || ''} onChange={e => setForm(f => f && ({ ...f, custodianName: e.target.value }))} /></FormField>
-                    <FormField label="Custodian Account"><input style={inputStyle} value={form.custodianAcct || ''} onChange={e => setForm(f => f && ({ ...f, custodianAcct: e.target.value }))} /></FormField>
-                    <FormField label="Custodian Phone"><input style={inputStyle} value={form.custodianPhone || ''} onChange={e => setForm(f => f && ({ ...f, custodianPhone: e.target.value }))} /></FormField>
-                    <FormField label="Custodian Email"><input type="email" style={inputStyle} value={form.custodianEmail || ''} onChange={e => setForm(f => f && ({ ...f, custodianEmail: e.target.value }))} /></FormField>
-                  </div>
-                </>
-              )}
-
-              {/* ── Sensitive IDs ── */}
-              <SectionTitle>Identity Documents</SectionTitle>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                <FormField label="Driving License No (leave blank to keep)">
-                  <input
-                    style={inputStyle}
-                    value={form.drivingLicenseNo || ''}
-                    placeholder={dlNoMasked || 'Enter new DL number to update'}
-                    onChange={e => setForm(f => f && ({ ...f, drivingLicenseNo: e.target.value }))}
-                    autoComplete="off"
+              {/* ── Investor Profile ── */}
+              <SectionTitle>Investor Profile</SectionTitle>
+              <div style={{ marginBottom: 16 }}>
+                {investorUserId ? (
+                  <AdminInvestorProfilePicker
+                    userId={investorUserId}
+                    isSuperAdmin={isSuperAdmin}
+                    selectedId={selectedProfileId}
+                    onSelect={handleSelectProfile}
                   />
-                </FormField>
-                <FormField label="Driving License State">
-                  <input style={inputStyle} value={form.drivingLicenseState || ''} onChange={e => setForm(f => f && ({ ...f, drivingLicenseState: e.target.value }))} />
-                </FormField>
+                ) : (
+                  <p style={{ fontSize: 13, color: '#94a3b8' }}>Unable to load this investor&apos;s profiles.</p>
+                )}
               </div>
 
               {/* ── Investment Details ── */}

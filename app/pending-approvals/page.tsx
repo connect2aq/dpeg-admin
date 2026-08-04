@@ -12,7 +12,7 @@ import { formatShortDate, formatShortDateTime } from '@/lib/dateFormat';
 import { PAGE_SIZE_OPTIONS } from '@/lib/pagination';
 
 const STATUSES = ['Pending', 'Checked', 'Approved', 'Rejected', 'Cancelled'];
-const ENTITY_TYPES = ['Investment', 'Redemption', 'Distribution', 'BankAccount', 'BulkUsers', 'BulkApplications', 'BulkRedemptions'];
+const ENTITY_TYPES = ['Investment', 'Redemption', 'Distribution', 'BankAccount', 'InvestorEntityProfile', 'BulkUsers', 'BulkApplications', 'BulkRedemptions'];
 const DEFAULT_PAGE_SIZE = 20;
 
 // ── Field definitions (payload keys are PascalCase — C# JsonSerializer default) ──
@@ -50,6 +50,7 @@ const INV_FIELDS: FieldDef[] = [
   { key: 'PaymentMethod',          label: 'Payment Method',          getCurrent: r => (r as ApplicationDetail).investment?.paymentMethod ?? '' },
   { key: 'DistributionPreference', label: 'Distribution Preference', getCurrent: r => (r as ApplicationDetail).investment?.distributionPreference ?? '' },
   { key: 'BankAccountId',          label: 'Bank Account',            getCurrent: r => String((r as ApplicationDetail).investment?.bankAccountId ?? '') },
+  { key: 'InvestorEntityProfileId', label: 'Investor Profile',       getCurrent: r => String((r as ApplicationDetail).investorEntityProfileId ?? '') },
 ];
 
 const REDEEM_FIELDS: FieldDef[] = [
@@ -93,6 +94,44 @@ const BANK_ACCOUNT_LABELS: Record<string, string> = {
   AccountNumber:     'Account Number',
   Label:             'Label',
   SetPrimary:        'Set as Primary',
+};
+
+const INVESTOR_PROFILE_LABELS: Record<string, string> = {
+  InvestorType:        'Investor Type',
+  EntitySubType:       'Entity Sub Type',
+  FirstName:           'First Name',
+  LastName:            'Last Name',
+  SSNumber:            'SSN',
+  DateOfBirth:         'Date of Birth',
+  Citizenship:         'Citizenship',
+  MaritalStatus:       'Marital Status',
+  SpouseFullName:      'Spouse Full Name',
+  SpouseEmail:         'Spouse Email',
+  SpouseSSN:           'Spouse SSN',
+  SpouseDateOfBirth:   'Spouse Date of Birth',
+  OwnershipType:       'Ownership Type',
+  Email:               'Email',
+  Phone:               'Phone',
+  StreetAddress:       'Street Address',
+  City:                'City',
+  State:               'State',
+  ZipCode:             'Zip Code',
+  MailingAddress:      'Mailing Address',
+  EntityName:          'Entity Name',
+  EIN:                 'EIN',
+  StateFormation:      'State of Formation',
+  SignatoryName:       'Signatory Name',
+  SignatoryTitle:      'Signatory Title',
+  CustodianName:       'Custodian Name',
+  CustodianAcct:       'Custodian Account',
+  CustodianPhone:      'Custodian Phone',
+  CustodianEmail:      'Custodian Email',
+  DrivingLicenseNo:    'Driving License No',
+  DrivingLicenseState: 'Driving License State',
+  Employer:            'Employer',
+  Day:                 'Day Phone',
+  Night:               'Night Phone',
+  SetPrimary:          'Set as Primary',
 };
 
 function fmt(v: unknown): string {
@@ -204,6 +243,43 @@ function PayloadDiff({ change, currentRecord, fetchingRecord }: {
                 </td>
                 <td style={{ padding: '6px 10px', color: '#1e293b', fontFamily: 'monospace', fontSize: 12 }}>
                   {k === 'AccountNumber' ? '••••' + String(v).slice(-4) : fmt(v)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // ── InvestorEntityProfile: no current-record fetch available — show payload with labels ──
+  if (entityType === 'InvestorEntityProfile') {
+    const entries = Object.entries(payload).filter(([, v]) => v !== null && v !== '' && v !== undefined);
+    const isAdd = operationType === 'Add';
+    if (entries.length === 0) {
+      return (
+        <div style={{ marginTop: 16, fontSize: 13, color: '#64748b' }}>
+          {change.description}
+        </div>
+      );
+    }
+    return (
+      <div style={{ marginTop: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6,
+          color: isAdd ? '#065f46' : '#92400e' }}>
+          {isAdd ? 'New investor profile' : 'Investor profile change'}
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <tbody>
+            {entries.map(([k, v]) => (
+              <tr key={k} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '6px 10px', background: '#f8fafc', fontWeight: 600, color: '#475569', width: 200, fontSize: 12 }}>
+                  {INVESTOR_PROFILE_LABELS[k] ?? k}
+                </td>
+                <td style={{ padding: '6px 10px', color: '#1e293b', fontFamily: 'monospace', fontSize: 12 }}>
+                  {(k === 'SSNumber' || k === 'SpouseSSN' || k === 'EIN') && String(v).length > 4
+                    ? '••••' + String(v).slice(-4)
+                    : fmt(v)}
                 </td>
               </tr>
             ))}

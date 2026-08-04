@@ -827,6 +827,41 @@ export const adminApi = {
       {},
     ),
 
+  // ── Investor Entity Profiles ─────────────────────────────────────────────
+  getUserInvestorProfiles: (userId: number) =>
+    api.get<ApiResponse<InvestorEntityProfile[]>>(
+      `/users/${userId}/investor-profiles`,
+    ),
+  getUserDeactivatedInvestorProfiles: (userId: number) =>
+    api.get<ApiResponse<InvestorEntityProfile[]>>(
+      `/users/${userId}/investor-profiles/deactivated`,
+    ),
+  addUserInvestorProfile: (userId: number, dto: AddInvestorEntityProfileRequest) =>
+    api.post<ApiResponse<InvestorEntityProfile>>(
+      `/users/${userId}/investor-profiles`,
+      dto,
+    ),
+  updateUserInvestorProfile: (userId: number, id: number, dto: UpdateInvestorEntityProfileRequest) =>
+    api.put<ApiResponse<InvestorEntityProfile>>(
+      `/users/${userId}/investor-profiles/${id}`,
+      dto,
+    ),
+  setUserInvestorProfilePrimary: (userId: number, id: number) =>
+    api.put<ApiResponse<string>>(
+      `/users/${userId}/investor-profiles/${id}/primary`,
+      {},
+    ),
+  deactivateUserInvestorProfile: (userId: number, id: number) =>
+    api.put<ApiResponse<string>>(
+      `/users/${userId}/investor-profiles/${id}/deactivate`,
+      {},
+    ),
+  reactivateUserInvestorProfile: (userId: number, id: number) =>
+    api.put<ApiResponse<string>>(
+      `/users/${userId}/investor-profiles/${id}/reactivate`,
+      {},
+    ),
+
   // ── Admin CRUD: Redemption ─────────────────────────────────────────────
   getRedemptionPreview: (
     trancheApplicationId: number,
@@ -1147,6 +1182,62 @@ export interface AddBankAccountRequest {
   setPrimary?: boolean;
 }
 
+export interface InvestorEntityProfile {
+  id: number;
+  investorType: string;
+  entitySubType?: string | null;
+  displayName: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  ssNumber?: string | null;
+  dateOfBirth?: string | null;
+  citizenship?: string | null;
+  maritalStatus?: string | null;
+  spouseFullName?: string | null;
+  spouseEmail?: string | null;
+  spouseSSN?: string | null;
+  spouseDateOfBirth?: string | null;
+  ownershipType?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  streetAddress?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+  mailingAddress?: string | null;
+  entityName?: string | null;
+  ein?: string | null;
+  stateFormation?: string | null;
+  signatoryName?: string | null;
+  signatoryTitle?: string | null;
+  custodianName?: string | null;
+  custodianAcct?: string | null;
+  custodianPhone?: string | null;
+  custodianEmail?: string | null;
+  drivingLicenseNo?: string | null;
+  drivingLicenseState?: string | null;
+  drivingLicensePaths?: string | null;
+  taxCertificateNo?: string | null;
+  taxCertificatePaths?: string | null;
+  employer?: string | null;
+  day?: string | null;
+  night?: string | null;
+  isPrimary: boolean;
+  isActive: boolean;
+  isLocked: boolean;
+  createdOn: string;
+}
+
+export type AddInvestorEntityProfileRequest = Omit<
+  InvestorEntityProfile,
+  "id" | "displayName" | "isPrimary" | "isActive" | "isLocked" | "createdOn"
+> & { setPrimary?: boolean };
+
+export type UpdateInvestorEntityProfileRequest = Omit<
+  AddInvestorEntityProfileRequest,
+  "investorType" | "entitySubType" | "setPrimary"
+>;
+
 export interface CreateApplicationRequest {
   investorType: string;
   investmentType?: string;
@@ -1190,6 +1281,9 @@ export interface CreateApplicationRequest {
   paymentMethod?: string;
   distributionPreference?: string;
   bankAccountId?: number | null;
+  // Update only: relink this application to a different existing InvestorEntityProfile.
+  // Omit/null to leave the current link (if any) unchanged.
+  investorEntityProfileId?: number | null;
 }
 
 export interface CreateRedemptionAdminRequest {
