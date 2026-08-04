@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import AdminLayout from "@/components/AdminLayout";
 import { PaginationControls } from "@/components/PaginationControls";
@@ -15,6 +15,7 @@ import {
   type BankTransactionLinkItem,
   type BankAccountBalanceAnchor,
   type BankTransactionBalanceFlow,
+  type BankCapitalLedgerResult,
   type LinkCandidate,
   type LinkedEntityType,
   type PagedResult,
@@ -38,6 +39,34 @@ function fmtMoney(n?: number) {
 function fmtSigned(n: number) {
   return `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+
+const statCard = (label: string, value: string, color: string, sub?: string) => (
+  <div
+    key={label}
+    style={{
+      background: "#fff",
+      border: "1.5px solid #e2e8f0",
+      borderRadius: 10,
+      padding: "14px 20px",
+      minWidth: 170,
+    }}
+  >
+    <div
+      style={{
+        fontSize: 11,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: "0.06em",
+        color: "#64748b",
+        marginBottom: 6,
+      }}
+    >
+      {label}
+    </div>
+    <div style={{ fontSize: 22, fontWeight: 700, color }}>{value}</div>
+    {sub && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{sub}</div>}
+  </div>
+);
 
 const s = {
   h1: { fontSize: 22, fontWeight: 700, color: "#0f2342", marginBottom: 4 } as React.CSSProperties,
@@ -128,6 +157,22 @@ export default function BankTransactionsPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const [flow, setFlow] = useState<BankTransactionBalanceFlow | null>(null);
+
+  // KPI cards: reuses the same unpaginated ledger endpoint Bank Capital Ledger's stat cards are
+  // built on, so the numbers stay in sync between the two pages. Only From/To go to the API; the
+  // Category/Sub-Category/Direction/Linked/search filters below are applied client-side, mirroring
+  // Bank Capital Ledger's own visibleEntries filter exactly (both read the same CategoryId/
+  // SubCategoryId shape from BankTransactionRepository.GetLedgerAsync).
+  const [statsData, setStatsData] = useState<BankCapitalLedgerResult | null>(null);
+
+  const loadStats = useCallback(async () => {
+    const res = await bankTransactionsApi.getLedger({ from: from || undefined, to: to || undefined });
+    if (res.success) setStatsData(res.data);
+  }, [from, to]);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
 
   const [anchors, setAnchors] = useState<BankAccountBalanceAnchor[]>([]);
   const [anchorListOpen, setAnchorListOpen] = useState(false);
@@ -220,6 +265,39 @@ export default function BankTransactionsPage() {
     loadFlow();
   }, [loadFlow]);
 
+  const filteredStatsEntries = useMemo(() => {
+    const entries = statsData?.entries ?? [];
+    return entries.filter((e) => {
+      if (categoryIds.length > 0) {
+        const wantsUncategorized = categoryIds.includes("uncategorized");
+        const realIds = categoryIds.filter((v) => v !== "uncategorized").map(Number);
+        const matchesUncategorized = wantsUncategorized && e.categoryId == null;
+        const matchesReal = e.categoryId != null && realIds.includes(e.categoryId);
+        if (!matchesUncategorized && !matchesReal) return false;
+      }
+      if (subCategoryIds.length > 0) {
+        if (e.subCategoryId == null || !subCategoryIds.includes(String(e.subCategoryId))) return false;
+      }
+      if (direction === "in" && e.credit == null) return false;
+      if (direction === "out" && e.debit == null) return false;
+      if (linkFilter === "linked" && e.linkedCount === 0) return false;
+      if (linkFilter === "unlinked" && e.linkedCount > 0) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        const hay = `${e.rawDescription} ${e.adminDescription ?? ""} ${e.checkNumber ?? ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [statsData, categoryIds, subCategoryIds, direction, linkFilter, search]);
+
+  const cardStats = useMemo(() => {
+    const totalIn = filteredStatsEntries.reduce((sum, e) => sum + (e.credit ?? 0), 0);
+    const totalOut = filteredStatsEntries.reduce((sum, e) => sum + (e.debit ?? 0), 0);
+    const netChange = filteredStatsEntries.reduce((sum, e) => sum + e.amount, 0);
+    return { totalIn, totalOut, netChange, count: filteredStatsEntries.length };
+  }, [filteredStatsEntries]);
+
   const openAnchorModal = (account: BankAccountBalanceAnchor) => {
     setAnchorModalAccount(account.accountNumber);
     setAnchorValue(
@@ -278,6 +356,7 @@ export default function BankTransactionsPage() {
         load();
         loadAnchors();
         loadFlow();
+        loadStats();
       } else setUploadError(res.message || "Upload failed.");
     } catch {
       setUploadError("Network error. Please try again.");
@@ -313,6 +392,7 @@ export default function BankTransactionsPage() {
     if (res.success) {
       const categoryName = categoryId == null ? undefined : findCategoryById(categories, categoryId)?.name;
       updateRowInPlace(row.id, { categoryId: categoryId ?? undefined, categoryName });
+      loadStats();
     }
   };
 
@@ -326,6 +406,7 @@ export default function BankTransactionsPage() {
     if (!res.success) alert(res.message);
     load();
     loadFlow();
+    loadStats();
   };
 
   // ── Selection & bulk link ────────────────────────────────────────────────
@@ -364,6 +445,7 @@ export default function BankTransactionsPage() {
         setSelectedCandidate(null);
         setSelected(new Set());
         load();
+        loadStats();
       } else setLinkError(res.message);
     } finally {
       setLinking(false);
@@ -388,6 +470,7 @@ export default function BankTransactionsPage() {
         setSelected(new Set());
         load();
         loadFlow();
+        loadStats();
       } else alert(res.message);
     } finally {
       setBulkDeleting(false);
@@ -711,6 +794,25 @@ export default function BankTransactionsPage() {
           </button>
         </div>
 
+        {/* KPI cards — reflect the filters above */}
+        <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+          {statsData && statsData.openingBalance !== 0 &&
+            statCard(
+              "Opening Balance",
+              fmtMoney(statsData.openingBalance),
+              "#0f2342",
+              from ? `as at ${from}` : undefined,
+            )}
+          {statCard("Total Credit", fmtMoney(cardStats.totalIn), "#0f9444")}
+          {statCard("Total Debit", fmtMoney(cardStats.totalOut), "#991b1b")}
+          {statCard(
+            "Net Change",
+            fmtSigned(cardStats.netChange),
+            cardStats.netChange >= 0 ? "#0f9444" : "#991b1b",
+          )}
+          {statCard("Transactions", String(cardStats.count), "#699172")}
+        </div>
+
         {/* Bulk toolbar */}
         {selected.size > 0 && (
           <div
@@ -786,7 +888,10 @@ export default function BankTransactionsPage() {
                         onSaveNotes={(v) => saveAdminDescription(row, v)}
                         onCategoryChange={(v) => changeCategory(row, v)}
                         onDelete={() => deleteRow(row)}
-                        onReload={load}
+                        onReload={() => {
+                          load();
+                          loadStats();
+                        }}
                       />
                     ))}
                   </tbody>
@@ -1014,6 +1119,7 @@ export default function BankTransactionsPage() {
             load();
             loadAnchors();
             loadFlow();
+            loadStats();
           }}
         />
       )}
