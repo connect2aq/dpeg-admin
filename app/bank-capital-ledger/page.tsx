@@ -159,18 +159,6 @@ function BankCapitalLedgerContent() {
   ];
   const subCategoryFilterOptions = buildSubCategoryOptionsForSelection(categories, categoryIds);
 
-  // KPI cards reflect the full From/To range exactly as loaded from the API — unaffected by the
-  // Category/Sub-Category/search/etc. filters below, the same way Fund Capital Ledger's stat cards
-  // come from backend-computed totals over the date range, not the further-filtered client view.
-  const rangeStats = useMemo(() => {
-    const entries = ledgerData?.entries ?? [];
-    const totalIn = entries.reduce((sum, e) => sum + (e.credit ?? 0), 0);
-    const totalOut = entries.reduce((sum, e) => sum + (e.debit ?? 0), 0);
-    const netChange = entries.reduce((sum, e) => sum + e.amount, 0);
-    const closingBalance = entries.length > 0 ? entries[entries.length - 1].calculatedBalance ?? null : null;
-    return { totalIn, totalOut, netChange, closingBalance, count: entries.length };
-  }, [ledgerData]);
-
   const visibleEntries = useMemo(() => {
     const entries = ledgerData?.entries ?? [];
     return entries.filter((e) => {
@@ -201,6 +189,15 @@ function BankCapitalLedgerContent() {
       return true;
     });
   }, [ledgerData, categoryIds, subCategoryIds, direction, linkFilter, search, investorSearch]);
+
+  // KPI cards reflect the currently filtered set (visibleEntries), so they update as the
+  // Category/Sub-Category/direction/linked/search filters change.
+  const rangeStats = useMemo(() => {
+    const totalIn = visibleEntries.reduce((sum, e) => sum + (e.credit ?? 0), 0);
+    const totalOut = visibleEntries.reduce((sum, e) => sum + (e.debit ?? 0), 0);
+    const netChange = visibleEntries.reduce((sum, e) => sum + e.amount, 0);
+    return { totalIn, totalOut, netChange, count: visibleEntries.length };
+  }, [visibleEntries]);
 
   const sortValue = (e: BankCapitalLedgerEntry, field: SortField): string | number => {
     switch (field) {
@@ -488,13 +485,6 @@ function BankCapitalLedgerContent() {
                           "#0f2342",
                           from ? `as at ${from}` : undefined,
                         )}
-                      {rangeStats.closingBalance != null &&
-                        statCard(
-                          "Closing Balance",
-                          fmtMoney(rangeStats.closingBalance),
-                          "#0f2342",
-                          to ? `as at ${to}` : "latest imported balance",
-                        )}
                       {statCard("Transactions", String(categoryStats.count), "#699172")}
                     </>
                   ) : (
@@ -513,13 +503,6 @@ function BankCapitalLedgerContent() {
                         signed(rangeStats.netChange),
                         rangeStats.netChange >= 0 ? "#0f9444" : "#991b1b",
                       )}
-                      {rangeStats.closingBalance != null &&
-                        statCard(
-                          "Closing Balance",
-                          fmtMoney(rangeStats.closingBalance),
-                          "#0f2342",
-                          to ? `as at ${to}` : "latest imported balance",
-                        )}
                       {statCard("Transactions", String(rangeStats.count), "#699172")}
                     </>
                   )}
