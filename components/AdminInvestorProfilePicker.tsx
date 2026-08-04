@@ -8,8 +8,22 @@ import {
   type UpdateInvestorEntityProfileRequest,
 } from "@/lib/api";
 
-const INVESTOR_TYPES = ["Individual", "Entity", "IRA", "Trust"];
-const ENTITY_SUB_TYPES = ["LLC", "Corporation", "LP_GP", "PensionFund", "BankBroker", "Other"];
+// InvestorType/EntitySubType are raw numeric enum values on the wire (no
+// JsonStringEnumConverter registered on the API) -- see eInvestorType/eEntitySubType.
+const INVESTOR_TYPES = [
+  { value: 1, label: "Individual" },
+  { value: 2, label: "Entity" },
+  { value: 3, label: "IRA" },
+  { value: 4, label: "Trust" },
+];
+const ENTITY_SUB_TYPES = [
+  { value: 1, label: "LLC" },
+  { value: 2, label: "Corporation" },
+  { value: 3, label: "LP_GP" },
+  { value: 4, label: "PensionFund" },
+  { value: 5, label: "BankBroker" },
+  { value: 6, label: "Other" },
+];
 const MARITAL_STATUSES = ["single", "married", "widowed", "divorced"];
 
 const inputStyle = {
@@ -148,8 +162,8 @@ export function AdminInvestorProfilePicker({
   const [isSaving, setIsSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [form, setForm] = useState<ProfileForm>(emptyForm);
-  const [formType, setFormType] = useState("Individual");
-  const [formEntitySubType, setFormEntitySubType] = useState("");
+  const [formType, setFormType] = useState(1);
+  const [formEntitySubType, setFormEntitySubType] = useState<number | null>(null);
   const [busyAction, setBusyAction] = useState<{ id: number; action: "primary" | "deactivate" | "reactivate" } | null>(null);
   const [showDeactivated, setShowDeactivated] = useState(false);
   const [isLoadingDeactivated, setIsLoadingDeactivated] = useState(false);
@@ -171,9 +185,9 @@ export function AdminInvestorProfilePicker({
     load();
   }, [load]);
 
-  const isIndividual = formType === "Individual";
+  const isIndividual = formType === 1;
   const isMarried = form.maritalStatus?.toLowerCase() === "married";
-  const isIRA = formType === "IRA";
+  const isIRA = formType === 3;
   const editingProfile = editingId ? profiles.find((p) => p.id === editingId) : null;
 
   const isFormValid = isIndividual
@@ -182,16 +196,16 @@ export function AdminInvestorProfilePicker({
 
   const resetForm = () => {
     setForm(emptyForm);
-    setFormType("Individual");
-    setFormEntitySubType("");
+    setFormType(1);
+    setFormEntitySubType(null);
     setIsAdding(false);
     setEditingId(null);
   };
 
   const startAdd = () => {
     setForm(emptyForm);
-    setFormType("Individual");
-    setFormEntitySubType("");
+    setFormType(1);
+    setFormEntitySubType(null);
     setEditingId(null);
     setIsAdding(true);
     setMsg(null);
@@ -200,7 +214,7 @@ export function AdminInvestorProfilePicker({
   const startEdit = (profile: InvestorEntityProfile) => {
     setForm(profileToForm(profile));
     setFormType(profile.investorType);
-    setFormEntitySubType(profile.entitySubType ?? "");
+    setFormEntitySubType(profile.entitySubType ?? null);
     setEditingId(profile.id);
     setIsAdding(false);
     setMsg(null);
@@ -226,7 +240,7 @@ export function AdminInvestorProfilePicker({
         const dto: AddInvestorEntityProfileRequest = {
           ...form,
           investorType: formType,
-          entitySubType: formEntitySubType || null,
+          entitySubType: formEntitySubType,
           setPrimary: profiles.length === 0,
         };
         const res = await adminApi.addUserInvestorProfile(userId, dto);
@@ -375,8 +389,8 @@ export function AdminInvestorProfilePicker({
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 16px", fontSize: 12, color: "#334155" }}>
                   <div>
-                    <span style={{ color: "#94a3b8" }}>{p.investorType === "Individual" ? "SSN: " : "EIN: "}</span>
-                    <span style={{ fontFamily: "monospace" }}>{maskedTail(p.investorType === "Individual" ? p.ssNumber : p.ein) ?? "—"}</span>
+                    <span style={{ color: "#94a3b8" }}>{p.investorType === 1 ? "SSN: " : "EIN: "}</span>
+                    <span style={{ fontFamily: "monospace" }}>{maskedTail(p.investorType === 1 ? p.ssNumber : p.ein) ?? "—"}</span>
                   </div>
                   <div>
                     <span style={{ color: "#94a3b8" }}>Phone: </span>
@@ -470,15 +484,15 @@ export function AdminInvestorProfilePicker({
           {!editingId && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
               <FormField label="Investor Type *">
-                <select required style={selectStyle} value={formType} onChange={(e) => setFormType(e.target.value)}>
-                  {INVESTOR_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                <select required style={selectStyle} value={formType} onChange={(e) => setFormType(Number(e.target.value))}>
+                  {INVESTOR_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </FormField>
-              {formType !== "Individual" && (
+              {formType !== 1 && (
                 <FormField label="Entity Sub-Type">
-                  <select style={selectStyle} value={formEntitySubType} onChange={(e) => setFormEntitySubType(e.target.value)}>
+                  <select style={selectStyle} value={formEntitySubType ?? ""} onChange={(e) => setFormEntitySubType(e.target.value ? Number(e.target.value) : null)}>
                     <option value="">— Select —</option>
-                    {ENTITY_SUB_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    {ENTITY_SUB_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
                 </FormField>
               )}

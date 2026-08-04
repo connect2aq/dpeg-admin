@@ -1182,10 +1182,14 @@ export interface AddBankAccountRequest {
   setPrimary?: boolean;
 }
 
+// InvestorType/EntitySubType round-trip as their raw numeric enum values (no
+// JsonStringEnumConverter registered on the API) -- see eInvestorType/eEntitySubType.
+// 1=Individual, 2=Entity, 3=IRA, 4=Trust / 1=LLC, 2=Corporation, 3=LP_GP, 4=PensionFund,
+// 5=BankBroker, 6=Other.
 export interface InvestorEntityProfile {
   id: number;
-  investorType: string;
-  entitySubType?: string | null;
+  investorType: number;
+  entitySubType?: number | null;
   displayName: string;
   firstName?: string | null;
   lastName?: string | null;

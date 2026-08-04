@@ -10,6 +10,12 @@ const ENTITY_SUB_TYPES = ['LLC', 'Corporation', 'LP_GP', 'PensionFund', 'BankBro
 const PAYMENT_METHODS = ['WireTransfer', 'CertifiedCheck'];
 const DIST_PREFS = ['WireToBank', 'Reinvest'];
 
+// AdminInvestorProfilePicker deals in the raw numeric eInvestorType/eEntitySubType values
+// (see eInvestorType.cs); the Application-level fields here are strings (AdminCreateApplicationDTO
+// parses them with Enum.TryParse server-side). 1-indexed to match the C# enums.
+const investorTypeToLabel = (n: number) => INVESTOR_TYPES[n - 1] ?? INVESTOR_TYPES[0];
+const entitySubTypeToLabel = (n?: number | null) => (n ? ENTITY_SUB_TYPES[n - 1] ?? '' : '');
+
 const inputStyle = { width: '100%', padding: '8px 11px', border: '1.5px solid #e2e8f0', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' as const };
 const labelStyle = { fontSize: 11, fontWeight: 700 as const, color: '#475569', display: 'block' as const, marginBottom: 3, textTransform: 'uppercase' as const, letterSpacing: '0.04em' };
 const selectStyle = { ...inputStyle, background: 'white' };
@@ -105,8 +111,8 @@ export function InvestmentEditModal({ applicationId, isSuperAdmin, onClose, onSa
     setSelectedProfileId(profileId);
     setForm(f => f && ({
       ...f,
-      investorType: profile.investorType,
-      entitySubType: profile.entitySubType || '',
+      investorType: investorTypeToLabel(profile.investorType),
+      entitySubType: entitySubTypeToLabel(profile.entitySubType),
       firstName: profile.firstName || '',
       lastName: profile.lastName || '',
       phone: profile.phone || '',
