@@ -10,6 +10,7 @@ import {
   type DailyInterestPagedResult,
   type DeleteDailyInterestPreviewResult,
   type ResetMonthResult,
+  type ZeroLogIncludeFixResult,
 } from "@/lib/api";
 import { downloadCsv } from "@/lib/exportCsv";
 import { hasMultiFilterValue } from "@/lib/filterUtils";
@@ -74,6 +75,41 @@ export default function DailyInterestPage() {
     phase: "idle",
   });
   const [exporting, setExporting] = useState(false);
+
+  // Mark zero-value ("Pending" forever) logs as distribution-complete
+  const [zeroFixLoading, setZeroFixLoading] = useState(false);
+  const [zeroFixPreview, setZeroFixPreview] =
+    useState<ZeroLogIncludeFixResult | null>(null);
+  const [zeroFixError, setZeroFixError] = useState<string | null>(null);
+  const [zeroFixApplying, setZeroFixApplying] = useState(false);
+  const [zeroFixApplied, setZeroFixApplied] =
+    useState<ZeroLogIncludeFixResult | null>(null);
+  const [zeroFixConfirmOpen, setZeroFixConfirmOpen] = useState(false);
+
+  const handleZeroFixPreview = async () => {
+    setZeroFixLoading(true);
+    setZeroFixError(null);
+    setZeroFixPreview(null);
+    setZeroFixApplied(null);
+    const r = await adminApi.markZeroLogsIncluded(true);
+    setZeroFixLoading(false);
+    if (r.success) setZeroFixPreview(r.data);
+    else setZeroFixError("Preview failed. Try again or check server logs.");
+  };
+
+  const handleZeroFixApply = async () => {
+    setZeroFixConfirmOpen(false);
+    setZeroFixApplying(true);
+    const r = await adminApi.markZeroLogsIncluded(false);
+    setZeroFixApplying(false);
+    if (r.success) {
+      setZeroFixApplied(r.data);
+      setZeroFixPreview(null);
+      load();
+    } else {
+      setZeroFixError("Apply failed. Try again or check server logs.");
+    }
+  };
 
   const exportToExcel = async () => {
     setExporting(true);
@@ -262,6 +298,303 @@ export default function DailyInterestPage() {
         <p style={{ color: "#64748b", fontSize: 13, marginBottom: 24 }}>
           Daily interest accrual records per investor application.
         </p>
+
+        {/* Fix: zero-value logs stuck as "Pending" */}
+        <div
+          style={{
+            background: "#ecfdf5",
+            border: "1.5px solid #a7f3d0",
+            borderRadius: 12,
+            padding: "20px 24px",
+            marginBottom: 20,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              color: "#065f46",
+              marginBottom: 10,
+            }}
+          >
+            Mark Zero-Value Logs as Distribution-Complete
+          </div>
+          <div style={{ fontSize: 13, color: "#065f46", marginBottom: 14 }}>
+            Rows correctly trimmed to $0 (fully redeemed, interest already
+            paid via the redemption&rsquo;s prorated preferred return) will
+            never get picked up by the monthly distribution job — it skips
+            any application/month that ends at 0 units. This only flips the
+            &ldquo;Distributed&rdquo; flag on rows that are already exactly
+            Units=0, Capital=$0, Net Interest=$0 and not yet marked
+            included. It never changes a dollar amount.
+          </div>
+          <button
+            onClick={handleZeroFixPreview}
+            disabled={zeroFixLoading}
+            style={{
+              padding: "9px 18px",
+              background: "#059669",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: zeroFixLoading ? "not-allowed" : "pointer",
+              opacity: zeroFixLoading ? 0.6 : 1,
+            }}
+          >
+            {zeroFixLoading ? "Checking…" : "Preview"}
+          </button>
+          {zeroFixError && (
+            <div style={{ fontSize: 13, color: "#dc2626", marginTop: 10 }}>
+              {zeroFixError}
+            </div>
+          )}
+          {zeroFixPreview && (
+            <div style={{ marginTop: 14 }}>
+              {zeroFixPreview.totalMatched === 0 ? (
+                <div
+                  style={{
+                    padding: "8px 14px",
+                    background: "#f0fdf4",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    color: "#15803d",
+                    fontWeight: 500,
+                    display: "inline-block",
+                  }}
+                >
+                  ✓ No zero-value logs are stuck as Pending.
+                </div>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#065f46",
+                      marginBottom: 8,
+                    }}
+                  >
+                    Found {zeroFixPreview.totalMatched} zero-value log
+                    {zeroFixPreview.totalMatched !== 1 ? "s" : ""} across{" "}
+                    {zeroFixPreview.distinctApplications} application
+                    {zeroFixPreview.distinctApplications !== 1 ? "s" : ""}{" "}
+                    still marked Pending.
+                  </div>
+                  <div style={{ overflowX: "auto", marginBottom: 12 }}>
+                    <table
+                      style={{
+                        width: "100%",
+                        borderCollapse: "collapse",
+                        fontSize: 12,
+                      }}
+                    >
+                      <thead>
+                        <tr>
+                          {["App ID", "Count", "Earliest Date", "Latest Date"].map(
+                            (h) => (
+                              <th
+                                key={h}
+                                style={{
+                                  textAlign: "left",
+                                  padding: "6px 10px",
+                                  background: "#d1fae5",
+                                  color: "#065f46",
+                                  fontWeight: 600,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {h}
+                              </th>
+                            ),
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {zeroFixPreview.apps.map((a) => (
+                          <tr key={a.applicationId}>
+                            <td
+                              style={{
+                                padding: "6px 10px",
+                                borderBottom: "1px solid #d1fae5",
+                              }}
+                            >
+                              <Link
+                                href={`/applications/${a.applicationId}`}
+                                style={{
+                                  color: "#6d28d9",
+                                  fontWeight: 600,
+                                  textDecoration: "underline",
+                                }}
+                              >
+                                #{a.applicationId}
+                              </Link>
+                            </td>
+                            <td
+                              style={{
+                                padding: "6px 10px",
+                                borderBottom: "1px solid #d1fae5",
+                              }}
+                            >
+                              {a.count}
+                            </td>
+                            <td
+                              style={{
+                                padding: "6px 10px",
+                                borderBottom: "1px solid #d1fae5",
+                              }}
+                            >
+                              {formatShortDate(a.minDate)}
+                            </td>
+                            <td
+                              style={{
+                                padding: "6px 10px",
+                                borderBottom: "1px solid #d1fae5",
+                              }}
+                            >
+                              {formatShortDate(a.maxDate)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <button
+                    onClick={() => setZeroFixConfirmOpen(true)}
+                    disabled={zeroFixApplying}
+                    style={{
+                      padding: "9px 18px",
+                      background: "#059669",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: zeroFixApplying ? "not-allowed" : "pointer",
+                      opacity: zeroFixApplying ? 0.6 : 1,
+                    }}
+                  >
+                    {zeroFixApplying
+                      ? "Applying…"
+                      : `Mark All ${zeroFixPreview.totalMatched} as Distribution-Complete`}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+          {zeroFixApplied && (
+            <div
+              style={{
+                marginTop: 14,
+                padding: "10px 14px",
+                background: "#f0fdf4",
+                border: "1px solid #bbf7d0",
+                borderRadius: 8,
+                fontSize: 13,
+                color: "#15803d",
+                fontWeight: 600,
+              }}
+            >
+              ✓ Marked {zeroFixApplied.totalMatched} log
+              {zeroFixApplied.totalMatched !== 1 ? "s" : ""} across{" "}
+              {zeroFixApplied.distinctApplications} application
+              {zeroFixApplied.distinctApplications !== 1 ? "s" : ""} as
+              distribution-complete.
+            </div>
+          )}
+        </div>
+
+        {/* Zero-value fix confirmation modal */}
+        {zeroFixConfirmOpen && zeroFixPreview && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.45)",
+              zIndex: 1000,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: 14,
+                padding: 32,
+                width: 520,
+                maxWidth: "95vw",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: "#0f2342",
+                  marginBottom: 6,
+                }}
+              >
+                Mark {zeroFixPreview.totalMatched} logs as distribution-complete?
+              </h2>
+              <div
+                style={{
+                  padding: "12px 14px",
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: "#065f46",
+                  margin: "16px 0 20px",
+                }}
+              >
+                This only sets the &ldquo;Distributed&rdquo; flag to true on
+                rows that are already exactly $0 across{" "}
+                {zeroFixPreview.distinctApplications} application
+                {zeroFixPreview.distinctApplications !== 1 ? "s" : ""}. No
+                unit count, capital, or interest value is changed on any row.
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  justifyContent: "flex-end",
+                }}
+              >
+                <button
+                  onClick={() => setZeroFixConfirmOpen(false)}
+                  style={{
+                    padding: "9px 18px",
+                    border: "1.5px solid #e2e8f0",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    background: "#fff",
+                    color: "#374151",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleZeroFixApply}
+                  style={{
+                    padding: "9px 18px",
+                    border: "none",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    background: "#059669",
+                    color: "#fff",
+                  }}
+                >
+                  Mark as Complete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         <div

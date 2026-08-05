@@ -860,6 +860,12 @@ export const adminApi = {
     );
   },
 
+  markZeroLogsIncluded: (dryRun: boolean) =>
+    api.post<ApiResponse<ZeroLogIncludeFixResult>>(
+      `/daily-interest/mark-zero-logs-included?dryRun=${dryRun}`,
+      {},
+    ),
+
   // ── Manual distribution run ───────────────────────────────────────────
   simulateDistribution: (asOfDate: string) =>
     api.post<ApiResponse<DistributionRunResult[]>>("/distributions/simulate", {
@@ -1047,6 +1053,20 @@ export interface HistoricalCatchUpFixResult {
   dryRun: boolean;
   changedLogs: DailyLogChange[];
   diagnosticNote: string | null;
+}
+
+export interface ZeroLogIncludeAppSummary {
+  applicationId: number;
+  count: number;
+  minDate: string;
+  maxDate: string;
+}
+
+export interface ZeroLogIncludeFixResult {
+  totalMatched: number;
+  distinctApplications: number;
+  dryRun: boolean;
+  apps: ZeroLogIncludeAppSummary[];
 }
 
 export interface StatementListItem {
