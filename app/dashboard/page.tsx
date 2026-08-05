@@ -442,15 +442,15 @@ export default function DashboardPage() {
                 href="/capital-ledger"
               />
               <KpiCard
-                label="Sponsored Equity"
+                label="Sponsor's Equity"
                 value={
                   stats.sponsoredEquity != null
                     ? fmt(stats.sponsoredEquity)
                     : "Not entered"
                 }
-                sub="Manually entered — update in Settings"
+                sub="Manually entered — view in Bank Capital Ledger"
                 color="#699172"
-                href="/settings"
+                href="/bank-capital-ledger"
               />
             </div>
 
