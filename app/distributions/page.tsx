@@ -163,6 +163,59 @@ function DistributionsContent() {
   const [fixHistError, setFixHistError] = useState<string | null>(null);
   const [fixHistConfirmOpen, setFixHistConfirmOpen] = useState(false);
 
+  // Scoped fix: preview then apply for one application at a time
+  const [scopedFixAppId, setScopedFixAppId] = useState("");
+  const [scopedFixLoading, setScopedFixLoading] = useState(false);
+  const [scopedFixPreview, setScopedFixPreview] = useState<
+    HistoricalCatchUpFixResult[] | null
+  >(null);
+  const [scopedFixError, setScopedFixError] = useState<string | null>(null);
+  const [scopedFixApplying, setScopedFixApplying] = useState(false);
+  const [scopedFixApplied, setScopedFixApplied] = useState<
+    HistoricalCatchUpFixResult[] | null
+  >(null);
+  const [scopedFixConfirmOpen, setScopedFixConfirmOpen] = useState(false);
+
+  const handleScopedFixPreview = async () => {
+    const id = parseInt(scopedFixAppId, 10);
+    if (isNaN(id) || id <= 0) {
+      setScopedFixError("Enter a valid application ID.");
+      return;
+    }
+    setScopedFixLoading(true);
+    setScopedFixError(null);
+    setScopedFixPreview(null);
+    setScopedFixApplied(null);
+    const r = await adminApi.fixHistoricalCatchUp({
+      applicationId: id,
+      dryRun: true,
+    });
+    setScopedFixLoading(false);
+    if (r.success) setScopedFixPreview(r.data);
+    else
+      setScopedFixError(
+        "Preview failed. Check the application ID and try again.",
+      );
+  };
+
+  const handleScopedFixApply = async () => {
+    const id = parseInt(scopedFixAppId, 10);
+    if (isNaN(id) || id <= 0) return;
+    setScopedFixConfirmOpen(false);
+    setScopedFixApplying(true);
+    const r = await adminApi.fixHistoricalCatchUp({
+      applicationId: id,
+      dryRun: false,
+    });
+    setScopedFixApplying(false);
+    if (r.success) {
+      setScopedFixApplied(r.data);
+      setScopedFixPreview(null);
+    } else {
+      setScopedFixError("Apply failed. Try again or check the server logs.");
+    }
+  };
+
   // Run distribution state
   const [runDate, setRunDate] = useState(todayStr());
   const [runMode, setRunMode] = useState<"preview" | "execute" | null>(null);
@@ -718,7 +771,372 @@ function DistributionsContent() {
           )}
         </div>
 
-        {/* Fix Historical Interest Trimming Panel */}
+        {/* Scoped Fix: single application preview + apply */}
+        <div
+          style={{
+            background: "#ecfdf5",
+            border: "1.5px solid #a7f3d0",
+            borderRadius: 12,
+            padding: "20px 24px",
+            marginBottom: 16,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              color: "#065f46",
+              marginBottom: 10,
+            }}
+          >
+            Fix Historical Interest Trimming — Single Application
+          </div>
+          <div style={{ fontSize: 13, color: "#065f46", marginBottom: 14 }}>
+            Same underlying correction as the bulk tool below, scoped to one
+            application so you can review the exact before/after values
+            before anything is written. Preview first — nothing changes until
+            you click Apply.
+          </div>
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              marginBottom: 10,
+            }}
+          >
+            <input
+              type="number"
+              placeholder="Application ID"
+              value={scopedFixAppId}
+              onChange={(e) => setScopedFixAppId(e.target.value)}
+              style={{
+                padding: "8px 12px",
+                border: "1.5px solid #a7f3d0",
+                borderRadius: 8,
+                fontSize: 13,
+                width: 160,
+              }}
+            />
+            <button
+              onClick={handleScopedFixPreview}
+              disabled={scopedFixLoading || !scopedFixAppId}
+              style={{
+                padding: "9px 18px",
+                background: "#059669",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor:
+                  scopedFixLoading || !scopedFixAppId
+                    ? "not-allowed"
+                    : "pointer",
+                opacity: scopedFixLoading || !scopedFixAppId ? 0.6 : 1,
+              }}
+            >
+              {scopedFixLoading ? "Checking…" : "Preview"}
+            </button>
+          </div>
+          {scopedFixError && (
+            <div style={{ fontSize: 13, color: "#dc2626", marginBottom: 10 }}>
+              {scopedFixError}
+            </div>
+          )}
+
+          {scopedFixPreview && (
+            <div style={{ marginTop: 4 }}>
+              {scopedFixPreview.length === 0 ? (
+                <div
+                  style={{
+                    padding: "8px 14px",
+                    background: "#f0fdf4",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    color: "#15803d",
+                    fontWeight: 500,
+                    display: "inline-block",
+                  }}
+                >
+                  ✓ No corrections needed for App #{scopedFixAppId} —
+                  historical logs are already correct.
+                </div>
+              ) : (
+                <>
+                  {scopedFixPreview.some(
+                    (r) =>
+                      r.hasExistingDistribution &&
+                      r.existingDistributionOdooStatus === "Sent",
+                  ) && (
+                    <div
+                      style={{
+                        padding: "10px 14px",
+                        background: "#fef2f2",
+                        border: "1px solid #fecaca",
+                        borderRadius: 8,
+                        fontSize: 13,
+                        color: "#991b1b",
+                        fontWeight: 600,
+                        marginBottom: 12,
+                      }}
+                    >
+                      ⚠ At least one affected month already has a
+                      distribution that was sent to Odoo. Applying this fix
+                      will delete that distribution record so it can be
+                      re-run — verify with Odoo/finance before proceeding if
+                      it was already paid out.
+                    </div>
+                  )}
+                  {scopedFixPreview.map((r, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        marginBottom: 16,
+                        padding: "12px 14px",
+                        background: "#fff",
+                        border: "1px solid #a7f3d0",
+                        borderRadius: 8,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#065f46",
+                          marginBottom: 8,
+                        }}
+                      >
+                        Redemption on{" "}
+                        {formatShortDate(r.redemptionEffectiveDate)} —{" "}
+                        {r.unitsRedeemed} unit
+                        {r.unitsRedeemed !== 1 ? "s" : ""} redeemed,{" "}
+                        {r.remainingUnits} remaining. Would correct{" "}
+                        {r.logsCorrected} daily log
+                        {r.logsCorrected !== 1 ? "s" : ""} in{" "}
+                        {formatShortDate(r.distributionMonthReset)}.
+                        {r.hasExistingDistribution && (
+                          <span style={{ color: "#b45309" }}>
+                            {" "}
+                            An existing distribution for this month (status:{" "}
+                            {r.existingDistributionOdooStatus ?? "Pending"})
+                            would be deleted and need to be re-run.
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ overflowX: "auto" }}>
+                        <table
+                          style={{
+                            width: "100%",
+                            borderCollapse: "collapse",
+                            fontSize: 12,
+                          }}
+                        >
+                          <thead>
+                            <tr>
+                              {[
+                                "Date",
+                                "Units (old → new)",
+                                "Capital (old → new)",
+                                "Net Interest (old → new)",
+                              ].map((h) => (
+                                <th
+                                  key={h}
+                                  style={{
+                                    textAlign: "left",
+                                    padding: "6px 10px",
+                                    background: "#d1fae5",
+                                    color: "#065f46",
+                                    fontWeight: 600,
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {h}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {r.changedLogs.map((c) => (
+                              <tr key={c.logId}>
+                                <td
+                                  style={{
+                                    padding: "6px 10px",
+                                    borderBottom: "1px solid #d1fae5",
+                                  }}
+                                >
+                                  {formatShortDate(c.date)}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: "6px 10px",
+                                    borderBottom: "1px solid #d1fae5",
+                                  }}
+                                >
+                                  {c.oldUnits} → {c.newUnits}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: "6px 10px",
+                                    borderBottom: "1px solid #d1fae5",
+                                  }}
+                                >
+                                  ${c.oldCapital.toFixed(2)} → $
+                                  {c.newCapital.toFixed(2)}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: "6px 10px",
+                                    borderBottom: "1px solid #d1fae5",
+                                  }}
+                                >
+                                  ${c.oldNetInterest.toFixed(2)} → $
+                                  {c.newNetInterest.toFixed(2)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setScopedFixConfirmOpen(true)}
+                    disabled={scopedFixApplying}
+                    style={{
+                      padding: "9px 18px",
+                      background: "#b91c1c",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: scopedFixApplying ? "not-allowed" : "pointer",
+                      opacity: scopedFixApplying ? 0.6 : 1,
+                    }}
+                  >
+                    {scopedFixApplying
+                      ? "Applying…"
+                      : `Apply to App #${scopedFixAppId}`}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {scopedFixApplied && (
+            <div
+              style={{
+                marginTop: 14,
+                padding: "10px 14px",
+                background: "#f0fdf4",
+                border: "1px solid #bbf7d0",
+                borderRadius: 8,
+                fontSize: 13,
+                color: "#15803d",
+                fontWeight: 600,
+              }}
+            >
+              ✓ Applied — corrected{" "}
+              {scopedFixApplied.reduce((sum, r) => sum + r.logsCorrected, 0)}{" "}
+              daily log(s) across {scopedFixApplied.length} redemption
+              {scopedFixApplied.length !== 1 ? "s" : ""} for App #
+              {scopedFixAppId}. Re-run Preview/Execute above for any affected
+              months.
+            </div>
+          )}
+
+          {/* Scoped fix apply confirmation */}
+          {scopedFixConfirmOpen && (
+            <div
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(0,0,0,0.45)",
+                zIndex: 1000,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <div
+                style={{
+                  background: "#fff",
+                  borderRadius: 14,
+                  padding: 32,
+                  width: 520,
+                  maxWidth: "95vw",
+                  boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+                }}
+              >
+                <h2
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: "#0f2342",
+                    marginBottom: 6,
+                  }}
+                >
+                  Apply fix to App #{scopedFixAppId}?
+                </h2>
+                <div
+                  style={{
+                    padding: "12px 14px",
+                    background: "#f0fdf4",
+                    border: "1px solid #bbf7d0",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    color: "#065f46",
+                    margin: "16px 0 20px",
+                  }}
+                >
+                  This writes exactly the values shown in the preview above
+                  for App #{scopedFixAppId} only — no other application is
+                  touched. This cannot be undone.
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <button
+                    onClick={() => setScopedFixConfirmOpen(false)}
+                    style={{
+                      padding: "9px 18px",
+                      border: "1.5px solid #e2e8f0",
+                      borderRadius: 8,
+                      fontSize: 13,
+                      cursor: "pointer",
+                      background: "#fff",
+                      color: "#374151",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleScopedFixApply}
+                    style={{
+                      padding: "9px 18px",
+                      border: "none",
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      background: "#b91c1c",
+                      color: "#fff",
+                    }}
+                  >
+                    Apply Fix
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Fix Historical Interest Trimming Panel (bulk — all applications) */}
         <div
           style={{
             background: "#f5f3ff",
@@ -736,7 +1154,7 @@ function DistributionsContent() {
               marginBottom: 10,
             }}
           >
-            Fix Historical Interest Trimming
+            Fix Historical Interest Trimming — All Applications
           </div>
           <div style={{ fontSize: 13, color: "#4c1d95", marginBottom: 14 }}>
             Not part of the routine monthly flow above — use this only if a
@@ -747,7 +1165,9 @@ function DistributionsContent() {
             daily logs down to the units actually remaining, so redeemed
             units aren&rsquo;t paid interest twice — once via the redemption
             itself, once via the daily log. Any affected monthly distribution
-            is reset so it can be re-run with corrected totals.
+            is reset so it can be re-run with corrected totals. Prefer the
+            single-application tool above when you only need to fix specific
+            cases.
           </div>
           <button
             onClick={() => setFixHistConfirmOpen(true)}

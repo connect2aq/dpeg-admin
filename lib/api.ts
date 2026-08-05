@@ -848,11 +848,17 @@ export const adminApi = {
       }>
     >("/distributions/catch-up", { from, to }),
 
-  fixHistoricalCatchUp: () =>
-    api.post<ApiResponse<HistoricalCatchUpFixResult[]>>(
-      "/distributions/fix-historical-catchup",
+  fixHistoricalCatchUp: (opts?: { applicationId?: number; dryRun?: boolean }) => {
+    const params = new URLSearchParams();
+    if (opts?.applicationId != null)
+      params.set("applicationId", String(opts.applicationId));
+    if (opts?.dryRun != null) params.set("dryRun", String(opts.dryRun));
+    const qs = params.toString();
+    return api.post<ApiResponse<HistoricalCatchUpFixResult[]>>(
+      `/distributions/fix-historical-catchup${qs ? `?${qs}` : ""}`,
       {},
-    ),
+    );
+  },
 
   // ── Manual distribution run ───────────────────────────────────────────
   simulateDistribution: (asOfDate: string) =>
@@ -1016,6 +1022,17 @@ export interface DistributionRunResult {
   distributionLogId: number | null;
 }
 
+export interface DailyLogChange {
+  logId: number;
+  date: string;
+  oldUnits: number;
+  newUnits: number;
+  oldCapital: number;
+  newCapital: number;
+  oldNetInterest: number;
+  newNetInterest: number;
+}
+
 export interface HistoricalCatchUpFixResult {
   applicationId: number;
   redemptionEffectiveDate: string;
@@ -1024,6 +1041,10 @@ export interface HistoricalCatchUpFixResult {
   logsCorrected: number;
   distributionMonthReset: string;
   distributionDeleted: boolean;
+  hasExistingDistribution: boolean;
+  existingDistributionOdooStatus: string | null;
+  dryRun: boolean;
+  changedLogs: DailyLogChange[];
 }
 
 export interface StatementListItem {
