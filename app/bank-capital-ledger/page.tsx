@@ -789,10 +789,11 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
     accent: string;
     arrow?: boolean;
     muted?: boolean;
+    breakdown?: string;
     sub?: string;
     onClick?: () => void;
   }) => {
-    const { label, value, accent, arrow, muted, sub, onClick } = opts;
+    const { label, value, accent, arrow, muted, breakdown, sub, onClick } = opts;
     return (
       <button
         type="button"
@@ -823,7 +824,12 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
         >
           {value}
         </div>
-        {sub && <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>{sub}</div>}
+        {breakdown && (
+          <div style={{ fontSize: 10, color: muted ? "#94a3b8" : arrow ? `${accent}cc` : "#64748b", marginTop: 4 }}>
+            {breakdown}
+          </div>
+        )}
+        {sub && <div style={{ fontSize: 10, color: "#94a3b8", marginTop: breakdown ? 2 : 4 }}>{sub}</div>}
         {onClick && (
           <div style={{ fontSize: 10, color: "#699172", marginTop: 6, fontWeight: 600 }}>
             View details →
@@ -866,6 +872,10 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
   const redemptionCount = portal.redemptionCount;
   const totalDistribution = portal.distributionTotal;
   const distributionCount = portal.distributionCount;
+  // monthlyDistributionOnlyTotal excludes redemption interest (see PortalCapitalFlowDTO); the
+  // remainder of distributionTotal against it is the interest paid out on exit via redemptions.
+  const totalMonthlyDistributionOnly = Math.abs(portal.monthlyDistributionOnlyTotal);
+  const totalDistributionOnExit = Math.abs(totalDistribution) - totalMonthlyDistributionOnly;
   const totalInvestments = investments?.total ?? 0;
   // Dividend Received, Sponsor's Equity, and Profit Received from Bank are always inflows to the
   // fund and must always add into Total Balance Available — matching the Dashboard's own Balance
@@ -932,6 +942,10 @@ function BalanceFlowTab({ onViewCategory }: { onViewCategory: (value: string | n
           accent: "#f59e0b",
           arrow: true,
           muted: distributionCount === 0,
+          breakdown:
+            distributionCount > 0 && totalDistributionOnExit > 0
+              ? `${fmt(totalMonthlyDistributionOnly)} monthly + ${fmt(totalDistributionOnExit)} on exit`
+              : undefined,
           sub: "From portal data",
           onClick: () => router.push("/capital-ledger?type=Redemption,Dividend"),
         })}
