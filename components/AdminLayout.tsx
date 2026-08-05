@@ -14,8 +14,9 @@ const NAV = [
   { href: "/applications", label: "Applications", icon: "📋" },
   { href: "/redemptions", label: "Redemptions", icon: "↩" },
   { href: "/capital-ledger", label: "Fund Capital Ledger", icon: "⊞" },
-  { href: "/daily-interest", label: "Daily Interest", icon: "%" },
-  { href: "/distributions", label: "Distributions", icon: "$" },
+  { href: "/daily-interest", label: "Manage Daily Interest", icon: "%" },
+  { href: "/daily-interest-ledger", label: "Daily Interest Ledger", icon: "≡" },
+  { href: "/distributions", label: "Manage Distributions", icon: "$" },
   { href: "/pending-approvals", label: "Pending Approvals", icon: "⏳" },
   // { href: "/odoo-logs", label: "Odoo Logs", icon: "⇄" },
   { href: "/users", label: "Users", icon: "👤" },
@@ -144,7 +145,7 @@ export default function AdminLayout({
               <Link
                 key={href}
                 href={href}
-                className={`sidebar-link ${pathname.startsWith(href) ? "active" : ""}`}
+                className={`sidebar-link ${pathname === href || pathname.startsWith(`${href}/`) ? "active" : ""}`}
                 onClick={() => setMobileOpen(false)}
                 style={{ position: "relative" }}
               >

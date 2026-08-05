@@ -1142,6 +1142,8 @@ export interface DailyInterestPagedResult extends PagedResult<DailyInterestItem>
   // Sum of netInterest across every row matching the current filters, not just this page —
   // directly comparable to Dashboard/Capital Ledger's "Accrued & Unpaid" figure.
   totalNetInterest: number;
+  totalNetInterestPaid: number;
+  totalNetInterestUnpaid: number;
 }
 
 export interface AffectedMonthlyDistribution {

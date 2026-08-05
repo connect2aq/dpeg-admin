@@ -439,7 +439,7 @@ export default function DashboardPage() {
                 value={fmt(stats.totalPendingAccruals)}
                 sub="Pending daily accruals, not yet distributed"
                 color="#7c3aed"
-                href="/daily-interest"
+                href="/daily-interest-ledger"
               />
               <KpiCard
                 label="Sponsor's Equity"
