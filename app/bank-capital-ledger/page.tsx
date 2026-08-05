@@ -131,10 +131,6 @@ function BankCapitalLedgerContent() {
 
   const [ledgerData, setLedgerData] = useState<BankCapitalLedgerResult | null>(null);
   const [ledgerLoading, setLedgerLoading] = useState(true);
-  // True only for the curated view landed on by clicking a Dashboard Balance Flow tile — swaps the
-  // generic Credit/Debit/Net Change KPI row for one scoped to that category. Any manual interaction
-  // with this page's own controls (filters, sort, reset) exits this view back to the normal one.
-  const [viaBalanceFlow, setViaBalanceFlow] = useState(() => searchParams.get("category") != null);
 
   // Only From/To are sent to the API — everything else is filtered/sorted client-side over the
   // full result, the same architecture Fund Capital Ledger uses, because Running Balance/Opening
@@ -243,20 +239,7 @@ function BankCapitalLedgerContent() {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const pagedEntries = sortedEntries.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize);
 
-  // Scoped to visibleEntries (the filtered set), unlike rangeStats above — this is what the
-  // Balance-Flow-curated KPI row shows instead of the generic Credit/Debit/Net Change trio.
-  const categoryStats = useMemo(() => {
-    const sum = visibleEntries.reduce((total, e) => total + e.amount, 0);
-    return { sum, count: visibleEntries.length };
-  }, [visibleEntries]);
-
-  const categoryLabel =
-    categoryIds.length === 1
-      ? (categoryFilterOptions.find((o) => o.value === categoryIds[0])?.label ?? "Category")
-      : "Category";
-
   const toggleSort = (key: string) => {
-    setViaBalanceFlow(false);
     const field = key as SortField;
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
@@ -281,7 +264,6 @@ function BankCapitalLedgerContent() {
     sortField !== "date";
 
   const resetToDateOrder = () => {
-    setViaBalanceFlow(false);
     setCategoryIds([]);
     setSubCategoryIds([]);
     setDirection("");
@@ -365,7 +347,6 @@ function BankCapitalLedgerContent() {
                 onChange={(e) => {
                   setFrom(e.target.value);
                   setPage(1);
-                  setViaBalanceFlow(false);
                 }}
                 style={s.input}
               />
@@ -376,7 +357,6 @@ function BankCapitalLedgerContent() {
                 onChange={(e) => {
                   setTo(e.target.value);
                   setPage(1);
-                  setViaBalanceFlow(false);
                 }}
                 style={s.input}
               />
@@ -388,7 +368,6 @@ function BankCapitalLedgerContent() {
                   const valid = new Set(buildSubCategoryOptionsForSelection(categories, v).map((o) => o.value));
                   setSubCategoryIds((prev) => prev.filter((id) => valid.has(id)));
                   setPage(1);
-                  setViaBalanceFlow(false);
                 }}
                 allLabel="All Categories"
                 buttonLabel="Category"
@@ -399,7 +378,6 @@ function BankCapitalLedgerContent() {
                 onChange={(v) => {
                   setSubCategoryIds(v);
                   setPage(1);
-                  setViaBalanceFlow(false);
                 }}
                 allLabel="All Sub-Categories"
                 buttonLabel="Sub-Category"
@@ -409,7 +387,6 @@ function BankCapitalLedgerContent() {
                 onChange={(e) => {
                   setDirection(e.target.value as typeof direction);
                   setPage(1);
-                  setViaBalanceFlow(false);
                 }}
                 style={s.input}
               >
@@ -422,7 +399,6 @@ function BankCapitalLedgerContent() {
                 onChange={(e) => {
                   setLinkFilter(e.target.value as typeof linkFilter);
                   setPage(1);
-                  setViaBalanceFlow(false);
                 }}
                 style={s.input}
               >
@@ -437,7 +413,6 @@ function BankCapitalLedgerContent() {
                 onChange={(e) => {
                   setSearch(e.target.value);
                   setPage(1);
-                  setViaBalanceFlow(false);
                 }}
                 style={{ ...s.input, minWidth: 200 }}
               />
@@ -448,7 +423,6 @@ function BankCapitalLedgerContent() {
                 onChange={(e) => {
                   setInvestorSearch(e.target.value);
                   setPage(1);
-                  setViaBalanceFlow(false);
                 }}
                 style={{ ...s.input, minWidth: 220 }}
               />
@@ -471,41 +445,21 @@ function BankCapitalLedgerContent() {
             ) : (
               <>
                 <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-                  {viaBalanceFlow ? (
-                    <>
-                      {statCard(
-                        `${categoryLabel} Total`,
-                        signed(categoryStats.sum),
-                        categoryStats.sum >= 0 ? "#0f9444" : "#991b1b",
-                      )}
-                      {ledgerData.openingBalance !== 0 &&
-                        statCard(
-                          "Opening Balance",
-                          fmtMoney(ledgerData.openingBalance),
-                          "#0f2342",
-                          from ? `as at ${from}` : undefined,
-                        )}
-                      {statCard("Transactions", String(categoryStats.count), "#699172")}
-                    </>
-                  ) : (
-                    <>
-                      {ledgerData.openingBalance !== 0 &&
-                        statCard(
-                          "Opening Balance",
-                          fmtMoney(ledgerData.openingBalance),
-                          "#0f2342",
-                          from ? `as at ${from}` : undefined,
-                        )}
-                      {statCard("Total Credit", fmtMoney(rangeStats.totalIn), "#0f9444")}
-                      {statCard("Total Debit", fmtMoney(rangeStats.totalOut), "#991b1b")}
-                      {statCard(
-                        "Net Change",
-                        signed(rangeStats.netChange),
-                        rangeStats.netChange >= 0 ? "#0f9444" : "#991b1b",
-                      )}
-                      {statCard("Transactions", String(rangeStats.count), "#699172")}
-                    </>
+                  {ledgerData.openingBalance !== 0 &&
+                    statCard(
+                      "Opening Balance",
+                      fmtMoney(ledgerData.openingBalance),
+                      "#0f2342",
+                      from ? `as at ${from}` : undefined,
+                    )}
+                  {statCard("Total Credit", fmtMoney(rangeStats.totalIn), "#0f9444")}
+                  {statCard("Total Debit", fmtMoney(rangeStats.totalOut), "#991b1b")}
+                  {statCard(
+                    "Net Change",
+                    signed(rangeStats.netChange),
+                    rangeStats.netChange >= 0 ? "#0f9444" : "#991b1b",
                   )}
+                  {statCard("Transactions", String(rangeStats.count), "#699172")}
                 </div>
 
                 {runningBalanceUnreliable && (
