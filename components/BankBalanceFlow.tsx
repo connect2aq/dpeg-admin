@@ -31,7 +31,16 @@ const btn = (color: string, disabled?: boolean): React.CSSProperties => ({
 // both miscategorized/uncategorized activity AND transactions the admin forgot to
 // import in the first place, since a missing transaction breaks the running total.
 
-export function BankBalanceFlow({ onViewCategory }: { onViewCategory: (value: string | null) => void }) {
+export function BankBalanceFlow({
+  onViewCategory,
+  onData,
+}: {
+  onViewCategory: (value: string | null) => void;
+  // Fires with the raw balance-flow response every time it (re)loads, so callers elsewhere on the
+  // page (e.g. the Dashboard's Capital Flows KPI row) can mirror this component's own category
+  // totals/click-through logic instead of relying on a separately-sourced, manually-entered figure.
+  onData?: (data: BankTransactionBalanceFlow) => void;
+}) {
   const router = useRouter();
   const [data, setData] = useState<BankTransactionBalanceFlow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,11 +49,14 @@ export function BankBalanceFlow({ onViewCategory }: { onViewCategory: (value: st
     setLoading(true);
     try {
       const res = await bankTransactionsApi.getBalanceFlow();
-      if (res.success) setData(res.data);
+      if (res.success) {
+        setData(res.data);
+        onData?.(res.data);
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onData]);
 
   useEffect(() => {
     load();

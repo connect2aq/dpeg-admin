@@ -11,6 +11,7 @@ import {
   type DashboardStats,
   type DashboardTrends,
   type ApplicationListItem,
+  type BankTransactionBalanceFlow,
 } from "@/lib/api";
 import { formatShortDate } from "@/lib/dateFormat";
 import {
@@ -185,6 +186,10 @@ export default function DashboardPage() {
   const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [trends, setTrends] = useState<DashboardTrends | null>(null);
+  // Populated by BankBalanceFlow's onData so the Capital Flows KPI row below can mirror the
+  // Balance Flow tile's own bank-transaction-category-driven value and click-through, instead of
+  // the retired manually-entered figure.
+  const [balanceFlowData, setBalanceFlowData] = useState<BankTransactionBalanceFlow | null>(null);
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -238,6 +243,12 @@ export default function DashboardPage() {
 
   const fmt = (n: number) =>
     `$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  // Same lookup BankBalanceFlow itself uses (see components/BankBalanceFlow.tsx getCat) — kept in
+  // sync via the onData callback below rather than a second independent fetch.
+  const sponsorsEquity = balanceFlowData?.categoryTotals.find(
+    (c) => c.categoryName.toLowerCase() === "sponsor's equity",
+  );
 
   return (
     <AdminLayout>
@@ -439,24 +450,29 @@ export default function DashboardPage() {
                 value={fmt(stats.totalPendingAccruals)}
                 sub="Pending daily accruals, not yet distributed"
                 color="#7c3aed"
-                href="/daily-interest-ledger"
+                href="/daily-interest-ledger?included=false"
               />
               <KpiCard
                 label="Sponsor's Equity"
                 value={
-                  stats.sponsoredEquity != null
-                    ? fmt(stats.sponsoredEquity)
-                    : "Not entered"
+                  sponsorsEquity && sponsorsEquity.count > 0
+                    ? fmt(sponsorsEquity.total)
+                    : "No transactions yet"
                 }
-                sub="Manually entered — view in Bank Capital Ledger"
+                sub="From bank transactions — view in Bank Capital Ledger"
                 color="#699172"
-                href="/bank-capital-ledger"
+                href={
+                  sponsorsEquity
+                    ? `/bank-capital-ledger?category=${sponsorsEquity.categoryId}`
+                    : "/bank-capital-ledger"
+                }
               />
             </div>
 
             {/* Balance Flow */}
             <SectionLabel>Balance Flow</SectionLabel>
             <BankBalanceFlow
+              onData={setBalanceFlowData}
               onViewCategory={(value) =>
                 router.push(
                   value != null

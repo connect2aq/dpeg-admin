@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import AdminLayout from "@/components/AdminLayout";
 import { MultiSelectFilter } from "@/components/MultiSelectFilter";
 import { PaginationControls } from "@/components/PaginationControls";
@@ -14,7 +15,12 @@ import Link from "next/link";
 
 const DEFAULT_PAGE_SIZE = 25;
 
-export default function DailyInterestLedgerPage() {
+function fmtMoney(n: number) {
+  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function DailyInterestLedgerContent() {
+  const searchParams = useSearchParams();
   const [result, setResult] = useState<DailyInterestPagedResult | null>(
     null,
   );
@@ -22,7 +28,12 @@ export default function DailyInterestLedgerPage() {
   const [appId, setAppId] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [included, setIncluded] = useState<string[]>([]);
+  // Pre-filtered when arriving from the Dashboard's "Accrued & Unpaid" KPI tile
+  // (/daily-interest-ledger?included=false).
+  const [included, setIncluded] = useState<string[]>(() => {
+    const v = searchParams.get("included");
+    return v ? [v] : [];
+  });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortOn, setSortOn] = useState("date");
@@ -253,14 +264,17 @@ export default function DailyInterestLedgerPage() {
         {result && result.totalCount > 0 && (
           <div style={{ display: "flex", gap: 20, marginBottom: 16 }}>
             {[
-              { label: "Total Records", value: result.totalCount.toString() },
+              {
+                label: "Total Records",
+                value: result.totalCount.toLocaleString("en-US"),
+              },
               {
                 label: "Distribution - Paid",
-                value: `$${result.totalNetInterestPaid.toFixed(2)}`,
+                value: fmtMoney(result.totalNetInterestPaid),
               },
               {
                 label: "Distribution - Accrued & Unpaid",
-                value: `$${result.totalNetInterestUnpaid.toFixed(2)}`,
+                value: fmtMoney(result.totalNetInterestUnpaid),
               },
             ].map((s) => (
               <div
@@ -508,5 +522,13 @@ export default function DailyInterestLedgerPage() {
         )}
       </div>
     </AdminLayout>
+  );
+}
+
+export default function DailyInterestLedgerPage() {
+  return (
+    <Suspense>
+      <DailyInterestLedgerContent />
+    </Suspense>
   );
 }
