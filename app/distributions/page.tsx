@@ -155,14 +155,6 @@ function DistributionsContent() {
   } | null>(null);
   const [catchUpError, setCatchUpError] = useState<string | null>(null);
 
-  // Fix historical catch-up (trims redeemed units out of already-created daily logs)
-  const [fixHistLoading, setFixHistLoading] = useState(false);
-  const [fixHistResult, setFixHistResult] = useState<
-    HistoricalCatchUpFixResult[] | null
-  >(null);
-  const [fixHistError, setFixHistError] = useState<string | null>(null);
-  const [fixHistConfirmOpen, setFixHistConfirmOpen] = useState(false);
-
   // Scoped fix: preview then apply for one application at a time
   const [scopedFixAppId, setScopedFixAppId] = useState("");
   const [scopedFixLoading, setScopedFixLoading] = useState(false);
@@ -402,17 +394,6 @@ function DistributionsContent() {
     if (r.success) setCatchUpResult(r.data);
     else
       setCatchUpError("Catch-up failed. Check the date range and try again.");
-  };
-
-  const handleFixHistoricalCatchUp = async () => {
-    setFixHistConfirmOpen(false);
-    setFixHistLoading(true);
-    setFixHistResult(null);
-    setFixHistError(null);
-    const r = await adminApi.fixHistoricalCatchUp();
-    setFixHistLoading(false);
-    if (r.success) setFixHistResult(r.data);
-    else setFixHistError("Fix failed. Try again or check the server logs.");
   };
 
   const handlePreview = async () => {
@@ -789,13 +770,17 @@ function DistributionsContent() {
               marginBottom: 10,
             }}
           >
-            Fix Historical Interest Trimming — Single Application
+            Fix Historical Interest Trimming
           </div>
           <div style={{ fontSize: 13, color: "#065f46", marginBottom: 14 }}>
-            Same underlying correction as the bulk tool below, scoped to one
-            application so you can review the exact before/after values
-            before anything is written. Preview first — nothing changes until
-            you click Apply.
+            Not part of the routine monthly flow above — use this only if a
+            redemption&rsquo;s daily interest logs weren&rsquo;t correctly
+            trimmed when it was approved (this normally happens
+            automatically), so redeemed units aren&rsquo;t paid interest
+            twice — once via the redemption itself, once via the daily log.
+            Scoped to one application at a time: enter an ID and preview the
+            exact before/after values first — nothing is written until you
+            review the diff and click Apply.
           </div>
           <div
             style={{
@@ -1160,253 +1145,6 @@ function DistributionsContent() {
             </div>
           )}
         </div>
-
-        {/* Fix Historical Interest Trimming Panel (bulk — all applications) */}
-        <div
-          style={{
-            background: "#f5f3ff",
-            border: "1.5px solid #ddd6fe",
-            borderRadius: 12,
-            padding: "20px 24px",
-            marginBottom: 16,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 15,
-              fontWeight: 700,
-              color: "#5b21b6",
-              marginBottom: 10,
-            }}
-          >
-            Fix Historical Interest Trimming — All Applications
-          </div>
-          <div style={{ fontSize: 13, color: "#4c1d95", marginBottom: 14 }}>
-            Not part of the routine monthly flow above — use this only if a
-            redemption&rsquo;s daily interest logs weren&rsquo;t correctly
-            trimmed when it was approved (this normally happens
-            automatically). Walks every approved redemption across every
-            investor and trims that redemption month&rsquo;s already-created
-            daily logs down to the units actually remaining, so redeemed
-            units aren&rsquo;t paid interest twice — once via the redemption
-            itself, once via the daily log. Any affected monthly distribution
-            is reset so it can be re-run with corrected totals. Prefer the
-            single-application tool above when you only need to fix specific
-            cases.
-          </div>
-          <button
-            onClick={() => setFixHistConfirmOpen(true)}
-            disabled={fixHistLoading}
-            style={{
-              padding: "9px 20px",
-              background: "#6d28d9",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: fixHistLoading ? "not-allowed" : "pointer",
-              opacity: fixHistLoading ? 0.6 : 1,
-            }}
-          >
-            {fixHistLoading ? "Running…" : "Fix Historical Trimming"}
-          </button>
-          {fixHistError && (
-            <div style={{ marginTop: 10, fontSize: 13, color: "#dc2626" }}>
-              {fixHistError}
-            </div>
-          )}
-          {fixHistResult && (
-            <div style={{ marginTop: 14 }}>
-              {fixHistResult.length === 0 ? (
-                <div
-                  style={{
-                    padding: "8px 14px",
-                    background: "#f0fdf4",
-                    borderRadius: 8,
-                    fontSize: 13,
-                    color: "#15803d",
-                    fontWeight: 500,
-                    display: "inline-block",
-                  }}
-                >
-                  ✓ No corrections needed — all historical logs already
-                  correct.
-                </div>
-              ) : (
-                <>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: "#5b21b6",
-                      marginBottom: 8,
-                    }}
-                  >
-                    ✓ Corrected {fixHistResult.length} redemption
-                    {fixHistResult.length !== 1 ? "s" : ""} — re-run
-                    Preview/Execute below for any affected months.
-                  </div>
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                      <thead>
-                        <tr>
-                          {[
-                            "App ID",
-                            "Redemption Date",
-                            "Units Redeemed",
-                            "Remaining Units",
-                            "Logs Corrected",
-                            "Distribution Month",
-                            "Distribution Deleted",
-                          ].map((h) => (
-                            <th
-                              key={h}
-                              style={{
-                                textAlign: "left",
-                                padding: "6px 10px",
-                                background: "#ede9fe",
-                                color: "#5b21b6",
-                                fontWeight: 600,
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {fixHistResult.map((r, i) => (
-                          <tr key={i}>
-                            <td style={{ padding: "6px 10px", borderBottom: "1px solid #ede9fe" }}>
-                              <Link
-                                href={`/applications/${r.applicationId}`}
-                                style={{ color: "#6d28d9", fontWeight: 600, textDecoration: "underline" }}
-                              >
-                                #{r.applicationId}
-                              </Link>
-                            </td>
-                            <td style={{ padding: "6px 10px", borderBottom: "1px solid #ede9fe" }}>
-                              {formatShortDate(r.redemptionEffectiveDate)}
-                            </td>
-                            <td style={{ padding: "6px 10px", borderBottom: "1px solid #ede9fe" }}>
-                              {r.unitsRedeemed}
-                            </td>
-                            <td style={{ padding: "6px 10px", borderBottom: "1px solid #ede9fe" }}>
-                              {r.remainingUnits}
-                            </td>
-                            <td style={{ padding: "6px 10px", borderBottom: "1px solid #ede9fe" }}>
-                              {r.logsCorrected}
-                            </td>
-                            <td style={{ padding: "6px 10px", borderBottom: "1px solid #ede9fe" }}>
-                              {formatShortDate(r.distributionMonthReset)}
-                            </td>
-                            <td style={{ padding: "6px 10px", borderBottom: "1px solid #ede9fe" }}>
-                              {r.distributionDeleted ? "Yes" : "No"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Fix Historical Trimming confirmation modal */}
-        {fixHistConfirmOpen && (
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,0.45)",
-              zIndex: 1000,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <div
-              style={{
-                background: "#fff",
-                borderRadius: 14,
-                padding: 32,
-                width: 520,
-                maxWidth: "95vw",
-                boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
-              }}
-            >
-              <h2
-                style={{
-                  fontSize: 18,
-                  fontWeight: 700,
-                  color: "#0f2342",
-                  marginBottom: 6,
-                }}
-              >
-                Fix Historical Interest Trimming?
-              </h2>
-              <div
-                style={{
-                  padding: "12px 14px",
-                  background: "#f5f3ff",
-                  border: "1px solid #ddd6fe",
-                  borderRadius: 8,
-                  fontSize: 13,
-                  color: "#4c1d95",
-                  margin: "16px 0 20px",
-                }}
-              >
-                This scans every approved redemption for every investor and
-                may modify already-created daily interest logs (trimming
-                units down) and delete/reset monthly distribution records for
-                any affected month so they can be re-run correctly. This
-                cannot be undone. Only run this if you have a specific reason
-                to believe historical trimming didn&rsquo;t happen correctly.
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  justifyContent: "flex-end",
-                }}
-              >
-                <button
-                  onClick={() => setFixHistConfirmOpen(false)}
-                  style={{
-                    padding: "9px 18px",
-                    border: "1.5px solid #e2e8f0",
-                    borderRadius: 8,
-                    fontSize: 13,
-                    cursor: "pointer",
-                    background: "#fff",
-                    color: "#374151",
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleFixHistoricalCatchUp}
-                  style={{
-                    padding: "9px 18px",
-                    border: "none",
-                    borderRadius: 8,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    background: "#6d28d9",
-                    color: "#fff",
-                  }}
-                >
-                  Run Fix
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Run Distribution Panel */}
         <div
