@@ -859,8 +859,10 @@ function DistributionsContent() {
                     display: "inline-block",
                   }}
                 >
-                  ✓ No corrections needed for App #{scopedFixAppId} —
-                  historical logs are already correct.
+                  No redemption records matched the fix criteria (approved
+                  status, parseable effective date, units to redeem) for App
+                  #{scopedFixAppId}. If you expected a match, check the
+                  redemption&rsquo;s status/effective date directly.
                 </div>
               ) : (
                 <>
@@ -924,82 +926,104 @@ function DistributionsContent() {
                           </span>
                         )}
                       </div>
-                      <div style={{ overflowX: "auto" }}>
-                        <table
+                      {r.diagnosticNote && (
+                        <div
                           style={{
-                            width: "100%",
-                            borderCollapse: "collapse",
-                            fontSize: 12,
+                            fontSize: 11,
+                            fontFamily: "monospace",
+                            color: "#6b7280",
+                            marginBottom: 8,
+                            padding: "4px 8px",
+                            background: "#f9fafb",
+                            borderRadius: 4,
                           }}
                         >
-                          <thead>
-                            <tr>
-                              {[
-                                "Date",
-                                "Units (old → new)",
-                                "Capital (old → new)",
-                                "Net Interest (old → new)",
-                              ].map((h) => (
-                                <th
-                                  key={h}
-                                  style={{
-                                    textAlign: "left",
-                                    padding: "6px 10px",
-                                    background: "#d1fae5",
-                                    color: "#065f46",
-                                    fontWeight: 600,
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {h}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {r.changedLogs.map((c) => (
-                              <tr key={c.logId}>
-                                <td
-                                  style={{
-                                    padding: "6px 10px",
-                                    borderBottom: "1px solid #d1fae5",
-                                  }}
-                                >
-                                  {formatShortDate(c.date)}
-                                </td>
-                                <td
-                                  style={{
-                                    padding: "6px 10px",
-                                    borderBottom: "1px solid #d1fae5",
-                                  }}
-                                >
-                                  {c.oldUnits} → {c.newUnits}
-                                </td>
-                                <td
-                                  style={{
-                                    padding: "6px 10px",
-                                    borderBottom: "1px solid #d1fae5",
-                                  }}
-                                >
-                                  ${c.oldCapital.toFixed(2)} → $
-                                  {c.newCapital.toFixed(2)}
-                                </td>
-                                <td
-                                  style={{
-                                    padding: "6px 10px",
-                                    borderBottom: "1px solid #d1fae5",
-                                  }}
-                                >
-                                  ${c.oldNetInterest.toFixed(2)} → $
-                                  {c.newNetInterest.toFixed(2)}
-                                </td>
+                          {r.diagnosticNote}
+                        </div>
+                      )}
+                      {r.changedLogs.length === 0 ? (
+                        <div style={{ fontSize: 12, color: "#065f46" }}>
+                          No daily logs needed correction for this redemption.
+                        </div>
+                      ) : (
+                        <div style={{ overflowX: "auto" }}>
+                          <table
+                            style={{
+                              width: "100%",
+                              borderCollapse: "collapse",
+                              fontSize: 12,
+                            }}
+                          >
+                            <thead>
+                              <tr>
+                                {[
+                                  "Date",
+                                  "Units (old → new)",
+                                  "Capital (old → new)",
+                                  "Net Interest (old → new)",
+                                ].map((h) => (
+                                  <th
+                                    key={h}
+                                    style={{
+                                      textAlign: "left",
+                                      padding: "6px 10px",
+                                      background: "#d1fae5",
+                                      color: "#065f46",
+                                      fontWeight: 600,
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {h}
+                                  </th>
+                                ))}
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                            </thead>
+                            <tbody>
+                              {r.changedLogs.map((c) => (
+                                <tr key={c.logId}>
+                                  <td
+                                    style={{
+                                      padding: "6px 10px",
+                                      borderBottom: "1px solid #d1fae5",
+                                    }}
+                                  >
+                                    {formatShortDate(c.date)}
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: "6px 10px",
+                                      borderBottom: "1px solid #d1fae5",
+                                    }}
+                                  >
+                                    {c.oldUnits} → {c.newUnits}
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: "6px 10px",
+                                      borderBottom: "1px solid #d1fae5",
+                                    }}
+                                  >
+                                    ${c.oldCapital.toFixed(2)} → $
+                                    {c.newCapital.toFixed(2)}
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: "6px 10px",
+                                      borderBottom: "1px solid #d1fae5",
+                                    }}
+                                  >
+                                    ${c.oldNetInterest.toFixed(2)} → $
+                                    {c.newNetInterest.toFixed(2)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   ))}
+                  {scopedFixPreview.some((r) => r.logsCorrected > 0) && (
                   <button
                     onClick={() => setScopedFixConfirmOpen(true)}
                     disabled={scopedFixApplying}
@@ -1019,6 +1043,7 @@ function DistributionsContent() {
                       ? "Applying…"
                       : `Apply to App #${scopedFixAppId}`}
                   </button>
+                  )}
                 </>
               )}
             </div>

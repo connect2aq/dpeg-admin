@@ -1045,6 +1045,7 @@ export interface HistoricalCatchUpFixResult {
   existingDistributionOdooStatus: string | null;
   dryRun: boolean;
   changedLogs: DailyLogChange[];
+  diagnosticNote: string | null;
 }
 
 export interface StatementListItem {
