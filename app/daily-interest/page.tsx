@@ -20,25 +20,6 @@ import Link from "next/link";
 
 const DEFAULT_PAGE_SIZE = 25;
 
-function OdooStatus({ status }: { status?: string | null }) {
-  if (!status) return <span style={{ color: "#9ca3af", fontSize: 12 }}>—</span>;
-  const ok = status === "Success";
-  return (
-    <span
-      style={{
-        padding: "2px 8px",
-        borderRadius: 4,
-        fontSize: 11,
-        fontWeight: 600,
-        background: ok ? "#f0fdf4" : "#fef2f2",
-        color: ok ? "#15803d" : "#dc2626",
-      }}
-    >
-      {status}
-    </span>
-  );
-}
-
 type DeleteModalState =
   | { phase: "idle" }
   | { phase: "loading" }
@@ -83,7 +64,6 @@ export default function DailyInterestPage() {
     }
     setPage(1);
   };
-  const [pushingDIId, setPushingDIId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [diBulkPushing, setDiBulkPushing] = useState(false);
   const [diBulkResult, setDiBulkResult] = useState<string | null>(null);
@@ -164,13 +144,6 @@ export default function DailyInterestPage() {
   useEffect(() => {
     load();
   }, [load]);
-
-  const handlePushDailyInterest = async (id: number) => {
-    setPushingDIId(id);
-    await adminApi.pushDailyInterestToOdoo(id);
-    setPushingDIId(null);
-    load();
-  };
 
   const handleBulkPushDailyInterest = async () => {
     const ids = [...selectedIds];
@@ -452,34 +425,6 @@ export default function DailyInterestPage() {
           </div>
         )}
 
-        {/* Accrued & Unpaid comparability note */}
-        {result && result.totalCount > 0 && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: 10,
-              marginBottom: 16,
-              padding: "12px 18px",
-              background: "#eff6ff",
-              border: "1.5px solid #bfdbfe",
-              borderRadius: 10,
-            }}
-          >
-            <span style={{ fontSize: 16, lineHeight: "18px" }}>ℹ️</span>
-            <span style={{ fontSize: 13, color: "#1e40af", lineHeight: 1.5, flex: 1 }}>
-              <strong>Net Interest (all filtered rows)</strong> sums every row matching the filters
-              above — not just the current page — so it&rsquo;s the number to compare against
-              Dashboard/Capital Ledger&rsquo;s <strong>Accrued & Unpaid</strong> figure. To match it
-              exactly, filter <strong>Included</strong> to &ldquo;Pending Distribution&rdquo; and clear
-              App ID/date filters — the two should then agree, since Accrued &amp; Unpaid is also a
-              since-inception sum of pending (not-yet-distributed) daily interest. One difference
-              remains: this page includes test-user records, while Accrued &amp; Unpaid excludes
-              them, so a small gap can still be expected if any test users have pending interest.
-            </span>
-          </div>
-        )}
-
         {/* Bulk action bar */}
         {selectedIds.size > 0 && (
           <div
@@ -729,34 +674,19 @@ export default function DailyInterestPage() {
                       onSort={toggleSort}
                     />
                     <SortableTh
-                      label="Odoo ID"
-                      sortKey="odooid"
-                      sortOn={sortOn}
-                      sortDirection={sortDirection}
-                      onSort={toggleSort}
-                    />
-                    <SortableTh
-                      label="Odoo Status"
-                      sortKey="odoostatus"
-                      sortOn={sortOn}
-                      sortDirection={sortDirection}
-                      onSort={toggleSort}
-                    />
-                    <SortableTh
                       label="Distributed"
                       sortKey="distributed"
                       sortOn={sortOn}
                       sortDirection={sortDirection}
                       onSort={toggleSort}
                     />
-                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {result?.items.length === 0 && (
                     <tr>
                       <td
-                        colSpan={12}
+                        colSpan={9}
                         style={{
                           ...td,
                           textAlign: "center",
@@ -769,7 +699,6 @@ export default function DailyInterestPage() {
                     </tr>
                   )}
                   {result?.items.map((row) => {
-                    const canPush = row.odooStatus !== "Success";
                     const isSelected = selectedIds.has(row.id);
                     return (
                       <tr
@@ -848,18 +777,6 @@ export default function DailyInterestPage() {
                         >
                           ${row.netInterest.toFixed(4)}
                         </td>
-                        <td
-                          style={{
-                            ...td,
-                            fontFamily: "monospace",
-                            fontSize: 11,
-                          }}
-                        >
-                          {row.odooInterestId ?? "—"}
-                        </td>
-                        <td style={td}>
-                          <OdooStatus status={row.odooStatus} />
-                        </td>
                         <td style={{ ...td, textAlign: "center" }}>
                           <span
                             style={{
@@ -879,55 +796,6 @@ export default function DailyInterestPage() {
                               ? "Yes"
                               : "Pending"}
                           </span>
-                        </td>
-                        <td style={{ ...td, whiteSpace: "nowrap" }}>
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: 6,
-                              flexWrap: "nowrap",
-                            }}
-                          >
-                            {canPush && (
-                              <button
-                                onClick={() => handlePushDailyInterest(row.id)}
-                                disabled={pushingDIId === row.id}
-                                style={{
-                                  padding: "4px 11px",
-                                  background: "#b8923a",
-                                  color: "#fff",
-                                  border: "none",
-                                  borderRadius: 5,
-                                  fontSize: 11,
-                                  fontWeight: 600,
-                                  cursor: "pointer",
-                                  opacity: pushingDIId === row.id ? 0.6 : 1,
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {pushingDIId === row.id ? "…" : "Push to Odoo"}
-                              </button>
-                            )}
-                            {row.includedInMonthlyDistribution && (
-                              <button
-                                onClick={() => handleResetMonth(row)}
-                                title="Unmark this month's distribution so it can be re-run with corrected daily logs"
-                                style={{
-                                  padding: "4px 11px",
-                                  background: "#f97316",
-                                  color: "#fff",
-                                  border: "none",
-                                  borderRadius: 5,
-                                  fontSize: 11,
-                                  fontWeight: 600,
-                                  cursor: "pointer",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                Reset Month
-                              </button>
-                            )}
-                          </div>
                         </td>
                       </tr>
                     );
