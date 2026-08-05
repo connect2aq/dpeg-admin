@@ -7,7 +7,7 @@ import { SortableTh } from "@/components/SortableTh";
 import {
   adminApi,
   type DailyInterestItem,
-  type PagedResult,
+  type DailyInterestPagedResult,
   type DeleteDailyInterestPreviewResult,
   type ResetMonthResult,
 } from "@/lib/api";
@@ -63,7 +63,7 @@ type ResetMonthModalState =
   | { phase: "done"; result: ResetMonthResult };
 
 export default function DailyInterestPage() {
-  const [result, setResult] = useState<PagedResult<DailyInterestItem> | null>(
+  const [result, setResult] = useState<DailyInterestPagedResult | null>(
     null,
   );
   const [loading, setLoading] = useState(true);
@@ -416,6 +416,10 @@ export default function DailyInterestPage() {
                 value: `$${totalInterest.toFixed(2)}`,
               },
               { label: "Total Records", value: result.totalCount.toString() },
+              {
+                label: "Net Interest (all filtered rows)",
+                value: `$${result.totalNetInterest.toFixed(2)}`,
+              },
             ].map((s) => (
               <div
                 key={s.label}
@@ -445,6 +449,34 @@ export default function DailyInterestPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Accrued & Unpaid comparability note */}
+        {result && result.totalCount > 0 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+              marginBottom: 16,
+              padding: "12px 18px",
+              background: "#eff6ff",
+              border: "1.5px solid #bfdbfe",
+              borderRadius: 10,
+            }}
+          >
+            <span style={{ fontSize: 16, lineHeight: "18px" }}>ℹ️</span>
+            <span style={{ fontSize: 13, color: "#1e40af", lineHeight: 1.5, flex: 1 }}>
+              <strong>Net Interest (all filtered rows)</strong> sums every row matching the filters
+              above — not just the current page — so it&rsquo;s the number to compare against
+              Dashboard/Capital Ledger&rsquo;s <strong>Accrued & Unpaid</strong> figure. To match it
+              exactly, filter <strong>Included</strong> to &ldquo;Pending Distribution&rdquo; and clear
+              App ID/date filters — the two should then agree, since Accrued &amp; Unpaid is also a
+              since-inception sum of pending (not-yet-distributed) daily interest. One difference
+              remains: this page includes test-user records, while Accrued &amp; Unpaid excludes
+              them, so a small gap can still be expected if any test users have pending interest.
+            </span>
           </div>
         )}
 

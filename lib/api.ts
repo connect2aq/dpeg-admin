@@ -737,9 +737,9 @@ export const adminApi = {
   },
   emailLog: (id: number) =>
     api.get<ApiResponse<EmailLogDetail>>(`/email-logs/${id}`),
-  dailyInterestLogs: (params: QueryParams) => {
+  dailyInterestLogs: (params: QueryParams): Promise<ApiResponse<DailyInterestPagedResult>> => {
     const q = buildQueryString(params);
-    return api.get<ApiResponse<PagedResult<DailyInterestItem>>>(
+    return api.get<ApiResponse<DailyInterestPagedResult>>(
       `/daily-interest?${q}`,
     );
   },
@@ -1080,6 +1080,12 @@ export interface DailyInterestItem {
   odooResponseMsg?: string;
   includedInMonthlyDistribution: boolean;
   createdOn: string;
+}
+
+export interface DailyInterestPagedResult extends PagedResult<DailyInterestItem> {
+  // Sum of netInterest across every row matching the current filters, not just this page —
+  // directly comparable to Dashboard/Capital Ledger's "Accrued & Unpaid" figure.
+  totalNetInterest: number;
 }
 
 export interface AffectedMonthlyDistribution {
