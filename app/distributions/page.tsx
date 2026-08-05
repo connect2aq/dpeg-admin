@@ -2285,9 +2285,6 @@ function DistributionsContent() {
                         <td style={colStyle}>
                           {d.paidAt ? formatShortDate(d.paidAt) : "—"}
                         </td>
-                        <td style={{ ...colStyle, fontWeight: 600 }}>
-                          {d.userName || "—"}
-                        </td>
                         <td style={colStyle}>
                           <Link
                             href={`/investor-statements?userId=${d.userId}`}
@@ -2296,24 +2293,30 @@ function DistributionsContent() {
                               color: "#1e293b",
                               textDecoration: "underline",
                             }}
+                            title="Open Investor Statement"
                           >
-                            {d.investorName}
+                            {d.userName || "—"}
                           </Link>
-                          {d.investorEmail && (
+                          {d.userEmail && (
                             <div style={{ fontSize: 12, color: "#9ca3af" }}>
-                              {d.investorEmail}
+                              {d.userEmail}
                             </div>
                           )}
+                        </td>
+                        <td style={{ ...colStyle, fontWeight: 600 }}>
+                          {d.investorName || "—"}
                           {d.hasMismatch && (
-                            <span
-                              style={{
-                                fontSize: 11,
-                                color: "#d97706",
-                                fontWeight: 600,
-                              }}
-                            >
-                              ⚠ Mismatch
-                            </span>
+                            <div>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  color: "#d97706",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                ⚠ Mismatch
+                              </span>
+                            </div>
                           )}
                         </td>
                         <td style={{ ...colStyle, fontWeight: 600 }}>

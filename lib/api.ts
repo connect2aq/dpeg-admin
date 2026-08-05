@@ -993,6 +993,7 @@ export interface DistributionListItem {
   applicationId: number;
   userId: number;
   userName?: string;
+  userEmail?: string;
   investorName: string;
   investorEmail?: string;
   distributionMonth: string;
@@ -1100,6 +1101,9 @@ export interface EmailLogDetail extends EmailLogItem {
 export interface DailyInterestItem {
   id: number;
   applicationId: number;
+  userId?: number;
+  userName?: string;
+  userEmail?: string;
   investorName: string;
   investorEmail?: string;
   date: string;

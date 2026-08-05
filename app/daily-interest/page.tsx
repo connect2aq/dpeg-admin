@@ -90,6 +90,7 @@ export default function DailyInterestPage() {
       const headers = [
         "ID",
         "App ID",
+        "Account User",
         "Investor Name",
         "Email",
         "Date",
@@ -104,8 +105,9 @@ export default function DailyInterestPage() {
       const rows = r.data.items.map((d) => [
         d.id,
         d.applicationId,
+        d.userName ?? "",
         d.investorName,
-        d.investorEmail ?? "",
+        d.userEmail ?? "",
         formatShortDate(d.date),
         d.units,
         d.capital,
@@ -639,6 +641,13 @@ export default function DailyInterestPage() {
                       onSort={toggleSort}
                     />
                     <SortableTh
+                      label="Account User"
+                      sortKey="accountuser"
+                      sortOn={sortOn}
+                      sortDirection={sortDirection}
+                      onSort={toggleSort}
+                    />
+                    <SortableTh
                       label="Investor"
                       sortKey="investor"
                       sortOn={sortOn}
@@ -686,7 +695,7 @@ export default function DailyInterestPage() {
                   {result?.items.length === 0 && (
                     <tr>
                       <td
-                        colSpan={9}
+                        colSpan={10}
                         style={{
                           ...td,
                           textAlign: "center",
@@ -756,14 +765,27 @@ export default function DailyInterestPage() {
                           {formatShortDate(row.date)}
                         </td>
                         <td style={td}>
+                          <Link
+                            href={`/investor-statements?userId=${row.userId}`}
+                            style={{
+                              fontWeight: 600,
+                              color: "#1e293b",
+                              textDecoration: "underline",
+                            }}
+                            title="Open Investor Statement"
+                          >
+                            {row.userName || "—"}
+                          </Link>
+                          {row.userEmail && (
+                            <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                              {row.userEmail}
+                            </div>
+                          )}
+                        </td>
+                        <td style={td}>
                           <div style={{ fontWeight: 500 }}>
                             {row.investorName}
                           </div>
-                          {row.investorEmail && (
-                            <div style={{ fontSize: 11, color: "#9ca3af" }}>
-                              {row.investorEmail}
-                            </div>
-                          )}
                         </td>
                         <td style={{ ...td, textAlign: "center" }}>
                           {row.units}
