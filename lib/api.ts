@@ -849,7 +849,7 @@ export const adminApi = {
     >("/distributions/catch-up", { from, to }),
 
   fixHistoricalCatchUp: () =>
-    api.post<ApiResponse<unknown[]>>(
+    api.post<ApiResponse<HistoricalCatchUpFixResult[]>>(
       "/distributions/fix-historical-catchup",
       {},
     ),
@@ -1014,6 +1014,16 @@ export interface DistributionRunResult {
   bankAccountNumber: string;
   alreadyRan: boolean;
   distributionLogId: number | null;
+}
+
+export interface HistoricalCatchUpFixResult {
+  applicationId: number;
+  redemptionEffectiveDate: string;
+  unitsRedeemed: number;
+  remainingUnits: number;
+  logsCorrected: number;
+  distributionMonthReset: string;
+  distributionDeleted: boolean;
 }
 
 export interface StatementListItem {
