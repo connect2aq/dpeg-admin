@@ -189,7 +189,7 @@ export function BankBalanceFlow({
   const otherCharges = getCat("Other Charges");
 
   // Fund Contributions / Redemption / Distribution Paid are sourced from portal data (Investments,
-  // RedemptionForms, MonthlyDistributionLogs — cumulative through yesterday), not from how bank
+  // RedemptionForms, MonthlyDistributionLogs — cumulative in real time), not from how bank
   // transactions happen to be categorized. This is what makes Variance below a real reconciliation
   // signal instead of a number that's definitionally always in sync with the category tiles.
   const portal = data.portalCapitalFlow;
