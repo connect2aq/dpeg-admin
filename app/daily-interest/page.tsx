@@ -1022,6 +1022,7 @@ export default function DailyInterestPage() {
                       sortDirection={sortDirection}
                       onSort={toggleSort}
                     />
+                    <th>Type</th>
                     <SortableTh
                       label="Account User"
                       sortKey="accountuser"
@@ -1078,7 +1079,7 @@ export default function DailyInterestPage() {
                   {result?.items.length === 0 && (
                     <tr>
                       <td
-                        colSpan={11}
+                        colSpan={12}
                         style={{
                           ...td,
                           textAlign: "center",
@@ -1146,6 +1147,37 @@ export default function DailyInterestPage() {
                           }}
                         >
                           {formatShortDate(row.date)}
+                        </td>
+                        <td style={{ ...td, textAlign: "center" }}>
+                          <span
+                            style={{
+                              padding: "2px 8px",
+                              borderRadius: 4,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              background:
+                                row.recordType === "Adjustment"
+                                  ? "#fef2f2"
+                                  : "#f1f5f9",
+                              color:
+                                row.recordType === "Adjustment"
+                                  ? "#b91c1c"
+                                  : "#475569",
+                            }}
+                          >
+                            {row.recordType === "Adjustment"
+                              ? "Adjustment"
+                              : "Nightly"}
+                          </span>
+                          {row.recordType === "Adjustment" &&
+                            row.adjustmentReason && (
+                              <div
+                                style={{ fontSize: 10, color: "#9ca3af" }}
+                                title={row.adjustmentReason}
+                              >
+                                {row.adjustmentReason}
+                              </div>
+                            )}
                         </td>
                         <td style={td}>
                           <Link

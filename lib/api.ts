@@ -1176,6 +1176,9 @@ export interface DailyInterestItem {
   odooResponseMsg?: string;
   includedInMonthlyDistribution: boolean;
   createdOn: string;
+  recordType: string; // "Nightly" | "Adjustment"
+  adjustmentReason?: string;
+  relatedRedemptionId?: number;
 }
 
 export interface DailyInterestPagedResult extends PagedResult<DailyInterestItem> {
