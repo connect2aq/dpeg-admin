@@ -560,7 +560,7 @@ function DistributionsContent() {
             marginBottom: 24,
           }}
         >
-          Monthly Distributions
+          Manage Distributions
         </h1>
 
         {/* Scoped Fix: single application preview + apply */}

@@ -343,7 +343,7 @@ export default function DailyInterestPage() {
             marginBottom: 6,
           }}
         >
-          Daily Interest Logs
+          Manage Daily Interest
         </h1>
         <p style={{ color: "#64748b", fontSize: 13, marginBottom: 24 }}>
           Daily interest accrual records per investor application.
