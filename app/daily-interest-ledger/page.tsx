@@ -1,11 +1,11 @@
 "use client";
-import { Suspense, useEffect, useState, useCallback } from "react";
+import { Fragment, Suspense, useEffect, useState, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import AdminLayout from "@/components/AdminLayout";
 import { MultiSelectFilter } from "@/components/MultiSelectFilter";
 import { PaginationControls } from "@/components/PaginationControls";
 import { SortableTh } from "@/components/SortableTh";
-import { adminApi, type DailyInterestPagedResult } from "@/lib/api";
+import { adminApi, type DailyInterestPagedResult, type DailyInterestItem } from "@/lib/api";
 import { downloadCsv } from "@/lib/exportCsv";
 import { hasMultiFilterValue } from "@/lib/filterUtils";
 import type { QueryParams } from "@/lib/apiContracts";
@@ -17,6 +17,36 @@ const DEFAULT_PAGE_SIZE = 25;
 
 function fmtMoney(n: number) {
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Adjustment rows (append-only corrections) are recorded one per corrected day, which is
+// correct for the ledger's math but reads as a wall of near-identical negative rows for a
+// single redemption. Collapse consecutive-in-value Adjustment rows sharing the same
+// RelatedRedemptionId into one summary line, expandable to the individual days. Units/Capital
+// are point-in-time snapshot values (constant per day for one redemption), so the summary shows
+// the per-day figure, not a sum; NetInterest is a flow, so the summary sums it.
+type DisplayRow =
+  | { kind: "single"; row: DailyInterestItem }
+  | { kind: "group"; redemptionId: number; rows: DailyInterestItem[] };
+
+function buildDisplayRows(items: DailyInterestItem[]): DisplayRow[] {
+  const grouped = new Set<number>();
+  const out: DisplayRow[] = [];
+  for (const row of items) {
+    if (row.recordType === "Adjustment" && row.relatedRedemptionId != null) {
+      if (grouped.has(row.relatedRedemptionId)) continue;
+      const siblings = items.filter(
+        (r) => r.recordType === "Adjustment" && r.relatedRedemptionId === row.relatedRedemptionId,
+      );
+      grouped.add(row.relatedRedemptionId);
+      if (siblings.length > 1) {
+        out.push({ kind: "group", redemptionId: row.relatedRedemptionId, rows: siblings });
+        continue;
+      }
+    }
+    out.push({ kind: "single", row });
+  }
+  return out;
 }
 
 function DailyInterestLedgerContent() {
@@ -47,6 +77,14 @@ function DailyInterestLedgerContent() {
     setPage(1);
   };
   const [exporting, setExporting] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
+  const toggleGroup = (redemptionId: number) =>
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(redemptionId)) next.delete(redemptionId);
+      else next.add(redemptionId);
+      return next;
+    });
 
   const exportToExcel = async () => {
     setExporting(true);
@@ -127,6 +165,107 @@ function DailyInterestLedgerContent() {
     color: "#374151",
     borderBottom: "1px solid #f1f5f9",
   };
+
+  const displayRows = useMemo(
+    () => buildDisplayRows(result?.items ?? []),
+    [result],
+  );
+
+  function renderRow(row: DailyInterestItem, indent = false) {
+    return (
+      <tr
+        key={row.id}
+        style={{
+          background: indent
+            ? "#fff7f7"
+            : row.includedInMonthlyDistribution
+              ? "#f8fafc"
+              : undefined,
+        }}
+      >
+        <td style={{ padding: "11px 16px", whiteSpace: "nowrap" }}>
+          {!indent && row.applicationId ? (
+            <Link
+              href={`/applications/${row.applicationId}`}
+              style={{
+                color: "#b8923a",
+                textDecoration: "underline",
+                fontWeight: 600,
+                fontSize: 12,
+              }}
+            >
+              #{row.applicationId}
+            </Link>
+          ) : !indent ? (
+            <span style={{ color: "#cbd5e1", fontSize: 12 }}>—</span>
+          ) : null}
+        </td>
+        <td
+          style={{
+            ...td,
+            fontWeight: indent ? 400 : 600,
+            whiteSpace: "nowrap",
+            paddingLeft: indent ? 32 : td.padding,
+            fontSize: indent ? 12 : td.fontSize,
+            color: indent ? "#9ca3af" : td.color,
+          }}
+        >
+          {formatShortDate(row.date)}
+        </td>
+        <td style={td}>
+          {!indent && (
+            <>
+              <Link
+                href={`/investor-statements?userId=${row.userId}`}
+                style={{
+                  fontWeight: 600,
+                  color: "#1e293b",
+                  textDecoration: "underline",
+                }}
+                title="Open Investor Statement"
+              >
+                {row.userName || "—"}
+              </Link>
+              {row.userEmail && (
+                <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                  {row.userEmail}
+                </div>
+              )}
+            </>
+          )}
+        </td>
+        <td style={td}>
+          {!indent && <div style={{ fontWeight: 500 }}>{row.investorName}</div>}
+        </td>
+        <td style={{ ...td, textAlign: "center" }}>{row.units}</td>
+        <td style={td}>${row.capital.toLocaleString()}</td>
+        <td style={{ ...td, color: "#6b7280" }}>
+          {(row.annualRate * 100).toFixed(0)}%
+        </td>
+        <td style={{ ...td, fontWeight: 700, color: "#0e3416" }}>
+          ${row.netInterest.toFixed(4)}
+        </td>
+        <td style={{ ...td, textAlign: "center" }}>
+          <span
+            style={{
+              padding: "2px 8px",
+              borderRadius: 4,
+              fontSize: 11,
+              fontWeight: 600,
+              background: row.includedInMonthlyDistribution
+                ? "#f0fdf4"
+                : "#fef9c3",
+              color: row.includedInMonthlyDistribution
+                ? "#15803d"
+                : "#854d0e",
+            }}
+          >
+            {row.includedInMonthlyDistribution ? "Yes" : "Pending"}
+          </span>
+        </td>
+      </tr>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -397,100 +536,118 @@ function DailyInterestLedgerContent() {
                       </td>
                     </tr>
                   )}
-                  {result?.items.map((row) => (
-                    <tr
-                      key={row.id}
-                      style={{
-                        background: row.includedInMonthlyDistribution
-                          ? "#f8fafc"
-                          : undefined,
-                      }}
-                    >
-                      <td
-                        style={{ padding: "11px 16px", whiteSpace: "nowrap" }}
-                      >
-                        {row.applicationId ? (
-                          <Link
-                            href={`/applications/${row.applicationId}`}
-                            style={{
-                              color: "#b8923a",
-                              textDecoration: "underline",
-                              fontWeight: 600,
-                              fontSize: 12,
-                            }}
-                          >
-                            #{row.applicationId}
-                          </Link>
-                        ) : (
-                          <span style={{ color: "#cbd5e1", fontSize: 12 }}>
-                            —
-                          </span>
-                        )}
-                      </td>
-                      <td
-                        style={{
-                          ...td,
-                          fontWeight: 600,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {formatShortDate(row.date)}
-                      </td>
-                      <td style={td}>
-                        <Link
-                          href={`/investor-statements?userId=${row.userId}`}
-                          style={{
-                            fontWeight: 600,
-                            color: "#1e293b",
-                            textDecoration: "underline",
-                          }}
-                          title="Open Investor Statement"
+                  {displayRows.map((entry) => {
+                    if (entry.kind === "single") return renderRow(entry.row);
+
+                    const { redemptionId, rows } = entry;
+                    const isExpanded = expandedGroups.has(redemptionId);
+                    const first = rows[0];
+                    const dates = rows.map((r) => r.date).sort();
+                    const minDate = dates[0];
+                    const maxDate = dates[dates.length - 1];
+                    const totalNetInterest = rows.reduce((s, r) => s + r.netInterest, 0);
+                    const allIncluded = rows.every((r) => r.includedInMonthlyDistribution);
+                    const anyIncluded = rows.some((r) => r.includedInMonthlyDistribution);
+
+                    return (
+                      <Fragment key={`group-${redemptionId}`}>
+                        <tr
+                          onClick={() => toggleGroup(redemptionId)}
+                          style={{ background: "#fef2f2", cursor: "pointer" }}
                         >
-                          {row.userName || "—"}
-                        </Link>
-                        {row.userEmail && (
-                          <div style={{ fontSize: 11, color: "#9ca3af" }}>
-                            {row.userEmail}
-                          </div>
-                        )}
-                      </td>
-                      <td style={td}>
-                        <div style={{ fontWeight: 500 }}>
-                          {row.investorName}
-                        </div>
-                      </td>
-                      <td style={{ ...td, textAlign: "center" }}>
-                        {row.units}
-                      </td>
-                      <td style={td}>${row.capital.toLocaleString()}</td>
-                      <td style={{ ...td, color: "#6b7280" }}>
-                        {(row.annualRate * 100).toFixed(0)}%
-                      </td>
-                      <td style={{ ...td, fontWeight: 700, color: "#0e3416" }}>
-                        ${row.netInterest.toFixed(4)}
-                      </td>
-                      <td style={{ ...td, textAlign: "center" }}>
-                        <span
-                          style={{
-                            padding: "2px 8px",
-                            borderRadius: 4,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            background: row.includedInMonthlyDistribution
-                              ? "#f0fdf4"
-                              : "#fef9c3",
-                            color: row.includedInMonthlyDistribution
-                              ? "#15803d"
-                              : "#854d0e",
-                          }}
-                        >
-                          {row.includedInMonthlyDistribution
-                            ? "Yes"
-                            : "Pending"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                          <td style={{ padding: "11px 16px", whiteSpace: "nowrap" }}>
+                            {first.applicationId ? (
+                              <Link
+                                href={`/applications/${first.applicationId}`}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  color: "#b8923a",
+                                  textDecoration: "underline",
+                                  fontWeight: 600,
+                                  fontSize: 12,
+                                }}
+                              >
+                                #{first.applicationId}
+                              </Link>
+                            ) : (
+                              <span style={{ color: "#cbd5e1", fontSize: 12 }}>—</span>
+                            )}
+                          </td>
+                          <td style={{ ...td, fontWeight: 600, whiteSpace: "nowrap" }}>
+                            <span style={{ marginRight: 6, color: "#b91c1c" }}>
+                              {isExpanded ? "▾" : "▸"}
+                            </span>
+                            {formatShortDate(minDate)} – {formatShortDate(maxDate)}
+                            <div style={{ fontSize: 10, fontWeight: 400, color: "#b91c1c" }}>
+                              Redemption #{redemptionId} adjustment · {rows.length} days
+                            </div>
+                          </td>
+                          <td style={td}>
+                            <Link
+                              href={`/investor-statements?userId=${first.userId}`}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                fontWeight: 600,
+                                color: "#1e293b",
+                                textDecoration: "underline",
+                              }}
+                              title="Open Investor Statement"
+                            >
+                              {first.userName || "—"}
+                            </Link>
+                            {first.userEmail && (
+                              <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                                {first.userEmail}
+                              </div>
+                            )}
+                          </td>
+                          <td style={td}>
+                            <div style={{ fontWeight: 500 }}>{first.investorName}</div>
+                          </td>
+                          <td style={{ ...td, textAlign: "center" }}>
+                            {first.units}
+                            <div style={{ fontSize: 10, color: "#9ca3af" }}>/day</div>
+                          </td>
+                          <td style={td}>
+                            ${first.capital.toLocaleString()}
+                            <div style={{ fontSize: 10, color: "#9ca3af" }}>/day</div>
+                          </td>
+                          <td style={{ ...td, color: "#6b7280" }}>
+                            {(first.annualRate * 100).toFixed(0)}%
+                          </td>
+                          <td style={{ ...td, fontWeight: 700, color: "#0e3416" }}>
+                            ${totalNetInterest.toFixed(4)}
+                            <div style={{ fontSize: 10, fontWeight: 400, color: "#9ca3af" }}>
+                              total
+                            </div>
+                          </td>
+                          <td style={{ ...td, textAlign: "center" }}>
+                            <span
+                              style={{
+                                padding: "2px 8px",
+                                borderRadius: 4,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                background: allIncluded
+                                  ? "#f0fdf4"
+                                  : anyIncluded
+                                    ? "#fef3c7"
+                                    : "#fef9c3",
+                                color: allIncluded
+                                  ? "#15803d"
+                                  : anyIncluded
+                                    ? "#92400e"
+                                    : "#854d0e",
+                              }}
+                            >
+                              {allIncluded ? "Yes" : anyIncluded ? "Partial" : "Pending"}
+                            </span>
+                          </td>
+                        </tr>
+                        {isExpanded && rows.map((r) => renderRow(r, true))}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
