@@ -64,6 +64,8 @@ function DailyInterestLedgerContent() {
     const v = searchParams.get("included");
     return v ? [v] : [];
   });
+  // Excluded by default, matching the Dashboard/Fund Capital Ledger's "Accrued & Unpaid" figure.
+  const [includeTestUsers, setIncludeTestUsers] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortOn, setSortOn] = useState("date");
@@ -96,6 +98,7 @@ function DailyInterestLedgerContent() {
     if (from) params.from = from;
     if (to) params.to = to;
     if (included.length === 1) params.included = included[0];
+    if (includeTestUsers) params.includeTestUsers = true;
     const r = await adminApi.dailyInterestLogs(params);
     if (r.success) {
       const headers = [
@@ -154,13 +157,14 @@ function DailyInterestLedgerContent() {
     if (from) params.from = from;
     if (to) params.to = to;
     if (included.length === 1) params.included = included[0];
+    if (includeTestUsers) params.includeTestUsers = true;
     adminApi
       .dailyInterestLogs(params)
       .then((r) => {
         if (r.success) setResult(r.data);
       })
       .finally(() => setLoading(false));
-  }, [page, effectivePageSize, appId, from, to, included, sortOn, sortDirection]);
+  }, [page, effectivePageSize, appId, from, to, included, includeTestUsers, sortOn, sortDirection]);
 
   useEffect(() => {
     load();
@@ -367,6 +371,30 @@ function DailyInterestLedgerContent() {
             }}
             minWidth={220}
           />
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "9px 12px",
+              border: "1.5px solid #e2e8f0",
+              borderRadius: 8,
+              fontSize: 13,
+              color: "#475569",
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={includeTestUsers}
+              onChange={(e) => {
+                setIncludeTestUsers(e.target.checked);
+                setPage(1);
+              }}
+            />
+            Include test users
+          </label>
           <button
             onClick={exportToExcel}
             disabled={exporting}
@@ -384,13 +412,14 @@ function DailyInterestLedgerContent() {
           >
             {exporting ? "Exporting…" : "↓ Export"}
           </button>
-          {(appId || from || to || hasMultiFilterValue(included)) && (
+          {(appId || from || to || hasMultiFilterValue(included) || includeTestUsers) && (
             <button
               onClick={() => {
                 setAppId("");
                 setFrom("");
                 setTo("");
                 setIncluded([]);
+                setIncludeTestUsers(false);
                 setPage(1);
               }}
               style={{

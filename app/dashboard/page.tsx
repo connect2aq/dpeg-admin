@@ -448,7 +448,8 @@ export default function DashboardPage() {
               <KpiCard
                 label="Accrued & Unpaid"
                 value={fmt(stats.totalPendingAccruals)}
-                sub="Pending daily accruals, not yet distributed"
+                breakdown="Pending daily accruals, not yet distributed"
+                sub="Current balance — not scoped to date range"
                 color="#7c3aed"
                 href="/daily-interest-ledger?included=false"
               />
@@ -459,7 +460,8 @@ export default function DashboardPage() {
                     ? fmt(sponsorsEquity.total)
                     : "No transactions yet"
                 }
-                sub="From bank transactions — view in Bank Capital Ledger"
+                breakdown="From bank transactions"
+                sub="Current balance — not scoped to date range"
                 color="#699172"
                 href={
                   sponsorsEquity
