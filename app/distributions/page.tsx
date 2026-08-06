@@ -983,6 +983,10 @@ function DistributionsContent() {
             <br />
             Preview shows projected amounts without saving. Execute saves
             records and lets you push to Odoo.
+            <br />
+            A month with nothing owed (e.g. fully redeemed) still needs
+            Execute to settle its daily ledger — no payout record is created
+            for it.
           </div>
           <div
             style={{
@@ -1265,6 +1269,10 @@ function DistributionsContent() {
                           {r.alreadyRan ? (
                             <span style={{ fontSize: 12, color: "#94a3b8" }}>
                               Skipped
+                            </span>
+                          ) : r.zeroSettlement ? (
+                            <span style={{ fontSize: 12, color: "#64748b" }}>
+                              No payout — settles ledger
                             </span>
                           ) : runMode === "preview" ? (
                             <span style={{ fontSize: 12, color: "#64748b" }}>

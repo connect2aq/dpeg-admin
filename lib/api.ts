@@ -1033,6 +1033,7 @@ export interface DistributionRunResult {
   bankName: string;
   bankAccountNumber: string;
   alreadyRan: boolean;
+  zeroSettlement: boolean;
   distributionLogId: number | null;
 }
 
