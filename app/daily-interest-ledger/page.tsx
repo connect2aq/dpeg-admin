@@ -133,11 +133,20 @@ function DailyInterestLedgerContent() {
     setExporting(false);
   };
 
+  // Adjustment-row grouping (buildDisplayRows) only sees whatever's in the current page of
+  // results — if a redemption's correction window straddles a page boundary, the group silently
+  // shows fewer days than it actually covers. When a single application is selected, that's a
+  // small, bounded dataset, so fetch it in full (skip real pagination) instead of risking a
+  // truncated group. Without an App ID filter, real pagination still applies — grouping across
+  // many investors' interleaved rows can't make this same guarantee.
+  const GROUPING_SAFE_PAGE_SIZE = 2000;
+  const effectivePageSize = appId ? GROUPING_SAFE_PAGE_SIZE : pageSize;
+
   const load = useCallback(() => {
     setLoading(true);
     const params: QueryParams = {
-      page,
-      pageSize,
+      page: appId ? 1 : page,
+      pageSize: effectivePageSize,
       sortOn,
       sortDirection,
     };
@@ -151,13 +160,13 @@ function DailyInterestLedgerContent() {
         if (r.success) setResult(r.data);
       })
       .finally(() => setLoading(false));
-  }, [page, pageSize, appId, from, to, included, sortOn, sortDirection]);
+  }, [page, effectivePageSize, appId, from, to, included, sortOn, sortDirection]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const totalPages = result ? Math.ceil(result.totalCount / pageSize) : 1;
+  const totalPages = result ? Math.ceil(result.totalCount / effectivePageSize) : 1;
 
   const td: React.CSSProperties = {
     padding: "10px 14px",
@@ -652,29 +661,40 @@ function DailyInterestLedgerContent() {
               </table>
             </div>
 
-            <PaginationControls
-              page={page}
-              totalPages={totalPages}
-              onPageChange={setPage}
-              pageSize={pageSize}
-              onPageSizeChange={(next) => {
-                setPage(1);
-                setPageSize(next);
-              }}
-              pageSizeOptions={PAGE_SIZE_OPTIONS}
-              containerStyle={{ justifyContent: "center", marginTop: 20 }}
-              buttonStyle={{
-                padding: "6px 14px",
-                border: "1px solid #e2e8f0",
-                borderRadius: 6,
-                fontSize: 13,
-              }}
-              inputStyle={{ width: 64, padding: "6px 8px" }}
-            />
-            <p style={{ marginTop: 10, fontSize: 13, color: "#94a3b8" }}>
-              {result?.totalCount ?? 0} total record
-              {result?.totalCount !== 1 ? "s" : ""}
-            </p>
+            {appId ? (
+              <p style={{ marginTop: 10, fontSize: 13, color: "#94a3b8" }}>
+                Showing all {result?.totalCount ?? 0} record
+                {result?.totalCount !== 1 ? "s" : ""} for App #{appId} (paging
+                is disabled for a single-application view so adjustment
+                groupings are never split across pages).
+              </p>
+            ) : (
+              <>
+                <PaginationControls
+                  page={page}
+                  totalPages={totalPages}
+                  onPageChange={setPage}
+                  pageSize={pageSize}
+                  onPageSizeChange={(next) => {
+                    setPage(1);
+                    setPageSize(next);
+                  }}
+                  pageSizeOptions={PAGE_SIZE_OPTIONS}
+                  containerStyle={{ justifyContent: "center", marginTop: 20 }}
+                  buttonStyle={{
+                    padding: "6px 14px",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 6,
+                    fontSize: 13,
+                  }}
+                  inputStyle={{ width: 64, padding: "6px 8px" }}
+                />
+                <p style={{ marginTop: 10, fontSize: 13, color: "#94a3b8" }}>
+                  {result?.totalCount ?? 0} total record
+                  {result?.totalCount !== 1 ? "s" : ""}
+                </p>
+              </>
+            )}
           </>
         )}
       </div>
