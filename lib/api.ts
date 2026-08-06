@@ -8,6 +8,7 @@ import {
   pendingChangesPath,
   pendingCountsPath,
   auditLogsPath,
+  dailyInterestAuditPath,
   distributionsPath,
   capitalLedgerPath,
   usersPath,
@@ -743,6 +744,12 @@ export const adminApi = {
       `/daily-interest?${q}`,
     );
   },
+  dailyInterestAudits: (
+    params: QueryParams,
+  ): Promise<ApiResponse<PagedResult<DailyInterestAuditItem>>> =>
+    api.get<ApiResponse<PagedResult<DailyInterestAuditItem>>>(
+      dailyInterestAuditPath(params),
+    ),
   pushDailyInterestToOdoo: (id: number) =>
     api.post<ApiResponse<{ message: string }>>(
       `/daily-interest/${id}/push-to-odoo`,
@@ -1067,6 +1074,39 @@ export interface ZeroLogIncludeFixResult {
   distinctApplications: number;
   dryRun: boolean;
   apps: ZeroLogIncludeAppSummary[];
+}
+
+export interface DailyInterestAuditItem {
+  id: number;
+  timestampUtc: string;
+  dailyInterestLogId: number;
+  applicationId: number;
+  userId: number;
+  correlationId: string;
+  changeType: string; // "Created" | "Updated" | "Deleted" | "TriggerError"
+  source: string;
+  reason?: string;
+  actorUserId?: number;
+  actorEmail?: string;
+  actorRole?: string;
+  oldDate?: string;
+  newDate?: string;
+  oldUnits?: number;
+  newUnits?: number;
+  oldCapital?: number;
+  newCapital?: number;
+  oldAnnualRate?: number;
+  newAnnualRate?: number;
+  oldNetInterest?: number;
+  newNetInterest?: number;
+  oldOdooInterestId?: string;
+  newOdooInterestId?: string;
+  oldOdooStatus?: string;
+  newOdooStatus?: string;
+  oldOdooResponseMsg?: string;
+  newOdooResponseMsg?: string;
+  oldIncludedInMonthlyDistribution?: boolean;
+  newIncludedInMonthlyDistribution?: boolean;
 }
 
 export interface StatementListItem {

@@ -6,9 +6,11 @@ import { PaginationControls } from "@/components/PaginationControls";
 import { SortableTh } from "@/components/SortableTh";
 import {
   adminApi,
+  type DailyInterestAuditItem,
   type DailyInterestItem,
   type DailyInterestPagedResult,
   type DeleteDailyInterestPreviewResult,
+  type PagedResult,
   type ResetMonthResult,
   type ZeroLogIncludeFixResult,
 } from "@/lib/api";
@@ -45,6 +47,15 @@ type ResetMonthModalState =
   | { phase: "done"; result: ResetMonthResult };
 
 export default function DailyInterestPage() {
+  const [activeTab, setActiveTab] = useState<"logs" | "audit">("logs");
+  const [auditLogIdFilter, setAuditLogIdFilter] = useState<number | null>(
+    null,
+  );
+  const viewHistory = (logId: number) => {
+    setAuditLogIdFilter(logId);
+    setActiveTab("audit");
+  };
+
   const [result, setResult] = useState<DailyInterestPagedResult | null>(
     null,
   );
@@ -299,6 +310,44 @@ export default function DailyInterestPage() {
           Daily interest accrual records per investor application.
         </p>
 
+        <div style={{ display: "flex", gap: 6, marginBottom: 20, borderBottom: "1px solid #e2e8f0" }}>
+          {(
+            [
+              { key: "logs", label: "Daily Interest Logs" },
+              { key: "audit", label: "Audit History" },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.key}
+              onClick={() => {
+                setActiveTab(t.key);
+                if (t.key === "logs") setAuditLogIdFilter(null);
+              }}
+              style={{
+                padding: "10px 18px",
+                border: "none",
+                borderBottom: activeTab === t.key ? "2px solid #b8923a" : "2px solid transparent",
+                background: "transparent",
+                fontSize: 14,
+                fontWeight: 600,
+                color: activeTab === t.key ? "#0f2342" : "#64748b",
+                cursor: "pointer",
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === "audit" && (
+          <DailyInterestAuditTab
+            initialLogId={auditLogIdFilter}
+            onClearLogFilter={() => setAuditLogIdFilter(null)}
+          />
+        )}
+
+        {activeTab === "logs" && (
+        <>
         {/* Fix: zero-value logs stuck as "Pending" */}
         <div
           style={{
@@ -1022,13 +1071,14 @@ export default function DailyInterestPage() {
                       sortDirection={sortDirection}
                       onSort={toggleSort}
                     />
+                    <th>History</th>
                   </tr>
                 </thead>
                 <tbody>
                   {result?.items.length === 0 && (
                     <tr>
                       <td
-                        colSpan={10}
+                        colSpan={11}
                         style={{
                           ...td,
                           textAlign: "center",
@@ -1152,6 +1202,25 @@ export default function DailyInterestPage() {
                               : "Pending"}
                           </span>
                         </td>
+                        <td style={{ ...td, textAlign: "center" }}>
+                          <button
+                            type="button"
+                            onClick={() => viewHistory(row.id)}
+                            style={{
+                              padding: "3px 10px",
+                              background: "#f5f3ff",
+                              border: "1px solid #ddd6fe",
+                              borderRadius: 5,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: "#6d28d9",
+                              cursor: "pointer",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            History
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -1184,10 +1253,12 @@ export default function DailyInterestPage() {
             </p>
           </>
         )}
+        </>
+        )}
       </div>
 
       {/* Reset Month confirmation modal */}
-      {(resetModal.phase === "confirm" || resetModal.phase === "resetting") && (
+      {activeTab === "logs" && (resetModal.phase === "confirm" || resetModal.phase === "resetting") && (
         <div
           style={{
             position: "fixed",
@@ -1342,7 +1413,7 @@ export default function DailyInterestPage() {
       )}
 
       {/* Delete confirmation modal */}
-      {(deleteModal.phase === "confirm" ||
+      {activeTab === "logs" && (deleteModal.phase === "confirm" ||
         deleteModal.phase === "deleting") && (
         <div
           style={{
@@ -1598,5 +1669,370 @@ export default function DailyInterestPage() {
         </div>
       )}
     </AdminLayout>
+  );
+}
+
+// ── Audit History tab ────────────────────────────────────────────────────
+// Read-only — populated exclusively by the trg_DailyInterestLog_Audit database trigger, so
+// every change shows up here regardless of whether it went through this app at all (a raw
+// SQL UPDATE run directly against the DB is captured too, just with Source = "Unattributed").
+
+const AUDIT_DEFAULT_PAGE_SIZE = 25;
+
+function DiffCell({
+  oldVal,
+  newVal,
+  format,
+}: {
+  oldVal: unknown;
+  newVal: unknown;
+  format?: (v: unknown) => string;
+}) {
+  if (oldVal == null && newVal == null) {
+    return <span style={{ color: "#cbd5e1" }}>—</span>;
+  }
+  const fmt = format ?? ((v: unknown) => String(v));
+  return (
+    <span style={{ whiteSpace: "nowrap" }}>
+      {oldVal != null && (
+        <span style={{ color: "#991b1b", textDecoration: "line-through" }}>
+          {fmt(oldVal)}
+        </span>
+      )}
+      {oldVal != null && newVal != null && (
+        <span style={{ color: "#94a3b8", margin: "0 4px" }}>→</span>
+      )}
+      {newVal != null && (
+        <span style={{ color: "#15803d", fontWeight: 600 }}>{fmt(newVal)}</span>
+      )}
+    </span>
+  );
+}
+
+const CHANGE_TYPE_COLORS: Record<string, { bg: string; fg: string }> = {
+  Created: { bg: "#f0fdf4", fg: "#15803d" },
+  Updated: { bg: "#eff6ff", fg: "#1d4ed8" },
+  Deleted: { bg: "#fef2f2", fg: "#b91c1c" },
+  TriggerError: { bg: "#fef9c3", fg: "#854d0e" },
+};
+
+function DailyInterestAuditTab({
+  initialLogId,
+  onClearLogFilter,
+}: {
+  initialLogId: number | null;
+  onClearLogFilter: () => void;
+}) {
+  const [result, setResult] = useState<PagedResult<DailyInterestAuditItem> | null>(
+    null,
+  );
+  const [loading, setLoading] = useState(true);
+  const [logId, setLogId] = useState(initialLogId != null ? String(initialLogId) : "");
+  const [appId, setAppId] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [source, setSource] = useState("");
+  const [actorEmail, setActorEmail] = useState("");
+  const [changeType, setChangeType] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(AUDIT_DEFAULT_PAGE_SIZE);
+  const [sortOn, setSortOn] = useState("timestamp");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const toggleSort = (key: string) => {
+    if (sortOn === key) setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortOn(key);
+      setSortDirection("asc");
+    }
+    setPage(1);
+  };
+
+  // A different row's "History" click while already on this tab should re-seed the filter.
+  useEffect(() => {
+    setLogId(initialLogId != null ? String(initialLogId) : "");
+    setPage(1);
+  }, [initialLogId]);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    const params: QueryParams = { page, pageSize, sortOn, sortDirection };
+    if (logId) params.logId = logId;
+    if (appId) params.appId = appId;
+    if (from) params.from = from;
+    if (to) params.to = to;
+    if (source) params.source = source;
+    if (actorEmail) params.actorEmail = actorEmail;
+    if (changeType.length === 1) params.changeType = changeType[0];
+    adminApi
+      .dailyInterestAudits(params)
+      .then((r) => {
+        if (r.success) setResult(r.data);
+      })
+      .finally(() => setLoading(false));
+  }, [page, pageSize, logId, appId, from, to, source, actorEmail, changeType, sortOn, sortDirection]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const resetFilters = () => {
+    setLogId("");
+    setAppId("");
+    setFrom("");
+    setTo("");
+    setSource("");
+    setActorEmail("");
+    setChangeType([]);
+    setPage(1);
+    onClearLogFilter();
+  };
+
+  const totalPages = result ? Math.ceil(result.totalCount / pageSize) : 1;
+
+  const td: React.CSSProperties = {
+    padding: "8px 12px",
+    fontSize: 12,
+    color: "#374151",
+    borderBottom: "1px solid #f1f5f9",
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <input
+          type="number"
+          placeholder="Log ID"
+          value={logId}
+          onChange={(e) => {
+            setLogId(e.target.value);
+            setPage(1);
+          }}
+          style={{ padding: "9px 12px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 13, width: 110 }}
+        />
+        <input
+          type="number"
+          placeholder="Application ID"
+          value={appId}
+          onChange={(e) => {
+            setAppId(e.target.value);
+            setPage(1);
+          }}
+          style={{ padding: "9px 12px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 13, width: 150 }}
+        />
+        <input
+          type="date"
+          value={from}
+          onChange={(e) => {
+            setFrom(e.target.value);
+            setPage(1);
+          }}
+          style={{ padding: "9px 12px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 13 }}
+        />
+        <input
+          type="date"
+          value={to}
+          onChange={(e) => {
+            setTo(e.target.value);
+            setPage(1);
+          }}
+          style={{ padding: "9px 12px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 13 }}
+        />
+        <input
+          type="text"
+          placeholder="Source contains…"
+          value={source}
+          onChange={(e) => {
+            setSource(e.target.value);
+            setPage(1);
+          }}
+          style={{ padding: "9px 12px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 13, minWidth: 180 }}
+        />
+        <input
+          type="text"
+          placeholder="Actor email contains…"
+          value={actorEmail}
+          onChange={(e) => {
+            setActorEmail(e.target.value);
+            setPage(1);
+          }}
+          style={{ padding: "9px 12px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 13, minWidth: 180 }}
+        />
+        <MultiSelectFilter
+          allLabel="All Change Types"
+          buttonLabel="Change Type"
+          options={[
+            { value: "Created", label: "Created" },
+            { value: "Updated", label: "Updated" },
+            { value: "Deleted", label: "Deleted" },
+            { value: "TriggerError", label: "Trigger Error" },
+          ]}
+          selectedValues={changeType}
+          onChange={(next) => {
+            setChangeType(next);
+            setPage(1);
+          }}
+          minWidth={190}
+        />
+        {(logId || appId || from || to || source || actorEmail || hasMultiFilterValue(changeType)) && (
+          <button
+            onClick={resetFilters}
+            style={{
+              padding: "9px 14px",
+              background: "#f1f5f9",
+              color: "#475569",
+              border: "1.5px solid #e2e8f0",
+              borderRadius: 8,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            Reset
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <p style={{ color: "#64748b", fontSize: 14 }}>Loading…</p>
+      ) : (
+        <>
+          <div className="table-scroll">
+            <table style={{ minWidth: 1400 }}>
+              <thead>
+                <tr>
+                  <SortableTh label="Timestamp" sortKey="timestamp" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                  <SortableTh label="Log ID" sortKey="logid" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                  <SortableTh label="App ID" sortKey="appid" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                  <th>Type</th>
+                  <SortableTh label="Source" sortKey="source" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                  <SortableTh label="Actor" sortKey="actor" sortOn={sortOn} sortDirection={sortDirection} onSort={toggleSort} />
+                  <th>Units</th>
+                  <th>Capital</th>
+                  <th>Net Interest</th>
+                  <th>Odoo Status</th>
+                  <th>Distributed</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result?.items.length === 0 && (
+                  <tr>
+                    <td colSpan={11} style={{ ...td, textAlign: "center", color: "#9ca3af", padding: 32 }}>
+                      No audit records found.
+                    </td>
+                  </tr>
+                )}
+                {result?.items.map((row) => {
+                  const colors = CHANGE_TYPE_COLORS[row.changeType] ?? { bg: "#f1f5f9", fg: "#475569" };
+                  return (
+                    <tr key={row.id}>
+                      <td style={{ ...td, whiteSpace: "nowrap" }}>
+                        {new Date(row.timestampUtc).toLocaleString()}
+                      </td>
+                      <td style={td}>
+                        <button
+                          type="button"
+                          onClick={() => setLogId(String(row.dailyInterestLogId))}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                            color: "#6d28d9",
+                            textDecoration: "underline",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            fontSize: 12,
+                          }}
+                        >
+                          #{row.dailyInterestLogId}
+                        </button>
+                      </td>
+                      <td style={td}>
+                        <Link
+                          href={`/applications/${row.applicationId}`}
+                          style={{ color: "#b8923a", fontWeight: 600, textDecoration: "underline" }}
+                        >
+                          #{row.applicationId}
+                        </Link>
+                      </td>
+                      <td style={td}>
+                        <span
+                          style={{
+                            padding: "2px 8px",
+                            borderRadius: 4,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            background: colors.bg,
+                            color: colors.fg,
+                          }}
+                        >
+                          {row.changeType}
+                        </span>
+                      </td>
+                      <td style={{ ...td, whiteSpace: "nowrap" }}>{row.source}</td>
+                      <td style={td}>
+                        {row.actorEmail ? (
+                          <>
+                            <div style={{ fontWeight: 500 }}>{row.actorEmail}</div>
+                            {row.actorRole && (
+                              <div style={{ fontSize: 10, color: "#9ca3af" }}>{row.actorRole}</div>
+                            )}
+                          </>
+                        ) : (
+                          <span style={{ color: "#9ca3af" }}>System</span>
+                        )}
+                      </td>
+                      <td style={td}>
+                        <DiffCell oldVal={row.oldUnits} newVal={row.newUnits} />
+                      </td>
+                      <td style={td}>
+                        <DiffCell
+                          oldVal={row.oldCapital}
+                          newVal={row.newCapital}
+                          format={(v) => `$${(v as number).toLocaleString()}`}
+                        />
+                      </td>
+                      <td style={td}>
+                        <DiffCell
+                          oldVal={row.oldNetInterest}
+                          newVal={row.newNetInterest}
+                          format={(v) => `$${(v as number).toFixed(4)}`}
+                        />
+                      </td>
+                      <td style={td}>
+                        <DiffCell oldVal={row.oldOdooStatus} newVal={row.newOdooStatus} />
+                      </td>
+                      <td style={td}>
+                        <DiffCell
+                          oldVal={row.oldIncludedInMonthlyDistribution}
+                          newVal={row.newIncludedInMonthlyDistribution}
+                          format={(v) => (v ? "Yes" : "No")}
+                        />
+                      </td>
+                      <td style={{ ...td, maxWidth: 260 }} title={row.reason ?? ""}>
+                        {row.reason ?? "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ marginTop: 16 }}>
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={(n) => {
+                setPageSize(n);
+                setPage(1);
+              }}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+              summary={`${result?.totalCount ?? 0} audit record(s)`}
+            />
+          </div>
+        </>
+      )}
+    </div>
   );
 }

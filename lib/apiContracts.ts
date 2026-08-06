@@ -77,6 +77,11 @@ export function auditLogsPath(params: QueryParams): string {
   return `/audit-logs?${q}`;
 }
 
+export function dailyInterestAuditPath(params: QueryParams): string {
+  const q = buildQueryString(params);
+  return `/daily-interest/audit?${q}`;
+}
+
 export function distributionsPath(params: QueryParams): string {
   const q = buildQueryString(params);
   return `/distributions?${q}`;
