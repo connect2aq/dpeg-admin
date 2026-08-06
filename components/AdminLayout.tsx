@@ -14,9 +14,8 @@ const NAV = [
   { href: "/applications", label: "Applications", icon: "📋" },
   { href: "/redemptions", label: "Redemptions", icon: "↩" },
   { href: "/capital-ledger", label: "Fund Capital Ledger", icon: "⊞" },
-  { href: "/daily-interest", label: "Manage Daily Interest", icon: "%" },
+  { href: "/bank-capital-ledger", label: "Bank Capital Ledger", icon: "🏛" },
   { href: "/daily-interest-ledger", label: "Daily Interest Ledger", icon: "≡" },
-  { href: "/distributions", label: "Manage Distributions", icon: "$" },
   { href: "/pending-approvals", label: "Pending Approvals", icon: "⏳" },
   // { href: "/odoo-logs", label: "Odoo Logs", icon: "⇄" },
   { href: "/users", label: "Users", icon: "👤" },
@@ -25,8 +24,9 @@ const NAV = [
   { href: "/audit-log", label: "Audit Log", icon: "🔍" },
   { href: "/settings", label: "Settings", icon: "⚙" },
   { href: "/historical-import", label: "Historical Import", icon: "⬆" },
-  { href: "/bank-capital-ledger", label: "Bank Capital Ledger", icon: "🏛" },
   { href: "/bank-transactions", label: "Manage Bank Statements", icon: "🏦" },
+  { href: "/daily-interest", label: "Manage Daily Interest", icon: "%" },
+  { href: "/distributions", label: "Manage Distributions", icon: "$" },
   // { href: "/smtp-test", label: "SMTP Test", icon: "✉" },
 ];
 
