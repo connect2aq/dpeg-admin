@@ -101,6 +101,9 @@ export default function DailyInterestPage() {
   // Backfill missing daily interest (bulk catch-up)
   const [catchUpFrom, setCatchUpFrom] = useState(firstOfMonthStr());
   const [catchUpTo, setCatchUpTo] = useState(yesterdayStr());
+  const [catchUpMode, setCatchUpMode] = useState<"preview" | "execute" | null>(
+    null,
+  );
   const [catchUpLoading, setCatchUpLoading] = useState(false);
   const [catchUpResult, setCatchUpResult] = useState<{
     appsProcessed: number;
@@ -109,14 +112,17 @@ export default function DailyInterestPage() {
   } | null>(null);
   const [catchUpError, setCatchUpError] = useState<string | null>(null);
 
-  const handleCatchUp = async () => {
+  const runCatchUp = async (dryRun: boolean) => {
+    setCatchUpMode(dryRun ? "preview" : "execute");
     setCatchUpLoading(true);
     setCatchUpResult(null);
     setCatchUpError(null);
-    const r = await adminApi.runBulkCatchUp(catchUpFrom, catchUpTo);
+    const r = await adminApi.runBulkCatchUp(catchUpFrom, catchUpTo, dryRun);
     setCatchUpLoading(false);
-    if (r.success) setCatchUpResult(r.data);
-    else
+    if (r.success) {
+      setCatchUpResult(r.data);
+      if (!dryRun) load();
+    } else
       setCatchUpError("Catch-up failed. Check the date range and try again.");
   };
 
@@ -404,7 +410,8 @@ export default function DailyInterestPage() {
           <div style={{ fontSize: 13, color: "#78350f", marginBottom: 14 }}>
             Run this if daily interest logs are missing for a date range
             (e.g. newly activated investors). Creates logs for all active
-            investors where no log exists yet, and sends each one to Odoo.
+            investors where no log exists yet for that range. Preview shows
+            projected counts without saving; Execute creates the records.
           </div>
           <div
             style={{
@@ -451,7 +458,26 @@ export default function DailyInterestPage() {
               }}
             />
             <button
-              onClick={handleCatchUp}
+              onClick={() => runCatchUp(true)}
+              disabled={catchUpLoading}
+              style={{
+                padding: "9px 20px",
+                background: "#fffbeb",
+                color: "#92400e",
+                border: "1.5px solid #b45309",
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: catchUpLoading ? "not-allowed" : "pointer",
+                opacity: catchUpLoading ? 0.6 : 1,
+              }}
+            >
+              {catchUpLoading && catchUpMode === "preview"
+                ? "Running…"
+                : "Preview"}
+            </button>
+            <button
+              onClick={() => runCatchUp(false)}
               disabled={catchUpLoading}
               style={{
                 padding: "9px 20px",
@@ -465,7 +491,9 @@ export default function DailyInterestPage() {
                 opacity: catchUpLoading ? 0.6 : 1,
               }}
             >
-              {catchUpLoading ? "Running…" : "Run Catch-Up"}
+              {catchUpLoading && catchUpMode === "execute"
+                ? "Running…"
+                : "Execute"}
             </button>
           </div>
           {catchUpError && (
@@ -478,20 +506,32 @@ export default function DailyInterestPage() {
               <div
                 style={{
                   padding: "8px 14px",
-                  background: "#f0fdf4",
+                  background: catchUpMode === "preview" ? "#eff6ff" : "#f0fdf4",
                   borderRadius: 8,
                   fontSize: 13,
-                  color: "#15803d",
+                  color: catchUpMode === "preview" ? "#1d4ed8" : "#15803d",
                   fontWeight: 500,
                   display: "inline-block",
                 }}
               >
-                ✓ Catch-up complete — {catchUpResult.appsProcessed} investor
-                {catchUpResult.appsProcessed !== 1 ? "s" : ""} updated,{" "}
-                {catchUpResult.logsCreated} new log
-                {catchUpResult.logsCreated !== 1 ? "s" : ""} created.
-                {catchUpResult.logsCreated > 0 &&
-                  " Now go to Manage Distribution to preview updated amounts."}
+                {catchUpMode === "preview" ? (
+                  <>
+                    Preview — would update {catchUpResult.appsProcessed}{" "}
+                    investor{catchUpResult.appsProcessed !== 1 ? "s" : ""},
+                    creating {catchUpResult.logsCreated} new log
+                    {catchUpResult.logsCreated !== 1 ? "s" : ""}. Nothing has
+                    been saved yet — click Execute to apply.
+                  </>
+                ) : (
+                  <>
+                    ✓ Catch-up complete — {catchUpResult.appsProcessed}{" "}
+                    investor{catchUpResult.appsProcessed !== 1 ? "s" : ""}{" "}
+                    updated, {catchUpResult.logsCreated} new log
+                    {catchUpResult.logsCreated !== 1 ? "s" : ""} created.
+                    {catchUpResult.logsCreated > 0 &&
+                      " Now go to Manage Distribution to preview updated amounts."}
+                  </>
+                )}
               </div>
               {catchUpResult.errors?.length > 0 && (
                 <div

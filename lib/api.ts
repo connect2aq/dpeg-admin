@@ -846,14 +846,14 @@ export const adminApi = {
     api.delete<ApiResponse<string>>(`/redemptions/${id}`),
 
   // ── Bulk catch-up ─────────────────────────────────────────────────────
-  runBulkCatchUp: (from: string, to: string) =>
+  runBulkCatchUp: (from: string, to: string, dryRun = false) =>
     api.post<
       ApiResponse<{
         appsProcessed: number;
         logsCreated: number;
         errors: string[];
       }>
-    >("/distributions/catch-up", { from, to }),
+    >("/distributions/catch-up", { from, to, dryRun }),
 
   fixHistoricalCatchUp: (opts?: { applicationId?: number; dryRun?: boolean }) => {
     const params = new URLSearchParams();
