@@ -23,6 +23,17 @@ import Link from "next/link";
 
 const DEFAULT_PAGE_SIZE = 25;
 
+function firstOfMonthStr() {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split("T")[0];
+}
+
+function yesterdayStr() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split("T")[0];
+}
+
 type DeleteModalState =
   | { phase: "idle" }
   | { phase: "loading" }
@@ -86,6 +97,28 @@ export default function DailyInterestPage() {
     phase: "idle",
   });
   const [exporting, setExporting] = useState(false);
+
+  // Backfill missing daily interest (bulk catch-up)
+  const [catchUpFrom, setCatchUpFrom] = useState(firstOfMonthStr());
+  const [catchUpTo, setCatchUpTo] = useState(yesterdayStr());
+  const [catchUpLoading, setCatchUpLoading] = useState(false);
+  const [catchUpResult, setCatchUpResult] = useState<{
+    appsProcessed: number;
+    logsCreated: number;
+    errors: string[];
+  } | null>(null);
+  const [catchUpError, setCatchUpError] = useState<string | null>(null);
+
+  const handleCatchUp = async () => {
+    setCatchUpLoading(true);
+    setCatchUpResult(null);
+    setCatchUpError(null);
+    const r = await adminApi.runBulkCatchUp(catchUpFrom, catchUpTo);
+    setCatchUpLoading(false);
+    if (r.success) setCatchUpResult(r.data);
+    else
+      setCatchUpError("Catch-up failed. Check the date range and try again.");
+  };
 
   // Mark zero-value ("Pending" forever) logs as distribution-complete
   const [zeroFixLoading, setZeroFixLoading] = useState(false);
@@ -348,6 +381,162 @@ export default function DailyInterestPage() {
 
         {activeTab === "logs" && (
         <>
+        {/* Backfill missing daily interest (bulk catch-up) */}
+        <div
+          style={{
+            background: "#fefce8",
+            border: "1.5px solid #fde68a",
+            borderRadius: 12,
+            padding: "20px 24px",
+            marginBottom: 20,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              color: "#92400e",
+              marginBottom: 10,
+            }}
+          >
+            Backfill Missing Daily Interest
+          </div>
+          <div style={{ fontSize: 13, color: "#78350f", marginBottom: 14 }}>
+            Run this if daily interest logs are missing for a date range
+            (e.g. newly activated investors). Creates logs for all active
+            investors where no log exists yet, and sends each one to Odoo.
+          </div>
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <label style={{ fontSize: 13, color: "#78350f", fontWeight: 500 }}>
+              From
+            </label>
+            <input
+              type="date"
+              value={catchUpFrom}
+              onChange={(e) => {
+                setCatchUpFrom(e.target.value);
+                setCatchUpResult(null);
+              }}
+              style={{
+                padding: "9px 12px",
+                border: "1.5px solid #fde68a",
+                borderRadius: 8,
+                fontSize: 14,
+                background: "#fffbeb",
+              }}
+            />
+            <label style={{ fontSize: 13, color: "#78350f", fontWeight: 500 }}>
+              To
+            </label>
+            <input
+              type="date"
+              value={catchUpTo}
+              onChange={(e) => {
+                setCatchUpTo(e.target.value);
+                setCatchUpResult(null);
+              }}
+              style={{
+                padding: "9px 12px",
+                border: "1.5px solid #fde68a",
+                borderRadius: 8,
+                fontSize: 14,
+                background: "#fffbeb",
+              }}
+            />
+            <button
+              onClick={handleCatchUp}
+              disabled={catchUpLoading}
+              style={{
+                padding: "9px 20px",
+                background: "#b45309",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: catchUpLoading ? "not-allowed" : "pointer",
+                opacity: catchUpLoading ? 0.6 : 1,
+              }}
+            >
+              {catchUpLoading ? "Running…" : "Run Catch-Up"}
+            </button>
+          </div>
+          {catchUpError && (
+            <div style={{ marginTop: 10, fontSize: 13, color: "#dc2626" }}>
+              {catchUpError}
+            </div>
+          )}
+          {catchUpResult && (
+            <div style={{ marginTop: 10 }}>
+              <div
+                style={{
+                  padding: "8px 14px",
+                  background: "#f0fdf4",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: "#15803d",
+                  fontWeight: 500,
+                  display: "inline-block",
+                }}
+              >
+                ✓ Catch-up complete — {catchUpResult.appsProcessed} investor
+                {catchUpResult.appsProcessed !== 1 ? "s" : ""} updated,{" "}
+                {catchUpResult.logsCreated} new log
+                {catchUpResult.logsCreated !== 1 ? "s" : ""} created.
+                {catchUpResult.logsCreated > 0 &&
+                  " Now go to Manage Distribution to preview updated amounts."}
+              </div>
+              {catchUpResult.errors?.length > 0 && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    padding: "12px 16px",
+                    background: "#fef9c3",
+                    border: "1.5px solid #fbbf24",
+                    borderRadius: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#92400e",
+                      marginBottom: 6,
+                    }}
+                  >
+                    ⚠ {catchUpResult.errors.length} redemption
+                    {catchUpResult.errors.length !== 1 ? "s" : ""} skipped —
+                    EffectiveDate missing or invalid. Fix these records
+                    manually:
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {catchUpResult.errors.map((e, i) => (
+                      <li
+                        key={i}
+                        style={{
+                          fontSize: 12,
+                          color: "#78350f",
+                          marginBottom: 2,
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {e}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Fix: zero-value logs stuck as "Pending" */}
         <div
           style={{

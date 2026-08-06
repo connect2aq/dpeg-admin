@@ -61,17 +61,6 @@ function todayStr() {
   return new Date().toISOString().split("T")[0];
 }
 
-function firstOfMonthStr() {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split("T")[0];
-}
-
-function yesterdayStr() {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().split("T")[0];
-}
-
 export default function DistributionsPage() {
   return (
     <Suspense
@@ -143,17 +132,6 @@ function DistributionsContent() {
   const [expandedBankRows, setExpandedBankRows] = useState<Set<string>>(
     new Set(),
   );
-
-  // Catch-up state
-  const [catchUpFrom, setCatchUpFrom] = useState(firstOfMonthStr());
-  const [catchUpTo, setCatchUpTo] = useState(yesterdayStr());
-  const [catchUpLoading, setCatchUpLoading] = useState(false);
-  const [catchUpResult, setCatchUpResult] = useState<{
-    appsProcessed: number;
-    logsCreated: number;
-    errors: string[];
-  } | null>(null);
-  const [catchUpError, setCatchUpError] = useState<string | null>(null);
 
   // Scoped fix: preview then apply for one application at a time
   const [scopedFixAppId, setScopedFixAppId] = useState("");
@@ -385,17 +363,6 @@ function DistributionsContent() {
     }
   };
 
-  const handleCatchUp = async () => {
-    setCatchUpLoading(true);
-    setCatchUpResult(null);
-    setCatchUpError(null);
-    const r = await adminApi.runBulkCatchUp(catchUpFrom, catchUpTo);
-    setCatchUpLoading(false);
-    if (r.success) setCatchUpResult(r.data);
-    else
-      setCatchUpError("Catch-up failed. Check the date range and try again.");
-  };
-
   const handlePreview = async () => {
     setRunLoading(true);
     setRunMode("preview");
@@ -595,162 +562,6 @@ function DistributionsContent() {
         >
           Monthly Distributions
         </h1>
-
-        {/* Catch-Up Panel */}
-        <div
-          style={{
-            background: "#fefce8",
-            border: "1.5px solid #fde68a",
-            borderRadius: 12,
-            padding: "20px 24px",
-            marginBottom: 16,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 15,
-              fontWeight: 700,
-              color: "#92400e",
-              marginBottom: 10,
-            }}
-          >
-            Step 1 — Backfill Missing Daily Interest
-          </div>
-          <div style={{ fontSize: 13, color: "#78350f", marginBottom: 14 }}>
-            Run this first if daily interest logs are missing for a date range
-            (e.g. newly activated investors). Creates logs for all active
-            investors where no log exists yet, and sends each one to Odoo.
-          </div>
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <label style={{ fontSize: 13, color: "#78350f", fontWeight: 500 }}>
-              From
-            </label>
-            <input
-              type="date"
-              value={catchUpFrom}
-              onChange={(e) => {
-                setCatchUpFrom(e.target.value);
-                setCatchUpResult(null);
-              }}
-              style={{
-                padding: "9px 12px",
-                border: "1.5px solid #fde68a",
-                borderRadius: 8,
-                fontSize: 14,
-                background: "#fffbeb",
-              }}
-            />
-            <label style={{ fontSize: 13, color: "#78350f", fontWeight: 500 }}>
-              To
-            </label>
-            <input
-              type="date"
-              value={catchUpTo}
-              onChange={(e) => {
-                setCatchUpTo(e.target.value);
-                setCatchUpResult(null);
-              }}
-              style={{
-                padding: "9px 12px",
-                border: "1.5px solid #fde68a",
-                borderRadius: 8,
-                fontSize: 14,
-                background: "#fffbeb",
-              }}
-            />
-            <button
-              onClick={handleCatchUp}
-              disabled={catchUpLoading}
-              style={{
-                padding: "9px 20px",
-                background: "#b45309",
-                color: "#fff",
-                border: "none",
-                borderRadius: 8,
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: catchUpLoading ? "not-allowed" : "pointer",
-                opacity: catchUpLoading ? 0.6 : 1,
-              }}
-            >
-              {catchUpLoading ? "Running…" : "Run Catch-Up"}
-            </button>
-          </div>
-          {catchUpError && (
-            <div style={{ marginTop: 10, fontSize: 13, color: "#dc2626" }}>
-              {catchUpError}
-            </div>
-          )}
-          {catchUpResult && (
-            <div style={{ marginTop: 10 }}>
-              <div
-                style={{
-                  padding: "8px 14px",
-                  background: "#f0fdf4",
-                  borderRadius: 8,
-                  fontSize: 13,
-                  color: "#15803d",
-                  fontWeight: 500,
-                  display: "inline-block",
-                }}
-              >
-                ✓ Catch-up complete — {catchUpResult.appsProcessed} investor
-                {catchUpResult.appsProcessed !== 1 ? "s" : ""} updated,{" "}
-                {catchUpResult.logsCreated} new log
-                {catchUpResult.logsCreated !== 1 ? "s" : ""} created.
-                {catchUpResult.logsCreated > 0 &&
-                  " Now run Preview below to see updated amounts."}
-              </div>
-              {catchUpResult.errors?.length > 0 && (
-                <div
-                  style={{
-                    marginTop: 10,
-                    padding: "12px 16px",
-                    background: "#fef9c3",
-                    border: "1.5px solid #fbbf24",
-                    borderRadius: 8,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: "#92400e",
-                      marginBottom: 6,
-                    }}
-                  >
-                    ⚠ {catchUpResult.errors.length} redemption
-                    {catchUpResult.errors.length !== 1 ? "s" : ""} skipped —
-                    EffectiveDate missing or invalid. Fix these records
-                    manually:
-                  </div>
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {catchUpResult.errors.map((e, i) => (
-                      <li
-                        key={i}
-                        style={{
-                          fontSize: 12,
-                          color: "#78350f",
-                          marginBottom: 2,
-                          fontFamily: "monospace",
-                        }}
-                      >
-                        {e}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
 
         {/* Scoped Fix: single application preview + apply */}
         <div
@@ -1164,7 +975,7 @@ function DistributionsContent() {
               marginBottom: 14,
             }}
           >
-            Step 2 — Run Distribution
+            Step 1 — Run Distribution
           </div>
           <div style={{ fontSize: 13, color: "#64748b", marginBottom: 14 }}>
             Pick a date to calculate distributions for all active investors from
@@ -1239,7 +1050,13 @@ function DistributionsContent() {
         </div>
 
         {/* Run Results */}
-        {runResults !== null && (
+        {runResults !== null &&
+          (() => {
+            const visibleRunResults =
+              runMode === "preview"
+                ? runResults.filter((r) => !r.alreadyRan)
+                : runResults;
+            return (
           <div style={{ marginBottom: 32 }}>
             <div
               style={{
@@ -1332,6 +1149,7 @@ function DistributionsContent() {
                   <tr>
                     {[
                       "Investor",
+                      "App ID",
                       "Month",
                       "PPM",
                       "Days",
@@ -1346,10 +1164,10 @@ function DistributionsContent() {
                   </tr>
                 </thead>
                 <tbody>
-                  {runResults.length === 0 && (
+                  {visibleRunResults.length === 0 && (
                     <tr>
                       <td
-                        colSpan={10}
+                        colSpan={11}
                         style={{
                           ...colStyle,
                           textAlign: "center",
@@ -1361,7 +1179,7 @@ function DistributionsContent() {
                       </td>
                     </tr>
                   )}
-                  {runResults.map((r, i) => {
+                  {visibleRunResults.map((r, i) => {
                     const isPushed =
                       r.distributionLogId !== null &&
                       pushedIds.has(r.distributionLogId);
@@ -1416,6 +1234,7 @@ function DistributionsContent() {
                             </span>
                           )}
                         </td>
+                        <td style={colStyle}>{r.applicationId}</td>
                         <td style={{ ...colStyle, fontWeight: 500 }}>
                           {formatShortDate(r.distributionMonth)}
                         </td>
@@ -1607,7 +1426,8 @@ function DistributionsContent() {
               </table>
             </div>
           </div>
-        )}
+            );
+          })()}
 
         {/* Filters */}
         <div
