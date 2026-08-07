@@ -126,7 +126,10 @@ function DailyInterestLedgerContent() {
         d.units,
         d.capital,
         d.annualRate,
-        d.netInterest,
+        // netInterest is stored unrounded server-side so a month's rows sum to exactly what the
+        // monthly distribution pays. Exported at 4dp to match the on-screen column rather than
+        // dumping 14 decimals.
+        d.netInterest.toFixed(4),
         d.includedInMonthlyDistribution ? "Yes" : "No",
         d.odooStatus ?? "",
         formatShortDate(d.createdOn),
